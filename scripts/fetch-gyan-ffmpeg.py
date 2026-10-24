@@ -53,6 +53,11 @@ def main() -> None:
                 if matches:
                     with z.open(matches[0]) as source:
                         (OUTPUT / "licenses" / filename).write_bytes(source.read())
+    (OUTPUT / "licenses" / "DISTRIBUTION-NOTICE.txt").write_text(
+        "FFmpeg release essentials by gyan.dev. GPLv3 licensed distribution.\\n"
+        "See https://www.gyan.dev/ffmpeg/builds/ and https://ffmpeg.org/legal.html\\n",
+        encoding="utf-8",
+    )
     ffmpeg = OUTPUT / "bin" / "ffmpeg.exe"
     ffprobe = OUTPUT / "bin" / "ffprobe.exe"
     subprocess.run([str(ffmpeg), "-version"], check=True, capture_output=True)
