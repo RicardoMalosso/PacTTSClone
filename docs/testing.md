@@ -270,3 +270,20 @@ work must preserve these RC4 artifacts and use a new version for another install
 - Chromium test: a 31-second running setup displays the prompt, Yes opens the two-second progress window, then a locally served GIF, and reload never repeats the prompt.
 - Installer tests continue to verify shortcut startup, HTTP reachability, reinstall and uninstall on Windows. They do not reproduce a physically clean Windows installation.
 - Browser/installer CI bundles the GIF before running tests/building wheels. Verify `naturalWidth > 0` in Chromium and inspect the wheel before declaring artifact readiness.
+
+## GitHub Actions strategy (RC5)
+
+- **PR or main push:** `.github/workflows/tests.yml` starts with Python 3.12,
+  Ruff, Python compilation and workflow YAML parsing. A failing fast check prevents
+  expensive Windows downloads and integration tests from starting.
+- **After fast checks:** Chromium tests run independently. Windows FFmpeg/PCM
+  validation supplies a temporary artifact to the Windows/Linux, Python 3.11/3.12
+  core matrix. `fail-fast: false` preserves diagnostics for each platform.
+- **Avoid duplicate runs:** Feature branches run on pull requests, while only main
+  receives push runs. Superseded PR runs are cancelled. GitHub retains run history.
+- **Installer:** `.github/workflows/installer.yml` runs manually. It invokes the
+  full reusable test workflow first, and only then builds/tests the installer.
+  Preview artifacts last 14 days; diagnostic logs last 7 days.
+- **Release:** `publish_draft` is effective only on the main branch after all
+  tests and real Windows installation checks pass. Existing draft/published
+  releases are never deleted or overwritten. Builds are not cancelled mid-run.
