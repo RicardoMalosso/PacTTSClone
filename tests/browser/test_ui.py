@@ -141,6 +141,8 @@ def test_small_viewport_and_counter(page, live_app):
 
 def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     state = dict(ready=False, status="idle", stage="idle", completed_steps=0)
+    # The test mocks polling state; block the real SSE stream from overwriting it.
+    page.route("**/api/setup/stream", lambda route: route.abort())
     page.route("**/api/setup", lambda route: route.fulfill(json=state))
 
     def start(route):
