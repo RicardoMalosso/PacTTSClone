@@ -1,4 +1,5 @@
-param([string]$AppRoot = (Split-Path $PSScriptRoot -Parent), [Parameter(ValueFromRemainingArguments=$true)][string[]]$AppArguments)
+param([string]$AppRoot, [Parameter(ValueFromRemainingArguments=$true)][string[]]$AppArguments)
+if (-not $AppRoot) { $AppRoot = Split-Path (Split-Path -Parent $PSCommandPath) -Parent }
 . (Join-Path $PSScriptRoot 'common.ps1')
 try {
     $config = Get-Content -Raw -LiteralPath (Join-Path $AppRoot 'active.json') | ConvertFrom-Json

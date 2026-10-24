@@ -39,6 +39,11 @@ jobs:
       - name: Actual CPU install, HTTP launch, repeat setup and uninstall
         shell: powershell
         run: ./installer/test-install.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
+      - name: Print setup failure detail
+        if: failure()
+        shell: powershell
+        run: |
+          Get-ChildItem "$env:RUNNER_TEMP/PacTTSClone installation test" -Filter setup.log -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 160 }
       - name: Retain diagnostics
         if: always()
         uses: actions/upload-artifact@v4

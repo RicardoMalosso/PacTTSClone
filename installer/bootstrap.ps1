@@ -2,8 +2,9 @@ param(
     [Parameter(Mandatory=$true)][string]$AppRoot,
     [Parameter(Mandatory=$true)][string]$DataRoot,
     [ValidateSet('auto','cpu','cuda')][string]$Device = 'auto',
-    [string]$PayloadDir = $PSScriptRoot
+    [string]$PayloadDir
 )
+if (-not $PayloadDir) { $PayloadDir = Split-Path -Parent $PSCommandPath }
 . (Join-Path $PSScriptRoot 'common.ps1')
 Assert-SeparatePaths $AppRoot $DataRoot
 Set-LocalEnvironment $AppRoot $DataRoot
@@ -61,6 +62,7 @@ try {
     Move-Item -LiteralPath $temporaryConfig -Destination (Join-Path $AppRoot 'active.json') -Force
     Write-Host 'Setup complete. Start PacTTSClone from the Start menu.'
 } catch {
+    Write-Host $_.ScriptStackTrace
     Write-Host "Setup failed: $_`nLog: $log`nRerun setup to retry. Completed downloads are reused." -ForegroundColor Red
     exit 1
 } finally {

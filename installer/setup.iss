@@ -86,7 +86,7 @@ begin
   if DevicePage.SelectedValueIndex = 1 then Device := 'cpu';
   if DevicePage.SelectedValueIndex = 2 then Device := 'cuda';
   Args := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\bootstrap.ps1') +
-    '" -AppRoot "' + ExpandConstant('{app}') + '" -DataRoot "' + DataPage.Values[0] + '" -Device ' + Device;
+    '" -PayloadDir "' + ExpandConstant('{tmp}') + '" -AppRoot "' + ExpandConstant('{app}') + '" -DataRoot "' + DataPage.Values[0] + '" -Device ' + Device;
   WizardForm.StatusLabel.Caption := 'Downloading dependencies. Follow progress in the setup console. Closing it cancels setup.';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args,
     ExpandConstant('{app}'), SW_SHOW, ewWaitUntilTerminated, ExitCode) then
