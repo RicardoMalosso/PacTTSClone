@@ -10,7 +10,7 @@ paths are retained. App and data must not overlap. Uninstall retains user data.
 Small red bold labels show planning estimates, not guaranteed download sizes.
 The first page uses large red instructions and a five-second monotonic Next delay.
 
-Native setup bundles the application wheel and a minimal project-built FFmpeg,
+Native setup bundles the application wheel and a minimal SHA-256-verified gyan.dev FFmpeg Essentials,
 then downloads SHA-256-pinned uv, managed Python and base web packages only. No
 PyTorch, CUDA runtime or weights are installed here. Large caches/temp paths are
 redirected to data. Windows/Inno may use small system-drive temporary files.
