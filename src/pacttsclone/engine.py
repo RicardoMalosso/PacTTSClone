@@ -65,7 +65,12 @@ class OmniVoiceEngine:
         if not self.asr_loaded:
             self.model.load_asr_model(model_name=self.settings.asr_model, device="cpu")
             self.asr_loaded = True
-        return self.model.transcribe(reference)
+        import soundfile as sf
+
+        # The worker has already decoded and validated reference.wav. Pass PCM
+        # directly so Transformers does not launch a second FFmpeg decoder.
+        samples, sample_rate = sf.read(reference, dtype="float32")
+        return self.model.transcribe((samples, sample_rate))
 
     def synthesize(self, reference: str, request: GenerationRequest) -> Waveform:
         try:
