@@ -143,7 +143,9 @@ def test_first_setup_blocks_generation_and_survives_interrupt(tmp_path, monkeypa
             == 200
         )
         deadline = time.monotonic() + 5
-        while not setup.snapshot()["lines"] and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            if any("installing" in line for line in setup.snapshot()["lines"]):
+                break
             time.sleep(0.01)
         assert any("installing" in line for line in setup.snapshot()["lines"])
         assert (
