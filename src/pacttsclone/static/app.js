@@ -444,16 +444,24 @@ $('general-form').addEventListener('submit', action(async event => {
 $('prepare-voices').addEventListener('click', () => tab('voices'));
 
 const countermeasureKey = 'pactts-initial-setup-countermeasures-v1';
-let countermeasureClaimed = false;
+let countermeasureClaimed = false, countermeasurePromptOpen = false;
 try { countermeasureClaimed = localStorage.getItem(countermeasureKey) === '1'; } catch { /* storage optional */ }
 function claimCountermeasures() {
   countermeasureClaimed = true;
+  countermeasurePromptOpen = false;
   try { localStorage.setItem(countermeasureKey, '1'); } catch { /* storage optional */ }
   $('setup-too-long').hidden = true;
 }
 function refreshCountermeasurePrompt() {
-  $('setup-too-long').hidden = countermeasureClaimed || runtimeSetup.status !== 'running' ||
-    !runtimeSetup.started_at || Date.now() / 1000 - runtimeSetup.started_at < 30;
+  const eligible = runtimeSetup.status === 'running' && !runtimeSetup.initial_setup_completed &&
+    runtimeSetup.started_at && Date.now() / 1000 - runtimeSetup.started_at >= 30;
+  if (!countermeasureClaimed && !countermeasurePromptOpen && eligible) {
+    countermeasurePromptOpen = true;
+    countermeasureClaimed = true; // mark consumed on appearance, even across reload/cancel
+    try { localStorage.setItem(countermeasureKey, '1'); } catch { /* optional */ }
+  }
+  if (runtimeSetup.status !== 'running') countermeasurePromptOpen = false;
+  $('setup-too-long').hidden = !countermeasurePromptOpen;
 }
 function closeCountermeasures() { $('countermeasure-modal').hidden = true; }
 $('setup-too-long-no').addEventListener('click', claimCountermeasures);
