@@ -70,5 +70,11 @@ def test_default_prepare_once_and_preserve_edits(tmp_path, engine, monkeypatch):
             studio.store.get("voice", voice["id"])["transcript"] == "My exact reference transcript."
         )
         assert restarted.pending() == []
+        generated = studio.voices.generate(
+            voice["id"], GenerationRequest(text="Prepared default voice")
+        )
+        finished = wait_job(restarted, generated["id"])
+        assert finished["status"] == "succeeded"
+        assert finished["request"]["ref_text"] == "My exact reference transcript."
     finally:
         studio.close()
