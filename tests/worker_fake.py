@@ -1,3 +1,4 @@
+import signal
 import time
 
 import numpy as np
@@ -18,3 +19,10 @@ class ProcessFakeEngine:
         if request.text == "hang":
             time.sleep(30)
         return Waveform(np.sin(np.arange(24000) * 0.1) * 0.1, 24000)
+
+
+class InterruptCheckingEngine(ProcessFakeEngine):
+    def __init__(self, settings):
+        assert signal.getsignal(signal.SIGINT) == signal.SIG_IGN
+        signal.raise_signal(signal.SIGINT)
+        super().__init__(settings)

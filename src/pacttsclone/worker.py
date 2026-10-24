@@ -185,6 +185,9 @@ def execute_task(engine, settings, task, emit):
 
 
 def worker_main(settings, commands, events, engine_factory):
+    # Windows broadcasts console Ctrl+C to parent and spawned children. The web
+    # server owns shutdown; the worker exits via its sentinel or hard termination.
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     if os.name == "posix":
         os.setsid()
     settings = Settings(**settings)

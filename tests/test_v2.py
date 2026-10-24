@@ -21,7 +21,7 @@ from pacttsclone.twitch import TwitchClient, parse_irc
 from pacttsclone.worker import ProcessRunner
 
 from .conftest import wait_job
-from .worker_fake import ProcessFakeEngine
+from .worker_fake import InterruptCheckingEngine, ProcessFakeEngine
 
 
 def wait_until(check, timeout=10):
@@ -577,3 +577,37 @@ def test_general_player_api_and_shared_audio_acl(tmp_path, engine, mp3):
             ).status_code
             == 422
         )
+
+
+def test_spawn_worker_ignores_ctrl_c_and_exits_cleanly(tmp_path, mp3):
+    settings = Settings(data_dir=tmp_path / "ctrl-c")
+    runner = ProcessRunner(settings, engine_factory=InterruptCheckingEngine)
+    service = GenerationService(settings, runner=runner)
+    try:
+        with mp3.open("rb") as ref:
+            job = service.submit(
+                ref, GenerationRequest(text="survives interrupt", ref_text="known")
+            )
+        assert wait_job(service, job["id"])["status"] == "succeeded"
+        pid = runner.pid
+        assert pid is not None
+        # The constructor above delivers SIGINT on Windows and POSIX. Also check
+        # the actual idle queue wait via a process-directed signal on POSIX.
+        import os
+        import signal
+
+        if os.name == "posix":
+            os.kill(pid, signal.SIGINT)
+        with mp3.open("rb") as ref:
+            second = service.submit(ref, GenerationRequest(text="still works", ref_text="known"))
+        assert wait_job(service, second["id"])["status"] == "succeeded"
+        assert runner.pid == pid
+        process = runner.process
+        process.close = lambda: None  # Retain exitcode after reset for assertion.
+        runner.reset()
+        assert process.exitcode == 0
+        del process.close
+        process.close()
+        assert runner.pid is None
+    finally:
+        service.close()

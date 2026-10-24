@@ -107,3 +107,14 @@ Twitch policy compliance or detect every evasion.
   separate control routing; language persistence and live dropdown refresh.
 - No new real-model/GPU/network performance claim is made by these fake-engine
   regression tests. Prior real CPU evidence remains above.
+
+## Ctrl+C shutdown follow-up — 2026-10-24
+
+The user's Windows console broadcast SIGINT to the idle spawned worker, which
+printed KeyboardInterrupt at commands.get() although the server shut down.
+The worker now ignores SIGINT immediately; server-controlled sentinel/hard-stop
+shutdown remains authoritative. Actual spawned regression verifies child SIGINT
+handling, same-PID subsequent generation and exit code zero on graceful reset.
+All 117 backend tests, Ruff checks/formatting and diff checks passed locally.
+Physical Windows Ctrl+C delivery remains a Windows acceptance check; the regression
+checks the installed signal handler inside a real child on both CI platforms.

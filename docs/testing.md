@@ -60,3 +60,10 @@ A physical Windows global keypress (including while a game is focused), real OBS
 CEF source and GTX 1660 SUPER VRAM/latency are manual/hardware acceptance items.
 Native message-loop simulation and Windows CI cover code paths but do not establish
 physical-key delivery or GPU compatibility.
+
+Console-interrupt regression uses a real spawned test engine: verifies SIGINT is
+ignored before initialization, raises SIGINT in that child on Windows/POSIX, and
+on POSIX also delivers SIGINT while it waits for the next command. A second job
+must reuse that PID, then sentinel shutdown must exit with code zero. Existing
+hard cancellation/recovery tests still run. This is not a physical Windows console
+keypress test.

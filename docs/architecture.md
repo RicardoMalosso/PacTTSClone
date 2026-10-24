@@ -84,3 +84,11 @@ playback is enabled. `/playbackMain/control` selects general controls; the playe
 is `/playbackMain`. Optional tunnel sharing includes this destination. Its player
 capability can retrieve only successful audio explicitly assigned to that FIFO,
 not every completed job in the studio.
+
+### Console shutdown
+
+The spawned inference worker ignores SIGINT before initializing the engine. On
+Windows console Ctrl+C reaches both server and child; only the server owns the
+shutdown lifecycle. Idle workers exit via the existing command sentinel, while
+active jobs are cancelled through bounded process-tree termination. This avoids
+an idle `commands.get()` KeyboardInterrupt traceback without changing cancellation.
