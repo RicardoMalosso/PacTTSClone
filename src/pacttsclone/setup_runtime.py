@@ -280,20 +280,71 @@ class RuntimeSetup:
                 env=env,
             )
             process = self.process
-        for line in process.stdout:
-            line = line.rstrip("\r\n")
+        last_package = None
+        last_sample_bytes = 0
+        last_sample_at = time.monotonic()
+        for raw_line in process.stdout:
+            line = raw_line.rstrip("\r\n")
             timestamp = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-            log.write(f"[{timestamp}] {line}\n")
+            formatted = f"[{timestamp}] {line}"
+            log.write(formatted + "\n")
             log.flush()
             if line.startswith("@@PACTTS_SETUP@@"):
                 self.update(**json.loads(line[len("@@PACTTS_SETUP@@") :]))
                 continue
-            if self.state.get("stage") in {"pytorch", "inference"} and (
-                "Downloading " in line or "Prepared " in line or "Installed " in line
-            ):
-                self.update(dependency_progress={"message": line, "timestamp": time.time()})
+            if self.state.get("stage") in {"pytorch", "inference"}:
+                package = re.match(r"\s*(?:Downloading|Using cached)\s+(.+)", line)
+                if package:
+                    last_package = package.group(1)
+                    last_sample_bytes = 0
+                    last_sample_at = time.monotonic()
+                    self.update(
+                        dependency_progress={
+                            "package": last_package,
+                            "message": line.strip(),
+                            "phase": "downloading",
+                            "timestamp": time.time(),
+                        }
+                    )
+                else:
+                    progress = re.match(r"^Progress (\d+) of (\d+)$", line.strip())
+                    if progress:
+                        current, total = map(int, progress.groups())
+                        now = time.monotonic()
+                        elapsed = now - last_sample_at
+                        speed = max(0, current - last_sample_bytes) / elapsed if elapsed > 0 else 0
+                        self.update(
+                            dependency_progress={
+                                "package": last_package,
+                                "message": last_package or "Downloading package",
+                                "phase": "downloading",
+                                "downloaded_bytes": current,
+                                "total_bytes": total,
+                                "percent": round(100 * current / total, 1) if total else None,
+                                "speed_bytes_per_second": round(speed) if speed else None,
+                                "eta_seconds": (
+                                    round((total - current) / speed)
+                                    if total and speed else None
+                                ),
+                                "timestamp": time.time(),
+                            }
+                        )
+                        last_sample_at = now
+                        last_sample_bytes = current
+                    elif "Installing collected packages" in line:
+                        self.update(dependency_progress={
+                            "message": line.strip(),
+                            "phase": "installing",
+                            "timestamp": time.time(),
+                        })
+                    elif "Successfully installed" in line:
+                        self.update(dependency_progress={
+                            "message": line.strip(),
+                            "phase": "complete",
+                            "timestamp": time.time(),
+                        })
             with self.lock:
-                self.lines.append(f"[{timestamp}] {line}")
+                self.lines.append(formatted)
                 self.lines = self.lines[-500:]
             if self.cancelled.is_set():
                 self._kill()
