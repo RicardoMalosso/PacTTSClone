@@ -15,7 +15,7 @@ explicitly injected fake engine tests selecting MP3, generating, downloading,
 native player controls, stop, error rendering and autoplay handling. It verifies
 the app pipeline and UI, not synthesized voice quality.
 
-CI: Linux and Windows Python 3.11, FFmpeg, lint and non-model tests; browser on
+CI: Linux and Windows Python 3.11/3.12, FFmpeg, lint and non-model tests; browser on
 Linux. Never silently skip required FFmpeg tests. Browser suite is opt-in locally
 and is explicitly selected in its CI job.
 

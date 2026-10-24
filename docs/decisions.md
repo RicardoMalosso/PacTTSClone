@@ -28,6 +28,21 @@
 8. License distinction: upstream code Apache-2.0; pretrained model CC-BY-NC per
    model card. Future monetized streamer deployment must resolve model licensing.
    Do not apply a project-wide license to third-party weights.
+9. Standard deployment is an isolated Python venv, confirmed with the user.
+   No Docker/container service in v1. Engine module provides the requested code
+   separation without adding a deployment layer.
+10. Export at 48 kHz / 192 kbps MP3; OmniVoice's native 24 kHz is resampled only
+    for encoding. A real FFmpeg test showed MPEG-2 at 24 kHz caps at 160 kbps.
+    Resampling does not add source detail; it satisfies the MP3 bitrate contract.
+11. Standard installer uses Python 3.12, the version used for local validation.
+    Pin transformers 5.20.2 and torch/torchaudio 2.8.0 in the inference extra;
+    CUDA/CPU wheel index is still explicitly selected before installing it.
+    PyPI OmniVoice 0.2.1 wheel was downloaded without dependencies and its API
+    inspected, confirming `asr_device`, `load_asr_model(device=...)`, and generation
+    arguments rather than assuming the development branch matched the release.
+12. Pin Playwright 1.56.0, which supplied a working Chromium download in this
+    environment. Browser tests use a real loopback HTTP server and ignore external
+    proxy variables only for their loopback readiness probe.
 
 ## Pre-implementation consistency review
 

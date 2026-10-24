@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+test-results/
+playwright-report/
+*.mp3
+*.wav
+*.pt
+*.safetensors
+.env

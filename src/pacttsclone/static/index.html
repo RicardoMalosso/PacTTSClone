@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PacTTSClone · Estúdio local</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><div class="brand">PAC<span>TTS</span>CLONE</div><span class="badge">● ESTÚDIO LOCAL</span></header>
+    <section class="intro"><p class="eyebrow">SUA REFERÊNCIA. UM NOVO TEXTO.</p><h1>Dê voz às suas palavras.</h1>
+      <p>Crie um MP3 com OmniVoice, usando o processamento do seu computador.</p></section>
+    <p id="health" class="notice" role="status">Verificando ambiente…</p>
+    <div class="workspace">
+      <form id="generate-form">
+        <section class="card"><h2><span class="number">01</span> Voz de referência</h2>
+          <label class="upload" for="reference"><strong>Escolha um arquivo MP3</strong><span>Fala limpa · recomendado 3–10 s · até 20 MiB</span>
+            <input id="reference" name="reference" type="file" accept=".mp3,audio/mpeg" required></label>
+          <label for="ref-text">O que é dito na referência <span class="muted">opcional</span></label>
+          <textarea id="ref-text" name="ref_text" rows="2" maxlength="4000" placeholder="Digite a transcrição exata, ou deixe em branco para transcrever localmente."></textarea>
+        </section>
+        <section class="card"><h2><span class="number">02</span> Texto para gerar</h2>
+          <label for="text">O que a voz deve dizer?</label>
+          <textarea id="text" name="text" rows="6" maxlength="2000" required placeholder="Escreva seu texto aqui…"></textarea>
+          <div class="below"><span>Pontuação ajuda a orientar a entonação.</span><span id="count">0 / 2000</span></div>
+          <details><summary>Ajustes de geração</summary><div class="settings">
+            <label for="language">Idioma<select id="language" name="language"><option value="pt">Português</option><option value="en">Inglês</option><option value="auto">Automático</option></select></label>
+            <label for="speed">Velocidade<input id="speed" name="speed" type="number" min="0.5" max="1.5" step="0.05" value="1"></label>
+            <label for="steps">Passos<input id="steps" name="steps" type="number" min="4" max="64" step="1" value="32"></label>
+          </div><p class="muted">Menos passos reduz o trabalho de geração e pode alterar a qualidade.</p></details>
+          <button id="generate" type="submit" disabled>Gerar MP3 <span>↗</span></button>
+        </section>
+      </form>
+      <aside><section class="card result"><p class="eyebrow">SEU ÁUDIO</p><h2>Ouça o resultado.</h2>
+        <div class="sound" aria-hidden="true">▂ ▅ ▃ █ ▆ ▂ ▄ ▇ ▃ ▅ ▂</div>
+        <p id="status" role="status" aria-live="polite">Seu MP3 aparecerá aqui após a geração.</p>
+        <p id="error" class="error" role="alert" hidden></p>
+        <audio id="player" controls preload="metadata" hidden></audio>
+        <div id="actions" hidden><button id="stop" type="button" class="secondary">Parar / voltar ao início</button>
+          <a id="download" class="download" download>Baixar MP3 ↓</a></div>
+        <label class="check"><input id="autoplay" type="checkbox"> Tocar automaticamente ao terminar</label>
+        <p id="playback-note" class="muted" role="status"></p>
+      </section><p class="footnote">A primeira geração baixa os modelos e pode demorar. Os MP3s ficam na pasta de saída local até você removê-los.</p></aside>
+    </div>
+    <footer>PacTTSClone <span>OmniVoice / k2-fsa · v0.1</span></footer>
+  </main>
+</body>
+</html>

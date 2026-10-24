@@ -15,7 +15,7 @@ First inference downloads public model assets; cached use can be offline.
 | R1 | Accept MP3 reference up to 20 MiB; decode and validate 1–30 s of mono audio; recommend 3–10 s. Invalid audio produces an actionable error. |
 | R2 | Require nonempty target text, maximum 2,000 characters. Default language Portuguese (`pt`); also offer English and automatic. |
 | R3 | Optional transcript: blank invokes local Whisper on CPU; supplied transcript avoids loading Whisper. |
-| R4 | Produce a valid MP3 at 192 kbps in the configured local outputs directory. Output names are generated identifiers; failed jobs leave no partial result. |
+| R4 | Produce a valid MP3 at 48 kHz / 192 kbps in the configured local outputs directory. Output names are generated identifiers; failed jobs leave no partial result. |
 | R5 | Show processing state and failure reason without blocking the HTTP server. Only one job is accepted at a time; busy requests fail explicitly. |
 | R6 | Playback uses native audio controls plus stop/restart; optional autoplay reports when the browser blocks it. Download works independently of autoplay. |
 | R7 | Bind to 127.0.0.1 only; validate Host/Origin; require a per-process session token for mutation. No remote inference or uploading recordings to third parties. |
