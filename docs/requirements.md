@@ -45,3 +45,7 @@ R18: Seed user-provided Akuma Lady, Dilma, Chrétien and lula references once, w
 inference on startup. Explicit first-use preparation with progress/cancel/retry and
 persisted transcript; only ready voices selectable for generation/chat. Preserve
 edits/deletions across upgrades. Parent-folder shortcut starts installed app.
+
+R19: Report a bug tab embeds the supplied video only after explicit activation and
+a three-second delay, requests autoplay, cancels/unloads on exit, and provides a
+manual-play/direct-link fallback. No initial YouTube embed/network request.

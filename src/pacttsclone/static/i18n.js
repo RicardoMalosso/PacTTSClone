@@ -1,6 +1,14 @@
 'use strict';
 (() => {
   const pt = {
+    'Report a bug': 'Relatar um problema',
+    'Watch the bug reporting guide.': 'Assista ao guia para relatar problemas.',
+    'Bug reporting guide': 'Guia para relatar problemas',
+    'The video loads three seconds after you open this tab.': 'O vídeo carrega três segundos depois de abrir esta aba.',
+    'Starting the video in three seconds…': 'O vídeo começará em três segundos…',
+    'If autoplay is blocked, press play in the video.': 'Se a reprodução automática for bloqueada, aperte play no vídeo.',
+    'Watch on YouTube ↗': 'Assistir no YouTube ↗',
+
     'unprepared': 'não preparada',
     'Prepare for first use': 'Preparar para o primeiro uso',
     'Retry preparation': 'Tentar preparação novamente',

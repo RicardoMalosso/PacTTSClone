@@ -5,10 +5,11 @@ const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
+let bugVideoTimer = null, bugVideoOpen = false;
 let completedJob = null;
 let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
 let voicesKey = '', historyKey = '', channelKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
-function stopAllAudio() { document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
+function stopAllAudio() { stopBugVideo(); document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -39,8 +40,29 @@ async function api(url, options = {}) {
   }
   return response.json();
 }
+function stopBugVideo() {
+  clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false;
+  $('bug-video').replaceChildren();
+  window.Locale.bind($('bug-video-status'), 'The video loads three seconds after you open this tab.');
+}
+function openBugVideo() {
+  if (bugVideoOpen) return;
+  bugVideoOpen = true;
+  window.Locale.bind($('bug-video-status'), 'Starting the video in three seconds…');
+  bugVideoTimer = setTimeout(() => {
+    bugVideoTimer = null;
+    if (!bugVideoOpen || $('pane-bugs').hidden) return;
+    $('bug-video').append(el('iframe', {
+      src: 'https://www.youtube-nocookie.com/embed/b2eEl2oKXLA?autoplay=1&rel=0',
+      title: t('Bug reporting guide'), allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
+      allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin'
+    }));
+    window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
+  }, 3000);
+}
 function tab(name) {
   window.Locale.apply();
+  if (name === 'bugs') openBugVideo(); else stopBugVideo();
   const general = name === 'general';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
@@ -322,6 +344,7 @@ async function init() {
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
 window.addEventListener('localechange', () => {
+  const guide = $('bug-video').querySelector('iframe'); if (guide) guide.title = t('Bug reporting guide');
   document.querySelectorAll('.resources strong').forEach(node => { node.textContent = t(node.textContent); });
   $('hotkey-status').textContent = t(state.hotkey_status || '');
   const drafts = [...document.querySelectorAll('.voice-card')].map(card => ({id: card.dataset.voiceId, title: card.querySelector('input')?.value, transcript: card.querySelector('textarea')?.value}));

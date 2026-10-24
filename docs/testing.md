@@ -100,3 +100,9 @@ run 40112512318 passed all five jobs (Windows/Linux 3.11/3.12 and Chromium).
 Local total: 119 backend tests, 16 browser tests. The release installer/wheel
 checksums and embedded default-reference catalog hashes were independently checked.
 Preparation tests use an explicit test engine; FFmpeg reference validation is real.
+
+Bug-guide browser regression intercepts the external iframe with a local stub and
+uses the browser clock to assert no initial embed/request, no frame before 3000ms,
+correct embed/autoplay delegation after the delay, cancellation before timeout,
+frame removal on exit and PT-BR labels. This validates embed lifecycle, not actual
+YouTube playback availability, embedding permissions or browser autoplay policy.

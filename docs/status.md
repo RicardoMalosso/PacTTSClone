@@ -187,3 +187,11 @@ and first-use UI progress/cancel controls. The default voice generation path was
 also exercised with an explicit test engine. All four references were verified
 inside the release wheel against their catalog hashes. No real ASR accuracy or
 new GPU performance claim is inferred from these application tests.
+
+## RC3 bug guide — implementation checkpoint
+
+Added localized Report a bug tab for the user-supplied b2eEl2oKXLA video. The embed
+is absent initially, starts after a three-second user-triggered delay, requests
+autoplay and unloads on tab exit/panic. Cancellation and manual-play/direct-link
+fallback are explicit. No automatic report/log submission. Browser lifecycle tests
+use a stubbed external frame; real YouTube playback is not asserted by those tests.

@@ -112,3 +112,13 @@ existing isolated transcription job; pending actions are idempotent, completion
 saves the transcript, and only ready voices can generate/be assigned to commands.
 UI distinguishes not prepared, preparing, ready and retryable failure/cancellation,
 with per-card progress/cancel and a Generate-to-Voices preparation link.
+
+## Bug reporting video
+
+The Report a bug pane lazily creates a youtube-nocookie iframe for b2eEl2oKXLA
+three seconds after explicit tab activation. No embed exists at initial load.
+A single tracked timer is cancelled on tab exit; removing the iframe stops media.
+Panic also unloads it. Repeated activation of an already-open tab does not create
+duplicate players. Autoplay is delegated/requested, with manual play/direct-link
+fallback for browser policy. UI locale changes update labels without reloading
+an already-playing video. There is no report submission or background log upload.

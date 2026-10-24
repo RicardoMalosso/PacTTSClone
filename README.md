@@ -23,7 +23,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.2.exe` when the preview is available. Draft releases are
+`PacTTSClone-Setup-0.3.0-rc.3.exe` when the preview is available. Draft releases are
 visible only to repository collaborators with the appropriate access; a private
 repository does not provide public downloads.
 
@@ -236,3 +236,11 @@ Whisper download. API/OBS use polling, compatible with Quick Tunnels' lack of SS
 
 Upstream code: Apache-2.0. OmniVoice pretrained weights: CC-BY-NC per its model
 card; commercial deployment requires resolving that separate model license.
+
+## Report a bug
+
+Open **Report a bug** to watch the project guide. Its YouTube embed loads only after
+opening the tab and waiting three seconds, then requests autoplay. Leaving the tab
+stops/unloads it and cancels any pending start. Press play manually if browser
+policy blocks autoplay; a direct YouTube link is also provided. This user-requested
+video uses the internet and does not automatically submit reports or upload logs.

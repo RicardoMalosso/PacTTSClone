@@ -380,3 +380,44 @@ def test_default_voice_first_use_preparation(page, live_server, monkeypatch):
     page.reload()
     expect(page.locator("#generate")).to_be_enabled()
     assert len(app.state.service.history()) == 1
+
+
+def test_bug_video_lazy_delay_cancel_and_locale(page, live_server):
+    url, _ = live_server
+    requests = []
+
+    def video_route(route):
+        requests.append(route.request.url)
+        route.fulfill(status=200, content_type="text/html", body="<p>Video embed test stub</p>")
+
+    page.route("https://www.youtube-nocookie.com/**", video_route)
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.clock.install()
+    page.clock.run_for(3500)
+    assert requests == []
+    page.locator('[data-tab="bugs"]').click()
+    page.clock.run_for(2999)
+    expect(page.locator("#bug-video iframe")).to_have_count(0)
+    page.clock.run_for(1)
+    frame = page.locator("#bug-video iframe")
+    expect(frame).to_have_attribute(
+        "src", "https://www.youtube-nocookie.com/embed/b2eEl2oKXLA?autoplay=1&rel=0"
+    )
+    expect(frame).to_have_attribute(
+        "allow", "autoplay; encrypted-media; picture-in-picture; fullscreen"
+    )
+    page.locator('[data-tab="voices"]').click()
+    expect(frame).to_have_count(0)
+    page.locator('[data-tab="bugs"]').click()
+    page.clock.run_for(2000)
+    page.locator('[data-tab="studio"]').click()
+    page.clock.run_for(2000)
+    expect(frame).to_have_count(0)
+    page.locator('[data-locale="pt"]').click()
+    expect(page.locator('[data-tab="bugs"]')).to_have_text("Relatar um problema")
+    page.locator('[data-tab="bugs"]').click()
+    page.clock.run_for(3000)
+    expect(frame).to_have_attribute("title", "Guia para relatar problemas")
+    page.locator('[data-tab="studio"]').click()
+    page.unroute_all(behavior="wait")
