@@ -360,6 +360,20 @@ class RuntimeSetup:
             with self.log_path.open("a", encoding="utf-8") as log:
                 log.write(f"\n[{datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')}] Setup requested: {device}\n")
                 self.update(model_ids=self.state.get("model_ids") or list(self.model_ids))
+                # uv venvs omit pip, so install pip once into the private runtime.
+                # This is only a dependency-installer bootstrap; the app stays local.
+                if importlib.util.find_spec("pip") is None:
+                    uv = os.environ.get("PACTTS_SETUP_UV")
+                    if uv and Path(uv).is_file():
+                        self._run_command(
+                            [uv, "pip", "install", "--python", sys.executable, "pip>=25,<27"],
+                            log,
+                        )
+                    else:
+                        self._run_command(
+                            [sys.executable, "-m", "ensurepip", "--upgrade"], log
+                        )
+                    importlib.invalidate_caches()
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
