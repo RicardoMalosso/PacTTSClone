@@ -2,6 +2,7 @@
 const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
+let modelDownloaded = 0, modelSession = null, setupEventsConnected = false;
 const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -32,6 +33,13 @@ function action(fn) { return async event => { try { await fn(event); } catch (e)
 function button(text, fn, cls = 'secondary small-button') { return window.Locale.bind(el('button', {type: 'button', class: cls, onclick: action(fn)}), text); }
 function link(text, href, download = false) { return window.Locale.bind(el('a', {href, ...(download ? {download: ''} : {target: '_blank', rel: 'noopener noreferrer'})}), text); }
 function bytes(value) { return value == null ? t('N/A') : `${(value / 1073741824).toFixed(2)} GiB`; }
+function formatTransferBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return 'N/A';
+  if (value < 1024) return Math.round(value) + ' B';
+  if (value < 1048576) return (value / 1024).toFixed(1) + ' KiB';
+  if (value < 1073741824) return (value / 1048576).toFixed(1) + ' MiB';
+  return (value / 1073741824).toFixed(2) + ' GiB';
+}
 function duration(value) { const n = Math.max(0, value || 0); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${(n % 60).toFixed(1).padStart(4, '0')}`; }
 async function api(url, options = {}) {
   const opts = {cache: 'no-store', ...options};
@@ -145,6 +153,11 @@ function renderMonitor(job) {
   $('report').textContent = JSON.stringify({elapsed_seconds: job.elapsed_seconds, device: job.device, ...job.metrics}, null, 2);
 }
 setInterval(() => {
+  if (runtimeSetup.status === 'running' && runtimeSetup.started_at) {
+    $('live-generation-timer').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
+    $('setup-elapsed').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
+    refreshCountermeasurePrompt();
+  }
   if (!lastMonitor) return;
   const delta = lastMonitor.status === 'running' ? (performance.now() - lastMonitorAt) / 1000 : 0;
   $('timer').textContent = duration((lastMonitor.elapsed_seconds || 0) + delta);
@@ -373,9 +386,18 @@ async function init() {
     $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
-    await runtimeStatus(); await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
+    await runtimeStatus();
+    if (!session?.remote_access && 'EventSource' in window) {
+      const setupEvents = new EventSource('/api/setup/stream');
+      setupEvents.onopen = () => { setupEventsConnected = true; };
+      setupEvents.onmessage = event => {
+        try { renderSetup(JSON.parse(event.data)); } catch (e) { console.warn('Setup stream:', e); }
+      };
+      setupEvents.onerror = () => { setupEventsConnected = false; };
+    }
+    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
     $('generate').disabled = !runtimeSetup.ready;
-    const loop = async () => { try { await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
+    const loop = async () => { try { if (!setupEventsConnected) await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
     const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
@@ -428,9 +450,58 @@ $('general-form').addEventListener('submit', action(async event => {
 
 $('prepare-voices').addEventListener('click', () => tab('voices'));
 
+let countermeasurePromptOpen = false, countermeasureOfferPending = false;
+function claimCountermeasures() {
+  // The backend permanently claimed this prompt when it was displayed.
+  countermeasurePromptOpen = false;
+  $('setup-too-long').hidden = true;
+}
+function refreshCountermeasurePrompt() {
+  const eligible = runtimeSetup.status === 'running' && !runtimeSetup.initial_setup_completed &&
+    !runtimeSetup.countermeasures_offered && runtimeSetup.started_at &&
+    Date.now() / 1000 - runtimeSetup.started_at >= 30;
+  if (eligible && !countermeasureOfferPending && !countermeasurePromptOpen) {
+    countermeasureOfferPending = true;
+    api('/api/setup/countermeasures/offer', {method: 'POST'}).then(result => {
+      if (result.offered && runtimeSetup.status === 'running') {
+        countermeasurePromptOpen = true;
+        $('setup-too-long').hidden = false;
+      }
+    }).catch(error => console.warn('Countermeasures prompt:', error))
+      .finally(() => { countermeasureOfferPending = false; });
+  }
+  if (runtimeSetup.status !== 'running') countermeasurePromptOpen = false;
+  $('setup-too-long').hidden = !countermeasurePromptOpen;
+}
+function closeCountermeasures() { $('countermeasure-modal').hidden = true; }
+$('setup-too-long-no').addEventListener('click', claimCountermeasures);
+$('setup-too-long-close').addEventListener('click', claimCountermeasures);
+$('setup-too-long-yes').addEventListener('click', async () => {
+  claimCountermeasures();
+  $('countermeasure-modal').hidden = false;
+  $('countermeasure-loading').hidden = false;
+  $('countermeasure-image').hidden = true;
+  const bar = $('countermeasure-bar');
+  bar.value = 0;
+  const started = performance.now();
+  while (!($('countermeasure-modal').hidden) && performance.now() - started < 2000) {
+    bar.value = Math.min(100, (performance.now() - started) / 20);
+    await sleep(40);
+  }
+  if ($('countermeasure-modal').hidden) return;
+  bar.value = 100;
+  $('countermeasure-loading').hidden = true;
+  $('countermeasure-image').hidden = false;
+});
+$('countermeasure-close').addEventListener('click', closeCountermeasures);
+
 function renderSetup(data) {
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
+  if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
+  if (data.stage === 'models' && data.download?.total_bytes) {
+    modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
+  }
   document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
   $('generate').disabled = busy || !data.ready;
   renderGlobalStatus();
@@ -442,11 +513,42 @@ function renderSetup(data) {
   $('setup-status').textContent = data.ready ? t('Setup ready. You can open the studio.') : t('Setup stage: ') + t(data.stage || 'idle');
   $('setup-error').hidden = !data.error;
   $('setup-error').textContent = data.error ? t(data.error) : '';
-  $('setup-log').textContent = (data.lines || []).join('\n');
+  const logPanel = $('setup-log');
+  const follow = logPanel.scrollTop + logPanel.clientHeight >= logPanel.scrollHeight - 36;
+  logPanel.textContent = (data.lines || []).join('\n');
+  if (follow) logPanel.scrollTop = logPanel.scrollHeight;
+  if (data.started_at) $('setup-elapsed').textContent = duration((data.finished_at || Date.now() / 1000) - data.started_at);
+  refreshCountermeasurePrompt();
   const d = data.download;
   $('setup-file-progress').hidden = !d;
-  if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.file_bytes || 0; }
-  $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : t('Package installation has no reliable byte total; technical details show actual activity.');
+  if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.phase?.startsWith('verifying') ? (d.file_total || 1) : (d.file_bytes || 0); }
+  const isDependency = data.stage === 'pytorch' || data.stage === 'inference';
+  const p = isDependency ? data.dependency_progress : null;
+  $('setup-package-status').textContent = isDependency ?
+    (p?.message || 'Preparing dependency downloads — resolving package information') : '';
+  $('setup-dependency-progress').hidden = !isDependency;
+  if (isDependency) {
+    const bar = $('setup-dependency-progress');
+    if (p?.total_bytes > 0 && p.downloaded_bytes != null) {
+      bar.max = p.total_bytes;
+      bar.value = Math.min(p.downloaded_bytes, p.total_bytes);
+      $('setup-dependency-metrics').textContent =
+        `${p.percent?.toFixed(1) ?? '0.0'}% · ${formatTransferBytes(p.downloaded_bytes)} / ${formatTransferBytes(p.total_bytes)}` +
+        (p.speed_bytes_per_second ? ` · ${formatTransferBytes(p.speed_bytes_per_second)}/s` : '') +
+        (p.eta_seconds != null ? ` · ~${Math.round(p.eta_seconds)} s remaining` : '');
+    } else {
+      bar.removeAttribute('value');
+      $('setup-dependency-metrics').textContent = p?.phase === 'installing' ?
+        'Installing downloaded packages (time remaining unknown)' :
+        'Waiting for measurable download bytes (time remaining unknown)';
+    }
+  } else $('setup-dependency-metrics').textContent = '';
+  $('setup-download-status').textContent = d ?
+    `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${d.file_total ? (100 * (d.file_bytes || 0) / d.file_total).toFixed(1) + '%' : 'N/A'}` +
+    ` · ${formatTransferBytes(d.file_bytes)} / ${formatTransferBytes(d.file_total)}` +
+    (d.total_bytes ? ` · total ${(100 * modelDownloaded / d.total_bytes).toFixed(1)}%` : '') +
+    ` · ${d.reused_files || 0} ${t('verified cached files reused')}` :
+    (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
   if (!data.ready && !setupAvailable) return;
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
@@ -492,7 +594,7 @@ function renderGlobalStatus() {
     $('live-generation-source').textContent = t('Initial Setup');
     $('live-generation-status').textContent = t(runtimeSetup.stage === 'models' ? 'Downloading / verifying models' : 'Installing dependencies') + ' · ' + t(runtimeSetup.stage || '');
     const d = runtimeSetup.download;
-    if (d?.total_bytes) { $('live-generation-progress').value = d.completed_bytes / d.total_bytes; } else $('live-generation-progress').removeAttribute('value');
+    if (d?.total_bytes) { $('live-generation-progress').value = Math.min(1, modelDownloaded / d.total_bytes); } else $('live-generation-progress').removeAttribute('value');
     $('live-generation-cancel').hidden = true; return;
   }
   if (running) { renderMonitor(running); return; }
