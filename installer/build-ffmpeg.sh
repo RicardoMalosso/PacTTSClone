@@ -17,11 +17,40 @@ test "$(git rev-parse HEAD)" = "$commit"
   --enable-encoder=libmp3lame,pcm_s16le --enable-parser=mpegaudio \
   --enable-filter=aresample,aformat,anull --enable-libmp3lame \
   --pkg-config-flags=--static --extra-ldflags=-static
-make -j2 ffmpeg.exe ffprobe.exe
+make -j"$(nproc)" ffmpeg.exe ffprobe.exe
 cp ffmpeg.exe ffprobe.exe "$output/bin/"
 cp COPYING.LGPLv2.1 LICENSE.md "$output/licenses/"
-cp /mingw64/share/licenses/lame/COPYING "$output/licenses/LAME-COPYING" \
-  || cp /mingw64/share/licenses/lame/LICENSE "$output/licenses/LAME-COPYING"
+# The signed LAME package does not install a COPYING file. Include its exact
+# upstream source/license and MSYS2 patch recipe instead of guessing a file path.
+case "$(pacman -Q mingw-w64-x86_64-lame)" in
+  "mingw-w64-x86_64-lame 3.100-3") ;;
+  *) echo "Update source/license manifest for the installed LAME version." >&2; exit 1 ;;
+esac
+pushd "$output" >/dev/null
+python - <<'PYLAME'
+import hashlib
+import pathlib
+import tarfile
+import urllib.request
+
+name = "lame-3.100.tar.gz"
+with urllib.request.urlopen("https://downloads.sourceforge.net/project/lame/lame/3.100/" + name, timeout=60) as response:
+    data = response.read()
+assert hashlib.sha256(data).hexdigest() == "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e", "LAME source integrity failure"
+pathlib.Path(name).write_bytes(data)
+with tarfile.open(name) as archive:
+    for filename in ["COPYING", "README"]:
+        pathlib.Path("licenses", "LAME-" + filename).write_bytes(archive.extractfile("lame-3.100/" + filename).read())
+base = "https://raw.githubusercontent.com/msys2/MINGW-packages/c9e5b84b9bd7ac93517ffc177522606b9762c1e5/mingw-w64-lame/"
+recipe = pathlib.Path("lame-build-recipe")
+recipe.mkdir(exist_ok=True)
+files = ["PKGBUILD", "0002-07-field-width-fix.all.patch", "0005-no-gtk.all.patch", "0006-dont-use-outdated-symbol-list.patch", "0007-revert-posix-code.patch", "0008-skip-termcap.patch", "0009-lame-add-pkgconfig.patch"]
+for filename in files:
+    with urllib.request.urlopen(base + filename, timeout=30) as response:
+        (recipe / filename).write_bytes(response.read())
+PYLAME
+popd >/dev/null
+
 {
  echo "FFmpeg official source: https://github.com/FFmpeg/FFmpeg"
  echo "Commit: $commit"

@@ -35,7 +35,7 @@ class AudioPipeline:
                 "Não foi possível processar o áudio. Verifique se o MP3 é válido."
             ) from exc
 
-    def decode(self, source: Path, destination: Path) -> None:
+    def decode(self, source: Path, destination: Path) -> bool:
         metadata = self._run(
             self.settings.ffprobe,
             [
@@ -85,11 +85,15 @@ class AudioPipeline:
             ],
         )
         info = sf.info(destination)
-        if not 1 <= info.duration <= 30:
+        if info.duration < 1:
             raise UserError("Use uma referência de 1 a 30 segundos; recomendado: 3 a 10 segundos.")
-        samples, _ = sf.read(destination)
+        cropped = info.duration > 30
+        samples, rate = sf.read(destination, frames=30 * info.samplerate)
+        if cropped:
+            sf.write(destination, samples, rate, subtype="PCM_16")
         if np.max(np.abs(samples)) < 0.0001:
             raise UserError("A referência está silenciosa. Escolha um trecho com fala audível.")
+        return cropped
 
     def encode(self, waveform: Waveform, workspace: Path, destination: Path) -> None:
         values = np.asarray(waveform.samples, dtype=np.float32)

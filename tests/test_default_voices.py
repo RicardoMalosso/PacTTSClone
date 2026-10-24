@@ -78,3 +78,36 @@ def test_default_prepare_once_and_preserve_edits(tmp_path, engine, monkeypatch):
         assert finished["request"]["ref_text"] == "My exact reference transcript."
     finally:
         studio.close()
+
+
+def test_builtin_thumbnails_seed_existing_voices_and_preserve_custom_images(
+    tmp_path, engine, monkeypatch
+):
+    import io
+
+    from PIL import Image
+
+    monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", CATALOG)
+    service = GenerationService(Settings(data_dir=tmp_path / "data"), engine)
+    studio = Studio(service)
+    try:
+        for entry in json.loads(CATALOG.read_text()):
+            image = CATALOG.parent / entry["thumbnail"]
+            assert max(Image.open(image).size) <= 128
+            assert hashlib.sha256(image.read_bytes()).hexdigest() == entry["thumbnail_sha256"]
+        voice = studio.store.all("voice")[0]
+        assert voice["thumbnail_url"]
+        target = studio.voices.root / voice["id"] / "thumbnail.jpg"
+        target.unlink()
+        studio.store.patch("voice", voice["id"], thumbnail_url=None, title="Personal title")
+        studio.voices.seed_defaults()
+        assert target.is_file()
+        assert studio.store.get("voice", voice["id"])["title"] == "Personal title"
+        image = io.BytesIO()
+        Image.new("RGB", (20, 20), "blue").save(image, "PNG")
+        studio.voices.set_thumbnail(voice["id"], image.getvalue())
+        saved = target.read_bytes()
+        studio.voices.seed_defaults()
+        assert target.read_bytes() == saved
+    finally:
+        studio.close()

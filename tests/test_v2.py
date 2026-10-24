@@ -642,3 +642,120 @@ def test_local_autoqueue_is_opt_in_idempotent_and_filtered(studio, mp3):
     wait_job(studio.service, chat["id"])
     wait_until(lambda: studio.playback.items("testchannel"))
     assert len(studio.playback.items("playbackMain")) == 1
+
+
+def test_channel_connection_toggle_delete_and_preserve_audio_history(tmp_path, engine, mp3):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    studio, service = app.state.studio, app.state.service
+    studio.twitch_factory = FakeIRC
+    with TestClient(app, base_url="http://127.0.0.1:7860") as client:
+        token = client.get("/api/session").json()["token"]
+        headers = {"X-PacTTS-Token": token}
+        with mp3.open("rb") as reference:
+            voice = studio.voices.create(reference, "Voice", "voice.mp3", "Known text")
+        config = ChannelConfig(name="channeltest", commands={"!voice": voice["id"]})
+        client.put(
+            "/api/channels/channeltest", json=config.model_dump(), headers=headers
+        ).raise_for_status()
+        assert (
+            client.post("/api/channels/channeltest/connection", json={"enabled": True}).status_code
+            == 403
+        )
+        assert (
+            client.post(
+                "/api/channels/channeltest/connection", json={"enabled": "yes"}, headers=headers
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                "/api/channels/channeltest/connection", json={"enabled": True}, headers=headers
+            ).status_code
+            == 200
+        )
+        assert studio.clients["channeltest"].status == "connected"
+        job = studio.receive("channeltest", "viewer", "!voice Keep this audio")
+        wait_job(service, job["id"])
+        wait_until(lambda: studio.playback.items("channeltest"))
+        closed_client = studio.clients["channeltest"]
+        assert (
+            client.post(
+                "/api/channels/channeltest/connection", json={"enabled": False}, headers=headers
+            ).status_code
+            == 200
+        )
+        assert closed_client.status == "disconnected"
+        assert "channeltest" not in studio.clients
+        assert studio.store.get("channel", "channeltest")["commands"] == config.commands
+        assert studio.receive("channeltest", "viewer", "!voice Ignored") is None
+        assert (
+            client.post(
+                "/api/channels/channeltest/connection", json={"enabled": True}, headers=headers
+            ).status_code
+            == 200
+        )
+        app.state.tunnel.player_keys["channeltest"] = "revoked-key"
+        assert client.delete("/api/channels/channeltest", headers=headers).status_code == 200
+        assert studio.store.get("channel", "channeltest") is None
+        assert "channeltest" not in studio.clients
+        assert "channeltest" not in app.state.tunnel.player_keys
+        assert studio.playback.items("channeltest")[0]["status"] == "cancelled"
+        assert service.output_path(job["id"]).is_file()
+        assert service.get(job["id"])["status"] == "succeeded"
+        assert client.delete("/api/channels/playbackMain", headers=headers).status_code == 422
+        assert studio.store.get("channel", "playbackMain")
+
+
+def test_long_voice_upload_crops_and_thumbnail_can_be_replaced(tmp_path, engine, long_mp3):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    with TestClient(app, base_url="http://127.0.0.1:7860") as client:
+        headers = {"X-PacTTS-Token": client.get("/api/session").json()["token"]}
+        response = client.post(
+            "/api/voices",
+            data={"title": "Long voice", "transcript": "First thirty seconds."},
+            files={"reference": ("long.mp3", long_mp3.read_bytes(), "audio/mpeg")},
+            headers=headers,
+        )
+        assert response.status_code == 201
+        voice = response.json()
+        assert voice["cropped"]
+        assert voice["warning"] == "mp3 was cropped to 30 seconds, will process anyway"
+        decoded = tmp_path / "saved.wav"
+        assert (
+            app.state.service.audio.decode(
+                app.state.studio.voices.root / voice["id"] / "reference.mp3", decoded
+            )
+            is False
+        )
+        import soundfile as sf
+
+        assert sf.info(decoded).duration == 30
+        image = io.BytesIO()
+        Image.new("RGB", (800, 400), "red").save(image, "PNG")
+        url = f"/api/voices/{voice['id']}/thumbnail"
+        result = client.post(
+            url, files={"thumbnail": ("thumb.png", image.getvalue(), "image/png")}, headers=headers
+        )
+        assert result.status_code == 200
+        assert "?v=" in result.json()["thumbnail_url"]
+        thumbnail = client.get(result.json()["thumbnail_url"]).content
+        assert Image.open(io.BytesIO(thumbnail)).size == (320, 160)
+        assert (
+            client.post(
+                url, files={"thumbnail": ("bad.png", b"bad", "image/png")}, headers=headers
+            ).status_code
+            == 422
+        )
+        assert client.get(result.json()["thumbnail_url"]).content == thumbnail
+        assert (
+            client.post(
+                url,
+                files={"thumbnail": ("large.png", b"x" * (2 * 1024 * 1024 + 1), "image/png")},
+                headers=headers,
+            ).status_code
+            == 422
+        )
+        assert (
+            app.state.service.store.get("voice", voice["id"])["transcript"]
+            == "First thirty seconds."
+        )

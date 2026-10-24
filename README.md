@@ -107,7 +107,7 @@ folder**, then run:
 
 ```powershell
 git pull --ff-only
-.\.venv\Scripts\python.exe -m pip install -e ".[inference]"
+.\.venv\Scripts\python.exe -m pip install -e "."
 powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir "YOUR_DATA_FOLDER"
 ```
 
@@ -120,11 +120,11 @@ Fresh source installation requires Python 3.12 x64, FFmpeg/ffprobe on PATH and G
 Clone this repository into any chosen directory, then run:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Device cuda
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir "YOUR_DATA_FOLDER"
 ```
 
-Use `-Device cpu` for CPU wheels. The venv is stored in the project. Set `HF_HOME`,
+CPU/NVIDIA inference libraries and model files are installed from **Initial Setup** in the browser. The venv is stored in the project. Set `HF_HOME`,
 `HF_HUB_CACHE`, `PIP_CACHE_DIR` and session `TEMP`/`TMP` to your chosen storage
 locations **before** installing/generating if space on the system drive is limited.
 The source scripts reuse existing Python/FFmpeg; use the installer for automatic
@@ -136,12 +136,22 @@ Linux/manual setup (install FFmpeg through your package manager):
 python3.12 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
-python -m pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-python -m pip install -e '.[inference]'
+python -m pip install -e .
 pacttsclone --data-dir ./local-data
 ```
 
-For compatible NVIDIA drivers, replace `cpu` in the wheel URL with `cu128`.
+Choose CPU or NVIDIA in the browser Initial Setup tab; the application selects the corresponding pinned package index.
+
+## Voices and references
+
+Add MP3s only in **Voices**; **Generate** selects a ready saved voice and text.
+References longer than 30 seconds are automatically trimmed to the first 30 seconds
+and saved that way, with an explicit crop notice. Invalid, too-short, silent or
+oversized uploads still report errors. For a manually supplied transcript, use only
+the retained first 30 seconds. Existing voice cards can add/replace thumbnails.
+The four default presets include user-provided thumbnails of at most 128 pixels;
+upgrades add missing defaults without replacing a custom image or restoring a
+previously deleted preset.
 
 ## Included voices and first-use preparation
 
@@ -190,7 +200,7 @@ channel has its own settings; the mandatory basic slur list cannot be disabled.
 
 Use **http://127.0.0.1:7860/playbackMain** as an OBS Browser Source without Twitch.
 Its dashboard is **http://127.0.0.1:7860/playbackMain/control**, also available in
-**General playback**. Generate an MP3, then click **Queue on general player**, or
+**Local OBS Sources**. Generate an MP3, then click **Queue on general player**, or
 use the same button in History for any completed local or channel generation.
 This reuses the MP3; it does not generate again or change the original channel.
 Configure delay (default 5 seconds), filters and custom blocked phrases in the
@@ -329,3 +339,13 @@ opening the tab and waiting three seconds, then requests autoplay. Leaving the t
 stops/unloads it and cancels any pending start. Press play manually if browser
 policy blocks autoplay; a direct YouTube link is also provided. This user-requested
 video uses the internet and does not automatically submit reports or upload logs.
+
+## Twitch connection management
+
+The **Twitch & OBS** dashboard lists every saved channel and its live connection
+state. Connect/Disconnect toggles monitoring while preserving commands/settings.
+Delete removes that channel's configuration, stops its client and cancels pending
+channel generation/playback, retaining generated audio/history. Each channel has
+independent controls. **Local OBS Sources** keeps the existing `/playbackMain` and
+`/playbackMain/control` URLs. Player/control links open in new tabs. Tunnel controls
+are in **Configuration**.

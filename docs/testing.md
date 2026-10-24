@@ -156,3 +156,42 @@ the full Generate monitor follows Twitch, preparation and queued local requests,
 including after reload. It prioritizes the running job over later queued work.
 Cancel targets the displayed job. Monitoring remote requests never autoplays them
 in the admin browser; OBS retains playback responsibility.
+
+RC4 local validation: ruff passed; 129 backend tests and 21 Chromium tests passed.
+Browser checks include actual OBS/control new-tab navigation, stable links across
+polls, first-run gate/progress/cancel/unlock, and Twitch active-job monitoring with
+two queued requests, reload, cross-tab status and cancellation. Downloader checks
+cover hash failure, exact cache reuse (including existing HF snapshots), HTTP Range
+resume and servers ignoring Range. These use tiny fixtures/fake inference, not a
+real model-generation benchmark. Live HF metadata plans resolved successfully for
+OmniVoice (8 files, 3,267,443,402 bytes) and Whisper Small (11 files, 971,367,937 bytes).
+Windows build/real dependency/model download validation remains pending CI. The
+first source build failed because the isolated MSYS2 environment lacked git; git
+and Python were added explicitly. A pre-existing browser timer test was made
+deterministic by pausing its test clock; the application retains the three-second
+delay. Obsolete preview builds are cancelled when a newer commit supersedes them.
+
+## RC4 studio organization and voice media
+
+Tunnel controls live in Configuration. Generate accepts a saved ready voice and
+text; MP3 imports live only in Voices (the legacy upload API remains compatible).
+Twitch & OBS includes a per-channel live dashboard with connect/disconnect/edit/
+delete. Disconnect preserves config and stops chat monitoring. Delete stops the
+client, cancels that channel's pending jobs/playback, drops its config/player
+capability and retains output/history. Local OBS Sources renames General playback
+without changing its URLs or identifiers.
+
+Voice imports decode at most 31 seconds, then retain exactly the first 30 seconds
+when longer, validate audible content, re-encode the saved reference and persist
+a crop notice. Too-short/corrupt/silent/oversized inputs remain errors. Existing
+voices accept bounded thumbnail replacement with atomic JPEG writes. Default
+user-provided thumbnails are downsampled to <=128 px, integrity-checked, and seeded
+to existing presets only when no custom thumbnail is present; tombstones remain.
+No transcription, title or custom image is replaced by thumbnail migration.
+
+Expanded RC4 local checks: 132 backend tests and 23 Chromium tests passed, plus
+ruff/JavaScript syntax checks. Added actual long-reference crop/retained duration,
+thumbnail replacement/invalid upload preservation/default migration tests, and
+channel connect/disconnect/delete/history retention tests. Browser tests now import
+references through Voices, then select a saved voice for generation. No new real
+OmniVoice inference measurement is claimed. Windows acceptance remains pending.

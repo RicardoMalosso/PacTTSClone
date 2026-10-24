@@ -62,3 +62,15 @@ def wait_job(service, job_id, timeout=10):
 def isolate_default_voice_catalog(monkeypatch):
     # Existing tests start with an empty studio; default assets have dedicated coverage.
     monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", None)
+
+
+@pytest.fixture
+def long_mp3(tmp_path):
+    source = tmp_path / "long.wav"
+    sf.write(source, 0.1 * np.sin(2 * np.pi * 220 * np.arange(35 * 24000) / 24000), 24000)
+    target = tmp_path / "long.mp3"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y", "-i", str(source), "-c:a", "libmp3lame", str(target)],
+        check=True,
+    )
+    return target

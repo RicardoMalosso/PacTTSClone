@@ -55,6 +55,36 @@ class Studio:
             self.connect(config)
         return config
 
+    def set_channel_connection(self, name, enabled):
+        with self.chat_lock:
+            config = self.store.get("channel", name)
+            if not config or config.get("kind") == "general":
+                raise UserError("Twitch channel not found.")
+            config = self.store.patch("channel", name, enabled=enabled)
+        self.connect(config)
+        return config
+
+    def delete_channel(self, name):
+        with self.chat_lock:
+            config = self.store.get("channel", name)
+            if not config or config.get("kind") == "general":
+                raise UserError("Twitch channel not found.")
+            self.store.patch("channel", name, enabled=False)
+            for job in self.service.pending():
+                if job.get("channel") == name:
+                    self.service.cancel(job["id"])
+            with self.playback.lock:
+                for item in self.playback.items(name):
+                    self.playback.cancel(item["id"])
+                self.playback.leases.pop(name, None)
+                self.store.delete("channel", name)
+            client = self.clients.pop(name, None)
+            self.cooldowns = {k: v for k, v in self.cooldowns.items() if k[0] != name}
+        # A closing IRC thread may be waiting for chat_lock.
+        if client:
+            client.close()
+        return {"deleted": name}
+
     def connect(self, config):
         if not self.service.setup_ready():
             return

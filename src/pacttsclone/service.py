@@ -248,6 +248,7 @@ class GenerationService:
                 progress=1,
                 device=result.get("device"),
                 transcript=result.get("transcript"),
+                reference_cropped=bool(result.get("reference_cropped")),
                 output_url=f"/api/jobs/{job_id}/audio" if job["kind"] == "speech" else None,
             )
         except Exception as exc:

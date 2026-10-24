@@ -9,7 +9,7 @@ let selectedChannel = location.pathname.endsWith('/control') ? location.pathname
 let bugVideoTimer = null, bugVideoOpen = false;
 let completedJob = null;
 let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
-let voicesKey = '', historyKey = '', channelKey = '', channelLinksKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
+let voicesKey = '', historyKey = '', channelKey = '', channelLinksKey = '', channelDashboardKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
 function stopAllAudio() { stopBugVideo(); document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
 
 function el(tag, attrs = {}, ...children) {
@@ -69,9 +69,10 @@ function tab(name) {
   const general = name === 'general';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
-  window.Locale.bind($('playback-heading'), general ? 'General playback' : 'Twitch & OBS');
+  window.Locale.bind($('playback-heading'), general ? 'Local OBS Sources' : 'Twitch & OBS');
   window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Read public Twitch chat. Commands queue local speech; this does not verify Bits or channel-point purchases.');
   $('channel-form').hidden = general;
+  $('channel-dashboard').hidden = general;
   $('general-form').hidden = !general;
   $('chat-events').parentElement.hidden = general;
   if (general && state.general_playback) {
@@ -91,7 +92,7 @@ $('autoplay').addEventListener('change', () => { try { localStorage.setItem('pac
 try { $('autoqueue').checked = localStorage.getItem('pactts-autoqueue') === 'true'; } catch { /* optional */ }
 $('autoqueue').addEventListener('change', () => { try { localStorage.setItem('pactts-autoqueue', String($('autoqueue').checked)); } catch { /* optional */ } });
 function autoqueueNote(job) {
-  $('autoqueue-note').textContent = !job?.request?.autoqueue_general ? '' : job.playback_error ? t('Automatic OBS queue failed: ') + t(job.playback_error) : job.general_playback_item_id ? t('Queued on general player.') : t('Queuing on general OBS player…');
+  $('autoqueue-note').textContent = !job?.request?.autoqueue_general ? '' : job.playback_error ? t('Automatic OBS queue failed: ') + t(job.playback_error) : job.general_playback_item_id ? t('Queued on local OBS source.') : t('Queuing on local OBS source…');
 }
 // Speech language is independent from the interface locale.
 try { const saved = localStorage.getItem('pactts-speech-language'); if (['pt', 'en', 'auto'].includes(saved)) $('language').value = saved; } catch { /* optional */ }
@@ -100,8 +101,6 @@ $('text').addEventListener('input', () => { $('count').textContent = `${$('text'
 $('stop').addEventListener('click', () => { $('player').pause(); $('player').currentTime = 0; });
 $('voice-select').addEventListener('change', () => {
   const voice = state.voices.find(v => v.id === $('voice-select').value);
-  $('upload-fields').hidden = Boolean(voice);
-  $('reference').required = !voice;
   $('preset-note').textContent = voice ? `${voice.original_filename} · ${t('saved transcript')}: ${voice.transcript}` : '';
 });
 function clearResult() {
@@ -116,7 +115,7 @@ function renderMonitor(job) {
   const source = [job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
   $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
   $('live-generation').hidden = !runtimeSetup.ready;
-  $('status').textContent = job.error || `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`;
+  $('status').textContent = job.error || (job.status === 'succeeded' ? (job.kind === 'transcribe' ? t('Voice preparation ready') : t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds})) : `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`);
   $('live-generation-status').textContent = $('status').textContent;
   $('live-generation-cancel').hidden = !['queued', 'running'].includes(job.status);
   $('overall-progress').value = job.progress || 0;
@@ -170,15 +169,8 @@ $('generate-form').addEventListener('submit', action(async event => {
   busy = true; $('generate').disabled = true; clearResult(); currentJob = null; suppressAutoplay = false;
   try {
     const voice = $('voice-select').value;
-    let job;
-    if (voice) job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked}});
-    else {
-      const file = $('reference').files[0];
-      if (!file || !file.name.toLowerCase().endsWith('.mp3')) throw new Error('Choose an MP3 reference.');
-      if (file.size > session.max_upload_bytes) throw new Error('MP3 exceeds 20 MiB.');
-      const body = new FormData($('generate-form')); body.set('autoqueue_general', String($('autoqueue').checked));
-      job = await api('/api/jobs', {method: 'POST', body});
-    }
+    if (!voice) throw new Error(t('Choose a saved voice in Voices first.'));
+    const job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked}});
     currentJob = job.id; await watch(job.id);
   } finally { busy = false; $('generate').disabled = !runtimeSetup.ready; }
 }));
@@ -196,26 +188,29 @@ document.addEventListener('keydown', action(async e => {
 }));
 $('voice-form').addEventListener('submit', action(async event => {
   event.preventDefault(); const submit = event.target.querySelector('[type=submit]'); submit.disabled = true;
-  try { await api('/api/voices', {method: 'POST', body: new FormData(event.target)}); event.target.reset(); await refresh(); }
+  try { const voice = await api('/api/voices', {method: 'POST', body: new FormData(event.target)}); event.target.reset(); $('voice-upload-note').textContent = voice.warning ? t(voice.warning) : ''; $('voice-upload-note').hidden = !voice.warning; await refresh(); }
   finally { submit.disabled = false; }
 }));
 function renderVoices() {
   const key = JSON.stringify([state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
   const selected = $('voice-select').value;
-  $('voice-select').replaceChildren(el('option', {value: ''}, t('Upload an MP3 instead')));
+  $('voice-select').replaceChildren(el('option', {value: ''}, t('Choose a saved voice')));
   for (const v of state.voices.filter(v => v.status === 'ready')) $('voice-select').append(el('option', {value: v.id}, v.title));
   $('voice-select').value = selected; $('voice-select').dispatchEvent(new Event('change'));
-  const drafts = new Map([...document.querySelectorAll('.voice-card')].filter(card => card.dataset.dirty === 'true').map(card => [card.dataset.voiceId, {title: card.querySelector('input').value, transcript: card.querySelector('textarea').value}]));
+  const drafts = new Map([...document.querySelectorAll('.voice-card')].filter(card => card.dataset.dirty === 'true').map(card => [card.dataset.voiceId, {title: card.querySelector('input[data-field="title"]').value, transcript: card.querySelector('textarea').value}]));
   $('voices-list').replaceChildren();
   for (const v of state.voices) {
     const preparing = v.status === 'pending';
     const prep = state.jobs.find(j => j.id === v.preparation_job_id);
-    const title = el('input', {...(preparing ? {disabled: ''} : {}), value: v.title, maxlength: '100', 'aria-label': t('Voice title')});
+    const title = el('input', {...(preparing ? {disabled: ''} : {}), value: v.title, maxlength: '100', 'data-field': 'title', 'aria-label': t('Voice title')});
     const transcript = el('textarea', {...(preparing ? {disabled: ''} : {}), rows: '3', maxlength: '4000', 'aria-label': t('Saved transcript')}); transcript.value = v.transcript || '';
+    const thumbnailInput = el('input', {type: 'file', accept: 'image/png,image/jpeg,image/webp', 'aria-label': t('Replace thumbnail')});
+    const thumbnailControl = el('label', {}, t('Add / replace thumbnail (up to 2 MiB)'), thumbnailInput);
+    thumbnailInput.addEventListener('change', action(async () => { const file = thumbnailInput.files[0]; if (!file) return; const body = new FormData(); body.set('thumbnail', file); await api(`/api/voices/${v.id}/thumbnail`, {method: 'POST', body}); await refresh(); }));
     const card = el('section', {class: 'card voice-card', 'data-voice-id': v.id}, v.thumbnail_url ? el('img', {src: v.thumbnail_url, alt: v.title}) : null,
-      el('h2', {}, v.title), el('p', {class: 'muted'}, v.original_filename), el('span', {class: 'pill'}, t(v.status)),
-      v.status === 'unprepared' ? el('p', {class: 'preparation-note'}, t('Not prepared for first use. Click Prepare to download required models and save the reference transcript locally.')) : null,
-      preparing ? el('div', {class: 'preparation-note', role: 'status'}, el('strong', {}, t('Preparing for first use…')), el('progress', {max: '1'}), el('p', {}, `${t(prep?.stage || 'queued')} · ${t('The first preparation may download models. You can cancel and retry.')} `), button('Cancel preparation', async () => { await api(`/api/jobs/${v.preparation_job_id}/cancel`, {method: 'POST'}); await refresh(); }, 'danger small-button')) : null,
+      el('h2', {}, v.title), el('p', {class: 'muted'}, v.original_filename), v.warning ? el('p', {class: 'notice'}, t(v.warning)) : null, thumbnailControl, el('span', {class: 'pill'}, t(v.status)),
+      v.status === 'unprepared' ? el('p', {class: 'preparation-note'}, t('Not prepared for first use. Complete Initial Setup, then click Prepare to save the reference transcript locally.')) : null,
+      preparing ? el('div', {class: 'preparation-note', role: 'status'}, el('strong', {}, t('Preparing for first use…')), el('progress', {max: '1'}), el('p', {}, `${t(prep?.stage || 'queued')} · ${t('Model files are already verified. Loading and transcription run locally. You can cancel and retry.')} `), button('Cancel preparation', async () => { await api(`/api/jobs/${v.preparation_job_id}/cancel`, {method: 'POST'}); await refresh(); }, 'danger small-button')) : null,
       v.error ? el('p', {class: 'error'}, v.error) : null, el('label', {}, t('Title'), title), el('label', {}, t('Saved reference transcript'), transcript),
       el('audio', {controls: '', src: `/api/voices/${v.id}/reference`, preload: 'none'}),
       el('div', {class: 'row-actions'}, button('Save edits', async () => { await api(`/api/voices/${v.id}`, {method: 'PUT', body: {title: title.value, transcript: transcript.value}}); card.dataset.dirty = 'false'; await refresh(); }),
@@ -227,7 +222,7 @@ function renderVoices() {
     card.querySelector('.row-actions button').disabled = preparing;
     $('voices-list').append(card);
   }
-  $('prepare-voices').hidden = !state.voices.some(v => v.status !== 'ready');
+  window.Locale.bind($('prepare-voices'), state.voices.some(v => v.status !== 'ready') ? 'Some voices need preparation · open Voices' : 'Manage voices');
   if (!state.voices.length) $('voices-list').append(el('p', {class: 'muted'}, t('No saved voices yet.')));
 }
 function renderJobs() {
@@ -246,7 +241,7 @@ function renderHistory() {
     const actions = el('div', {class: 'row-actions'});
     if (j.output_url) {
       actions.append(button('Preview here', () => { preview.hidden = !preview.hidden; if (!preview.hidden) preview.src = j.output_url; else preview.pause(); }), link('Download MP3', j.output_url, true));
-      actions.append(button('Queue on general player', () => queueGeneral(j.id)));
+      actions.append(button('Queue on local OBS source', () => queueGeneral(j.id)));
       if (j.channel) actions.append(button('Replay on OBS', async () => { await api(`/api/channels/${j.channel}/replay/${j.id}`, {method: 'POST'}); }));
     }
     actions.append(link('Timing report', `/api/jobs/${j.id}/report`, true));
@@ -300,13 +295,14 @@ $('channel-form').addEventListener('submit', action(async event => {
 $('pause-channel').addEventListener('click', action(async () => { if (selectedChannel) { await api(`/api/channels/${selectedChannel}/pause`, {method: 'POST', body: {paused: !latestChannelState?.paused}}); await refresh(); } }));
 function renderChannels() {
   refreshCommandVoices();
+  renderChannelDashboard();
   const key = JSON.stringify(state.channels.map(c => ({name: c.name})));
   if (key !== channelKey) {
     channelKey = key; $('channel-select').replaceChildren(el('option', {value: ''}, t('Create a channel')));
     for (const c of state.channels) $('channel-select').append(el('option', {value: c.name}, c.name));
     $('channel-select').value = selectedChannel;
   }
-  const c = selectedChannel === 'playbackMain' ? {name: 'playbackMain', connection: t('General playback')} : state.channels.find(c => c.name === selectedChannel);
+  const c = selectedChannel === 'playbackMain' ? {name: 'playbackMain', connection: t('Local OBS Sources')} : state.channels.find(c => c.name === selectedChannel);
   $('channel-connection').textContent = c ? `${c.name}: ${t(c.connection)}${c.connection_error ? ' · ' + c.connection_error : ''}` : t('Choose a saved channel.');
   const linksKey = c?.name || '';
   if (linksKey === channelLinksKey) return;
@@ -332,7 +328,7 @@ $('config-form').addEventListener('submit', action(async event => {
 }));
 async function refresh() {
   state = await api('/api/state');
-  const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.find(j => j.status === 'queued') || state.jobs.find(j => j.id === lastMonitor?.id) || state.jobs[0];
+  const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.filter(j => j.status === 'queued').sort((a, b) => a.created_at - b.created_at)[0] || [...state.jobs].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
   if (monitored) renderMonitor(monitored);
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
@@ -374,9 +370,9 @@ window.addEventListener('localechange', () => {
   const guide = $('bug-video').querySelector('iframe'); if (guide) guide.title = t('Bug reporting guide');
   document.querySelectorAll('.resources strong').forEach(node => { node.textContent = t(node.textContent); });
   $('hotkey-status').textContent = t(state.hotkey_status || '');
-  const drafts = [...document.querySelectorAll('.voice-card')].map(card => ({id: card.dataset.voiceId, title: card.querySelector('input')?.value, transcript: card.querySelector('textarea')?.value}));
+  const drafts = [...document.querySelectorAll('.voice-card')].map(card => ({id: card.dataset.voiceId, title: card.querySelector('input[data-field="title"]')?.value, transcript: card.querySelector('textarea')?.value}));
   voicesKey = historyKey = ''; renderVoices(); renderHistory(); renderJobs(); renderChannels();
-  for (const d of drafts) { const card = [...document.querySelectorAll('.voice-card')].find(c => c.dataset.voiceId === d.id); if (card) { card.querySelector('input').value = d.title; card.querySelector('textarea').value = d.transcript; } }
+  for (const d of drafts) { const card = [...document.querySelectorAll('.voice-card')].find(c => c.dataset.voiceId === d.id); if (card) { card.querySelector('input[data-field="title"]').value = d.title; card.querySelector('textarea').value = d.transcript; } }
   if (lastMonitor) renderMonitor(lastMonitor);
   if (initialHealth) $('health').textContent = [initialHealth.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), initialHealth.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
   if (session) { renderChannelState().catch(() => {}); tunnelStatus().catch(() => {}); }
@@ -407,7 +403,7 @@ $('tunnel-stop').addEventListener('click', action(async () => { await api('/api/
 
 async function queueGeneral(id) {
   await api(`/api/channels/playbackMain/replay/${id}`, {method: 'POST'});
-  $('playback-note').textContent = t('Queued on general player.');
+  $('playback-note').textContent = t('Queued on local OBS source.');
 }
 $('send-general').addEventListener('click', action(async () => { if (completedJob) await queueGeneral(completedJob); }));
 $('general-form').addEventListener('submit', action(async event => {
@@ -457,3 +453,27 @@ $('setup-start').addEventListener('click', setupAction(async () => {
 }));
 $('setup-cancel').addEventListener('click', setupAction(async () => { renderSetup(await api('/api/setup/cancel', {method: 'POST'})); }));
 window.addEventListener('localechange', () => { if (setupAvailable) renderSetup(runtimeSetup); });
+
+function renderChannelDashboard() {
+  const key = JSON.stringify([window.Locale.language, state.channels]);
+  if (channelDashboardKey === key) return;
+  channelDashboardKey = key;
+  $('channel-list').replaceChildren();
+  for (const channel of state.channels) {
+    const row = el('div', {class: 'job-row', 'data-channel': channel.name},
+      el('strong', {}, '#' + channel.name), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + channel.connection_error : '')),
+      el('div', {class: 'row-actions'},
+        button(channel.enabled ? 'Disconnect' : 'Connect', async () => {
+          await api(`/api/channels/${channel.name}/connection`, {method: 'POST', body: {enabled: !channel.enabled}});
+          await refresh(); if (selectedChannel === channel.name) fillChannel(channel.name);
+        }),
+        button('Edit channel', () => fillChannel(channel.name)),
+        button('Delete channel', async () => {
+          await api(`/api/channels/${channel.name}`, {method: 'DELETE'});
+          if (selectedChannel === channel.name) { selectedChannel = ''; }
+          await refresh(); fillChannel(selectedChannel);
+        }, 'danger small-button')));
+    $('channel-list').append(row);
+  }
+  if (!state.channels.length) $('channel-list').textContent = t('No saved Twitch channels. Add one below.');
+}

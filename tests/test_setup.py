@@ -197,3 +197,41 @@ def test_verified_model_paths_are_used_offline_after_restart(tmp_path, engine):
         assert not second.state.runtime_setup._models_present()
     finally:
         second.state.studio.close()
+
+
+def test_model_setup_reuses_existing_hf_snapshot_and_reports_real_bytes(tmp_path, monkeypatch):
+    root, cache = tmp_path / "models", tmp_path / "hf"
+    revision, payload = "a" * 40, b"verified weights"
+    entry = dict(
+        name="model.safetensors",
+        size=len(payload),
+        hash=hashlib.sha256(payload).hexdigest(),
+        algorithm="sha256",
+        url="unused",
+    )
+    snapshot = cache / "models--owner--voice" / "snapshots" / revision
+    snapshot.mkdir(parents=True)
+    (snapshot / entry["name"]).write_bytes(payload)
+    monkeypatch.setattr(
+        model_setup,
+        "make_plan",
+        lambda repo: dict(repo=repo, revision=revision, files=[entry.copy()]),
+    )
+    monkeypatch.setattr(
+        model_setup.urllib.request,
+        "urlopen",
+        lambda *a, **k: pytest.fail("Existing exact HF snapshot was downloaded again"),
+    )
+    progress = []
+    monkeypatch.setattr(model_setup, "emit", lambda **values: progress.append(values))
+    result = model_setup.download_models(root, ["owner/voice"], cache)
+    assert result["reused_files"] == 1
+    assert Path(result["files"][0]["path"]).read_bytes() == payload
+    assert progress[-1]["download"]["completed_bytes"] == len(payload)
+    assert progress[-1]["download"]["total_bytes"] == len(payload)
+    assert progress[-1]["download"]["cache_status"] == "verified cache"
+    # A retry must use the persisted revision plan and reverify without metadata HTTP.
+    monkeypatch.setattr(
+        model_setup, "make_plan", lambda repo: pytest.fail("Revision resolved again")
+    )
+    assert model_setup.download_models(root, ["owner/voice"], cache)["reused_files"] == 1

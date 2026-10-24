@@ -182,3 +182,21 @@ the full Generate monitor follows Twitch, preparation and queued local requests,
 including after reload. It prioritizes the running job over later queued work.
 Cancel targets the displayed job. Monitoring remote requests never autoplays them
 in the admin browser; OBS retains playback responsibility.
+
+## RC4 studio organization and voice media
+
+Tunnel controls live in Configuration. Generate accepts a saved ready voice and
+text; MP3 imports live only in Voices (the legacy upload API remains compatible).
+Twitch & OBS includes a per-channel live dashboard with connect/disconnect/edit/
+delete. Disconnect preserves config and stops chat monitoring. Delete stops the
+client, cancels that channel's pending jobs/playback, drops its config/player
+capability and retains output/history. Local OBS Sources renames General playback
+without changing its URLs or identifiers.
+
+Voice imports decode at most 31 seconds, then retain exactly the first 30 seconds
+when longer, validate audible content, re-encode the saved reference and persist
+a crop notice. Too-short/corrupt/silent/oversized inputs remain errors. Existing
+voices accept bounded thumbnail replacement with atomic JPEG writes. Default
+user-provided thumbnails are downsampled to <=128 px, integrity-checked, and seeded
+to existing presets only when no custom thumbnail is present; tombstones remain.
+No transcription, title or custom image is replaced by thumbnail migration.

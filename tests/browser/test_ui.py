@@ -47,12 +47,25 @@ def live_app(live_server):
     return live_server[0]
 
 
+def add_ready_voice(page, mp3, title="Browser voice"):
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator('[data-tab="voices"]').click()
+    page.locator("#voice-title").fill(title)
+    page.locator("#voice-reference").set_input_files(mp3)
+    page.locator("#voice-transcript").fill("Known reference transcript.")
+    page.get_by_role("button", name="Save voice", exact=True).click()
+    expect(
+        page.locator(".voice-card").filter(has=page.locator('input[value="' + title + '"]'))
+    ).to_be_visible()
+    page.locator('[data-tab="studio"]').click()
+    page.locator("#voice-select").select_option(label=title)
+
+
 def prepare(page, live_app, mp3):
     page.goto(live_app)
     expect(page.get_by_role("button", name="Generate MP3")).to_be_enabled()
-    page.locator("#reference").set_input_files(mp3)
+    add_ready_voice(page, mp3)
     page.locator("#text").fill("Olá, este é um teste local.")
-    page.locator("#ref-text").fill("Referência.")
 
 
 def test_generate_play_download_stop(page, live_app, mp3, tmp_path):
@@ -82,13 +95,22 @@ def test_generate_play_download_stop(page, live_app, mp3, tmp_path):
 def test_error_message_and_retry(page, live_app, mp3, tmp_path):
     bad = tmp_path / "broken.mp3"
     bad.write_bytes(b"not mp3")
-    prepare(page, live_app, bad)
-    page.get_by_role("button", name="Generate MP3").click()
-    expect(page.locator("#error")).to_be_visible(timeout=15000)
+    page.goto(live_app)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator('[data-tab="voices"]').click()
+    page.locator("#voice-title").fill("Retry voice")
+    page.locator("#voice-reference").set_input_files(bad)
+    page.locator("#voice-transcript").fill("Known text")
+    page.get_by_role("button", name="Save voice", exact=True).click()
     expect(page.locator("#error")).to_contain_text("MP3")
-    expect(page.locator("#player")).to_be_hidden()
-    page.locator("#reference").set_input_files(mp3)
-    page.get_by_role("button", name="Generate MP3").click()
+    expect(page.locator(".voice-card")).to_have_count(0)
+    page.locator("#voice-reference").set_input_files(mp3)
+    page.get_by_role("button", name="Save voice", exact=True).click()
+    expect(page.locator(".voice-card")).to_have_count(1)
+    page.locator('[data-tab="studio"]').click()
+    page.locator("#voice-select").select_option(label="Retry voice")
+    page.locator("#text").fill("Retry successful")
+    page.locator("#generate").click()
     expect(page.locator("#player")).to_be_visible(timeout=15000)
     expect(page.locator("#error")).to_be_hidden()
 

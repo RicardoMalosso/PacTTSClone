@@ -28,3 +28,15 @@ Windows acceptance covers real wizard/failure handling and minimal installation 
 shortcut launch, repeat setup and data-preserving uninstall. GPU installation and
 generation need physical hardware validation; model quality is not inferred from
 installation tests.
+
+OBS and separate control links open in new tabs and remain stable during polling.
+The generation monitor follows the active local/Twitch/preparation job, restores
+on reload and includes a source/stage/timer/cancel strip visible across tabs.
+Monitoring Twitch generation does not autoplay its result in the admin browser.
+
+Tunnel controls moved to Configuration. Generate uses saved voices; reference MP3
+imports live in Voices. Twitch & OBS now has per-channel connect/disconnect/delete
+controls, and General playback is named Local OBS Sources (same URLs). Long MP3
+references are automatically cropped to 30 seconds with a persistent notice.
+Existing voice thumbnails can be replaced; the four defaults include the supplied
+small thumbnails and preserve user customizations on upgrade.

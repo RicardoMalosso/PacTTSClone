@@ -57,7 +57,7 @@ def test_rejects_wav_disguised_as_mp3(tmp_path):
         AudioPipeline(Settings()).decode(disguised, tmp_path / "decoded.wav")
 
 
-@pytest.mark.parametrize("duration,silent", [(0.4, False), (30.5, False), (3, True)])
+@pytest.mark.parametrize("duration,silent", [(0.4, False), (3, True)])
 def test_rejects_duration_or_silence(duration, silent, tmp_path):
     source = tmp_path / "source.wav"
     samples = np.zeros(int(duration * 24000)) if silent else np.ones(int(duration * 24000)) * 0.1
@@ -116,3 +116,10 @@ def test_encode_failure_cleans_partial(monkeypatch, tmp_path):
         pipeline.encode(Waveform(np.ones(24000), 24000), tmp_path, output)
     assert not output.exists()
     assert not output.with_suffix(".partial.mp3").exists()
+
+
+def test_long_reference_is_cropped_to_exactly_thirty_seconds(long_mp3, tmp_path):
+    destination = tmp_path / "cropped.wav"
+    assert AudioPipeline(Settings()).decode(long_mp3, destination) is True
+    assert sf.info(destination).duration == 30
+    assert AudioPipeline(Settings()).decode(long_mp3, destination) is True

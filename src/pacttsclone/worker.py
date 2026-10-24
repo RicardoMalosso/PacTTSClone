@@ -143,7 +143,7 @@ def execute_task(engine, settings, task, emit):
         workspace = Path(task["workspace"])
         report.stage("decode")
         reference = workspace / "reference.wav"
-        pipeline.decode(workspace / "reference.mp3", reference)
+        reference_cropped = pipeline.decode(workspace / "reference.mp3", reference)
         request = GenerationRequest(**task["request"])
         transcript = request.ref_text
         if not transcript:
@@ -165,6 +165,7 @@ def execute_task(engine, settings, task, emit):
         return {
             "type": "result",
             "ok": True,
+            "reference_cropped": reference_cropped,
             "transcript": transcript,
             "metrics": report.finish(),
             "device": getattr(engine, "device", None) or "test/cpu",

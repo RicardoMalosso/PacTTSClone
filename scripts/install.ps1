@@ -14,7 +14,6 @@ if (-not (Test-Path '.venv\Scripts\python.exe')) {
 }
 $PythonExe = Join-Path $PWD '.venv\Scripts\python.exe'
 Run-Checked $PythonExe @('-m', 'pip', 'install', '--upgrade', 'pip')
-$WheelIndex = if ($Device -eq 'cuda') { 'cu128' } else { 'cpu' }
-Run-Checked $PythonExe @('-m', 'pip', 'install', 'torch==2.8.0', 'torchaudio==2.8.0', '--index-url', "https://download.pytorch.org/whl/$WheelIndex")
-Run-Checked $PythonExe @('-m', 'pip', 'install', '-e', '.[inference]')
+Run-Checked $PythonExe @('-m', 'pip', 'install', '-e', '.')
+Write-Host 'CPU/NVIDIA e modelos serão configurados na aba Initial Setup do navegador.'
 Write-Host 'Instalação concluída. Execute scripts\start.ps1.'

@@ -301,9 +301,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.get("/api/state")
     def state():
+        with service._lock:
+            active = service.get(service.active_id) if service.active_id else None
+            jobs = [service.get(j["id"]) for j in service.history(100)]
         return {
-            "active_job": service.get(service.active_id) if service.active_id else None,
-            "jobs": [service.get(j["id"]) for j in service.history(100)],
+            "active_job": active,
+            "jobs": jobs,
             "voices": service.store.all("voice"),
             "channels": studio.channels(),
             "general_playback": service.store.get("channel", GENERAL_PLAYER),
@@ -387,6 +390,13 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def prepare_voice(voice_id: str):
         return studio.voices.prepare(voice_id)
 
+    @app.post("/api/voices/{voice_id}/thumbnail")
+    def update_thumbnail(voice_id: str, thumbnail: Annotated[UploadFile, File()]):
+        try:
+            return studio.voices.set_thumbnail(voice_id, thumbnail.file.read(2 * 1024 * 1024 + 1))
+        finally:
+            thumbnail.file.close()
+
     @app.post("/api/voices/{voice_id}/generate", status_code=202)
     def generate_voice(voice_id: str, value: GenerationRequest):
         return studio.voices.generate(voice_id, value)
@@ -423,6 +433,19 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         if channel != value.name:
             raise HTTPException(422, "Channel name does not match the URL.")
         return studio.save_channel(value)
+
+    @app.post("/api/channels/{channel}/connection")
+    def channel_connection(channel: str, value: dict):
+        if not isinstance(value.get("enabled"), bool):
+            raise HTTPException(422, "enabled must be true or false.")
+        return studio.set_channel_connection(channel, value["enabled"])
+
+    @app.delete("/api/channels/{channel}")
+    def delete_channel(channel: str):
+        result = studio.delete_channel(channel)
+        with tunnel.lock:
+            tunnel.player_keys.pop(channel, None)
+        return result
 
     @app.get("/api/channels/{channel}/state")
     def channel_state(channel: str):

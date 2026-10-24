@@ -6,12 +6,14 @@ import tempfile
 import uuid
 from pathlib import Path
 
+import soundfile as sf
 from PIL import Image, UnidentifiedImageError
 
 from .config import MAX_UPLOAD_BYTES
-from .domain import GenerationRequest, UserError
+from .domain import GenerationRequest, UserError, Waveform
 
 BUILTIN_CATALOG = Path(__file__).parent / "assets" / "voices" / "catalog.json"
+CROP_NOTICE = "mp3 was cropped to 30 seconds, will process anyway"
 
 
 class Voices:
@@ -37,7 +39,9 @@ class Voices:
         catalog = json.loads(BUILTIN_CATALOG.read_text(encoding="utf-8"))
         for entry in catalog:
             key = entry["key"]
-            if self.store.get("builtin_voice", key):
+            marker = self.store.get("builtin_voice", key)
+            if marker:
+                self._seed_thumbnail(marker["voice_id"], entry)
                 continue
             voice_id = uuid.uuid5(uuid.NAMESPACE_URL, "pacttsclone-default:" + key).hex
             if not self.store.get("voice", voice_id):
@@ -63,6 +67,45 @@ class Voices:
                 )
             # Keep this marker after deletion so upgrades never resurrect user-deleted presets.
             self.store.put("builtin_voice", key, {"initialized": True, "voice_id": voice_id})
+            self._seed_thumbnail(voice_id, entry)
+
+    def _seed_thumbnail(self, voice_id, entry):
+        voice = self.store.get("voice", voice_id)
+        if not voice or voice.get("thumbnail_url") or not entry.get("thumbnail"):
+            return
+        source = BUILTIN_CATALOG.parent / entry["thumbnail"]
+        if hashlib.sha256(source.read_bytes()).hexdigest() != entry["thumbnail_sha256"]:
+            raise UserError("A bundled voice thumbnail failed its integrity check.")
+        shutil.copyfile(source, self.root / voice_id / "thumbnail.jpg")
+        self.store.patch("voice", voice_id, thumbnail_url=f"/api/voices/{voice_id}/thumbnail")
+
+    def _write_thumbnail(self, folder, data):
+        if len(data) > 2 * 1024 * 1024:
+            raise UserError("Thumbnail exceeds 2 MiB.")
+        temporary = folder / (uuid.uuid4().hex + ".jpg")
+        try:
+            with Image.open(io.BytesIO(data)) as image:
+                if image.width * image.height > 16_000_000:
+                    raise UserError("Thumbnail dimensions are too large.")
+                image.thumbnail((320, 320))
+                image.convert("RGB").save(temporary, "JPEG", quality=80)
+            temporary.replace(folder / "thumbnail.jpg")
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
+            raise UserError("Choose a valid PNG, JPEG or WebP thumbnail.") from exc
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def set_thumbnail(self, voice_id, data):
+        with self.service._lock:
+            voice = self.store.get("voice", voice_id)
+            if not voice:
+                raise UserError("Voice not found.")
+            self._write_thumbnail(self.root / voice_id, data)
+            return self.store.patch(
+                "voice",
+                voice_id,
+                thumbnail_url=f"/api/voices/{voice_id}/thumbnail?v={uuid.uuid4().hex}",
+            )
 
     def create(self, stream, title, filename, transcript="", thumbnail=None):
         title, transcript = title.strip(), transcript.strip()
@@ -85,19 +128,14 @@ class Voices:
                         raise UserError("MP3 exceeds 20 MiB.")
                     target.write(chunk)
             with tempfile.TemporaryDirectory(dir=self.service.temporary) as tmp:
-                self.service.audio.decode(path, Path(tmp) / "reference.wav")
+                decoded = Path(tmp) / "reference.wav"
+                cropped = self.service.audio.decode(path, decoded)
+                if cropped:
+                    samples, rate = sf.read(decoded)
+                    self.service.audio.encode(Waveform(samples, rate), Path(tmp), path)
             thumb_url = None
             if thumbnail:
-                if len(thumbnail) > 2 * 1024 * 1024:
-                    raise UserError("Thumbnail exceeds 2 MiB.")
-                try:
-                    with Image.open(io.BytesIO(thumbnail)) as image:
-                        if image.width * image.height > 16_000_000:
-                            raise UserError("Thumbnail dimensions are too large.")
-                        image.thumbnail((320, 320))
-                        image.convert("RGB").save(folder / "thumbnail.jpg", "JPEG", quality=85)
-                except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as exc:
-                    raise UserError("Choose a valid PNG, JPEG or WebP thumbnail.") from exc
+                self._write_thumbnail(folder, thumbnail)
                 thumb_url = f"/api/voices/{voice_id}/thumbnail"
             voice = {
                 "id": voice_id,
@@ -107,6 +145,8 @@ class Voices:
                 "status": "ready" if transcript else "pending",
                 "thumbnail_url": thumb_url,
                 "error": None,
+                "cropped": bool(cropped),
+                "warning": CROP_NOTICE if cropped else None,
             }
             self.store.put("voice", voice_id, voice)
             if not transcript:

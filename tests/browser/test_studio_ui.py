@@ -6,6 +6,7 @@ from playwright.sync_api import expect
 
 from pacttsclone.models import ChannelConfig
 
+from .test_ui import add_ready_voice
 from .test_ui import live_server as live_server
 
 
@@ -71,8 +72,7 @@ def test_progress_timer_and_cancel_interface(page, live_server, mp3):
     try:
         page.goto(url)
         expect(page.locator("#generate")).to_be_enabled()
-        page.locator("#reference").set_input_files(mp3)
-        page.locator("#ref-text").fill("Known text")
+        add_ready_voice(page, mp3)
         page.locator("#text").fill("Cancel this generation")
         page.locator("#generate").click()
         expect(page.locator("#cancel-job")).to_be_visible()
@@ -192,6 +192,8 @@ def test_tunnel_buttons_and_scoped_links(page, live_server, monkeypatch):
     monkeypatch.setattr(tunnel, "start", start)
     page.goto(url)
     expect(page.locator("#generate")).to_be_enabled()
+    expect(page.locator("#tunnel-card")).to_be_hidden()
+    open_tab(page, "Configuration")
     page.get_by_role("button", name="Start secure tunnel", exact=True).click()
     expect(page.locator("#tunnel-stop")).to_be_visible()
     expect(page.locator("#tunnel-links input").first).to_have_value(
@@ -311,14 +313,13 @@ def test_general_player_generate_queue_and_controls(page, live_server, mp3):
     url, app = live_server
     page.goto(url)
     expect(page.locator("#generate")).to_be_enabled()
-    page.locator("#reference").set_input_files(mp3)
-    page.locator("#ref-text").fill("Reference transcript.")
+    add_ready_voice(page, mp3)
     page.locator("#text").fill("General player browser test")
     page.locator("#generate").click()
     expect(page.locator("#send-general")).to_be_visible(timeout=15000)
     page.locator("#send-general").click()
-    expect(page.locator("#playback-note")).to_have_text("Queued on general player.")
-    open_tab(page, "General playback")
+    expect(page.locator("#playback-note")).to_have_text("Queued on local OBS source.")
+    open_tab(page, "Local OBS Sources")
     expect(page.locator("#channel-queue")).to_contain_text("General player browser test")
     expect(page.locator("#channel-form")).to_be_hidden()
     page.locator("#general-delay").fill("0")
@@ -435,11 +436,12 @@ def test_local_autoqueue_checkbox_persists_and_queues_without_autoplay(page, liv
     page.reload()
     expect(page.locator("#autoqueue")).to_be_checked()
     expect(page.locator("#autoplay")).not_to_be_checked()
-    page.locator("#reference").set_input_files(mp3)
-    page.locator("#ref-text").fill("Reference transcript.")
+    add_ready_voice(page, mp3)
     page.locator("#text").fill("Automatically queue my local generation")
     page.locator("#generate").click()
-    expect(page.locator("#autoqueue-note")).to_have_text("Queued on general player.", timeout=15000)
+    expect(page.locator("#autoqueue-note")).to_have_text(
+        "Queued on local OBS source.", timeout=15000
+    )
     assert len(app.state.studio.playback.items("playbackMain")) == 1
     assert page.locator("#player").evaluate("audio => audio.paused")
     page.locator('[data-tab="general"]').click()
@@ -475,10 +477,10 @@ def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_ser
         popup.value.wait_for_url(url + path)
         assert page.url == url + "/"
         popup.value.close()
-    open_tab(page, "General playback")
+    open_tab(page, "Local OBS Sources")
     for label, path in [
-        ("Open general OBS player", "/playbackMain"),
-        ("Open general control page", "/playbackMain/control"),
+        ("Open local OBS player", "/playbackMain"),
+        ("Open local OBS control page", "/playbackMain/control"),
     ]:
         with page.expect_popup() as popup:
             page.get_by_role("link", name=label, exact=True).click()
@@ -543,3 +545,70 @@ def test_monitor_follows_twitch_jobs_across_tabs_and_after_reload(page, live_ser
     finally:
         for release in releases:
             release.set()
+
+
+def test_voice_only_generation_and_channel_dashboard(page, live_server):
+    from tests.test_v2 import FakeIRC
+
+    url, app = live_server
+    app.state.studio.twitch_factory = FakeIRC
+    app.state.studio.save_channel(ChannelConfig(name="channelone"))
+    app.state.studio.save_channel(ChannelConfig(name="channeltwo"))
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    expect(page.locator('#pane-studio input[type="file"]')).to_have_count(0)
+    expect(page.locator('#pane-voices input[type="file"]')).to_have_count(2)
+    expect(page.locator("#tunnel-card")).to_be_hidden()
+    open_tab(page, "Twitch & OBS")
+    first = page.locator('[data-channel="channelone"]')
+    second = page.locator('[data-channel="channeltwo"]')
+    expect(first).to_contain_text("disconnected")
+    first.get_by_role("button", name="Connect", exact=True).click()
+    expect(first).to_contain_text("connected")
+    assert app.state.studio.clients["channelone"].status == "connected"
+    expect(second.get_by_role("button", name="Connect", exact=True)).to_be_visible()
+    first.get_by_role("button", name="Disconnect", exact=True).click()
+    expect(first.get_by_role("button", name="Connect", exact=True)).to_be_visible()
+    assert not app.state.studio.store.get("channel", "channelone")["enabled"]
+    first.get_by_role("button", name="Delete channel", exact=True).click()
+    expect(first).to_have_count(0)
+    expect(second).to_be_visible()
+    page.reload()
+    open_tab(page, "Twitch & OBS")
+    expect(page.locator('[data-channel="channelone"]')).to_have_count(0)
+    open_tab(page, "Local OBS Sources")
+    expect(page.locator("#channel-dashboard")).to_be_hidden()
+    open_tab(page, "Configuration")
+    expect(page.locator("#tunnel-start")).to_be_visible()
+
+
+def test_long_voice_crop_notice_and_existing_thumbnail_upload(
+    page, live_server, long_mp3, tmp_path
+):
+    from PIL import Image
+
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator('[data-tab="voices"]').click()
+    page.locator("#voice-title").fill("Long voice")
+    page.locator("#voice-reference").set_input_files(long_mp3)
+    page.locator("#voice-transcript").fill("First thirty seconds.")
+    page.get_by_role("button", name="Save voice", exact=True).click()
+    expect(page.locator("#voice-upload-note")).to_have_text(
+        "mp3 was cropped to 30 seconds, will process anyway"
+    )
+    card = page.locator(".voice-card")
+    expect(card.locator(".notice")).to_contain_text("cropped to 30 seconds")
+    thumbnail = tmp_path / "thumbnail.png"
+    Image.new("RGB", (600, 300), "green").save(thumbnail)
+    card.get_by_label("Replace thumbnail", exact=True).set_input_files(thumbnail)
+    expect(card.locator("img")).to_be_visible()
+    page.wait_for_function('document.querySelector(".voice-card img")?.naturalWidth === 320')
+    page.reload()
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator('[data-tab="voices"]').click()
+    expect(page.locator(".voice-card img")).to_be_visible()
+    page.locator('[data-locale="pt"]').click()
+    expect(page.locator(".voice-card .notice")).to_contain_text("cortado para 30 segundos")
+    expect(page.locator(".voice-card img")).to_be_visible()
