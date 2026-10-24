@@ -256,3 +256,53 @@ def test_dependency_constraints_use_relative_path_in_directory_with_spaces(
         assert (setup.root / "base-constraints.txt").is_file()
     finally:
         app.state.studio.close()
+
+def test_dependency_progress_reports_actual_bytes_and_timestamp(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    setup = app.state.runtime_setup
+    setup.update(stage="pytorch")
+    output = io.StringIO()
+    try:
+        setup._run_command(
+            [
+                sys.executable,
+                "-c",
+                "print('Downloading torch-2.8.0.whl (20 bytes)', flush=True); "
+                "print('Progress 10 of 20', flush=True)",
+            ],
+            output,
+        )
+        progress = setup.snapshot()["dependency_progress"]
+        assert progress["package"] == "torch-2.8.0.whl (20 bytes)"
+        assert progress["downloaded_bytes"] == 10
+        assert progress["total_bytes"] == 20
+        assert progress["percent"] == 50.0
+        assert any(line.startswith("[20") for line in setup.snapshot()["lines"])
+        assert "[20" in output.getvalue()
+    finally:
+        app.state.studio.close()
+
+
+def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    setup = app.state.runtime_setup
+    setup.update(
+        status="running",
+        started_at=time.time() - 31,
+        initial_setup_completed=False,
+        countermeasures_offered=False,
+    )
+    try:
+        with TestClient(app, base_url="http://127.0.0.1:7860") as client:
+            headers = {"X-PacTTS-Token": client.get("/api/session").json()["token"]}
+            path = "/api/setup/countermeasures/offer"
+            assert client.post(path).status_code == 403
+            assert client.post(path, headers=headers).json() == {"offered": True}
+            assert client.post(path, headers=headers).json() == {"offered": False}
+        assert setup.state["countermeasures_offered"] is True
+        from pacttsclone.setup_runtime import RuntimeSetup
+
+        restored = RuntimeSetup(app.state.service)
+        assert restored.offer_countermeasures() == {"offered": False}
+    finally:
+        app.state.studio.close()
