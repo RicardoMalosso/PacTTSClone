@@ -156,8 +156,19 @@ Added first-page large red storage/model/unsigned notice with a five-second
 interactive Next gate. Default data is a sibling PacTTSClone-data directory;
 checkbox unlocks a custom data path. Small red bold estimates sit beside both
 pickers. Existing native uninstaller gains explicit Start Menu/app-folder links.
-Windows CI now checks the interactive wizard and performs actual default-sibling
-CPU install/reinstall/uninstall with retained data. Validation pending new run.
+Windows validation passed in run 40112512322 on commit
+`91823bf7121fd6ba93acdd9668d440c29ab42af1`:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40112512322
+
+- Actual wizard automation verified disabled Next/countdown, both space labels,
+  sibling data default, checkbox unlock/relock and default restoration.
+- Screenshots visually reviewed: large red notice and small red bold estimates
+  appear without overlap; disabled data picker and checkbox are visible.
+- Real CPU installation used default sibling data layout under PacTTS, checked
+  uninstaller links and launched the parent PacTTSClone.lnk to serve HTTP.
+- Reinstall and uninstall preserved user data and removed the parent shortcut.
+- RC2 draft setup: 3,608,636 bytes, below the 10 MiB gate and still unsigned.
+- Setup/wheel checksums independently verified from the downloaded CI artifact.
 
 ## Default voices and parent launcher — implementation checkpoint
 
@@ -166,5 +177,13 @@ Akuma Lady is a 29.9-second copy of the 30.59-second original, other samples byt
 unchanged. Defaults seed once without jobs/model downloads, require Prepare, and
 retain edits/deletions across restarts. Preparation is idempotent with stored ASR
 text, UI progress/cancel/retry and readiness gating. Added parent launcher shortcut.
-All samples passed real FFmpeg reference decoding. New lifecycle/browser tests and
-updated Windows installer validation are running; no real ASR accuracy claim yet.
+All samples passed real FFmpeg reference decoding. Validation completed: 119 backend tests and 16 Chromium tests passed locally,
+and all five Windows/Linux application CI jobs passed in run 40112512318:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40112512318
+
+New tests cover lazy/default seeding, real FFmpeg decoding of all four references,
+readiness gating, preparation/transcript reuse, persisted edits/deletion markers,
+and first-use UI progress/cancel controls. The default voice generation path was
+also exercised with an explicit test engine. All four references were verified
+inside the release wheel against their catalog hashes. No real ASR accuracy or
+new GPU performance claim is inferred from these application tests.

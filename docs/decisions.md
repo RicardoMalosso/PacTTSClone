@@ -135,3 +135,11 @@ are approximately 3.3 GB per official repository listing, while total app/data
 usage depends on CPU/CUDA, ASR and growing caches/recordings. The requested red
 five-second notice applies to interactive setup only. Reuse Inno's existing
 uninstaller, add visible shortcuts, and keep user data outside deletion rules.
+
+The user explicitly supplied four references for distribution as defaults. This
+supersedes the blanket no-recordings-in-git rule only for assets/voices: no model
+weights or arbitrary user recordings are committed. Preserve source filenames and
+user-requested titles, trim only Akuma Lady's overlong source to a documented
+29.9-second copy, and never guess transcripts. Hash/copy samples once, then require
+manual Prepare or a manually supplied exact transcript. Preserve deleted presets
+and edits across upgrades. Reuse the existing isolated transcription pipeline.

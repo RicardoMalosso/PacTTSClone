@@ -93,3 +93,10 @@ path, checkbox unlock/relock and default restoration. Screenshots are retained.
 The real CPU installation test omits /DATADIR to exercise the default sibling
 layout, verifies both uninstaller shortcuts, and retains user data on uninstall.
 Explicit /DATADIR still unlocks custom storage for unattended setup.
+
+RC2 passed Windows wizard + actual CPU install/parent-shortcut launch/reinstall/
+uninstall in run 40112512322; screenshots were visually inspected. Application
+run 40112512318 passed all five jobs (Windows/Linux 3.11/3.12 and Chromium).
+Local total: 119 backend tests, 16 browser tests. The release installer/wheel
+checksums and embedded default-reference catalog hashes were independently checked.
+Preparation tests use an explicit test engine; FFmpeg reference validation is real.
