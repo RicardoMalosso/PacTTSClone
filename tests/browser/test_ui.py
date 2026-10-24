@@ -213,12 +213,20 @@ def test_initial_setup_countermeasures_prompt_once(page, live_server):
     expect(page.locator("#setup-elapsed")).not_to_have_text("00:00.0")
     page.locator("#setup-too-long-yes").click()
     expect(page.locator("#countermeasure-loading")).to_be_visible()
-    expect(page.locator("#countermeasure-image")).to_be_visible(timeout=5000)
+    expect(page.locator("#countermeasure-video")).to_be_visible(timeout=5000)
     page.wait_for_function(
-        'document.querySelector("#countermeasure-image")?.naturalWidth > 0',
+        'document.querySelector("#countermeasure-video")?.videoWidth > 0',
         timeout=10000,
     )
     page.locator("#countermeasure-close").click()
     expect(page.locator("#countermeasure-modal")).to_be_hidden()
+    video = page.locator("#countermeasure-video")
+    expect(video).to_have_attribute("loop", "")
+    page.wait_for_function(
+        'document.querySelector("#countermeasure-video")?.currentTime > 0',
+        timeout=10000,
+    )
+    page.locator("#countermeasure-close").click()
+    assert video.evaluate("(v) => v.paused")
     page.reload()
     expect(page.locator("#setup-too-long")).to_be_hidden()
