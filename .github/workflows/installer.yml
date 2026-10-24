@@ -37,7 +37,7 @@ jobs:
         with:
           msystem: MINGW64
           update: true
-          install: make nasm diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-lame
+          install: git python make nasm diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-lame
       - name: Build FFmpeg from pinned official source
         shell: msys2 {0}
         run: bash installer/build-ffmpeg.sh

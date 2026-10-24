@@ -6,7 +6,33 @@ concurrency:
   group: tests-v1-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  windows-tools:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: 8ae0b34901ba60a802f183ee75a250a9fc3e09a5
+          path: build-sources/ffmpeg
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: git python make nasm diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-lame
+      - shell: msys2 {0}
+        run: bash installer/build-ffmpeg.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-built-windows-ffmpeg
+          path: installer/ffmpeg/bin/*.exe
   core:
+    needs: windows-tools
     timeout-minutes: 15
     strategy:
       matrix:
@@ -21,9 +47,15 @@ jobs:
       - name: FFmpeg (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: FFmpeg (Windows)
+      - uses: actions/download-artifact@v4
         if: runner.os == 'Windows'
-        run: choco install ffmpeg --no-progress -y
+        with:
+          name: source-built-windows-ffmpeg
+          path: ffmpeg-tools
+      - name: FFmpeg path (Windows, built from official source)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Add-Content $env:GITHUB_PATH (Join-Path $env:GITHUB_WORKSPACE 'ffmpeg-tools')
       - run: python -m pip install -e ".[dev]"
       - run: python -m ruff check .
       - run: python -m pytest -vv --timeout=15

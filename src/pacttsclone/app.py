@@ -302,6 +302,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.get("/api/state")
     def state():
         return {
+            "active_job": service.get(service.active_id) if service.active_id else None,
             "jobs": [service.get(j["id"]) for j in service.history(100)],
             "voices": service.store.all("voice"),
             "channels": studio.channels(),

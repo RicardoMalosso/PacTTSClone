@@ -65,7 +65,6 @@ var
   IntroUntil: Int64;
   IntroSeen: Boolean;
   IntroTimer: LongWord;
-  DevicePage: TInputOptionWizardPage;
   PreparationFailed: Boolean;
   LogButton: TNewButton;
   SetupLogPath: String;
@@ -165,7 +164,7 @@ begin
   IntroModels.SetBounds(0, ScaleY(116), IntroPage.SurfaceWidth, ScaleY(88));
   IntroModels.AutoSize := False; IntroModels.WordWrap := True;
   IntroModels.Font.Size := 13; IntroModels.Font.Style := [fsBold]; IntroModels.Font.Color := clRed;
-  IntroModels.Caption := 'OmniVoice is about a 3.3 GB download on first use. Dependencies, optional transcription models and caches need more. Pick the folders right.';
+  IntroModels.Caption := 'OmniVoice is about a 3.3 GB download in browser Initial Setup. Dependencies, the transcription model and caches need more. Pick the folders right.';
   IntroUnsigned := TNewStaticText.Create(WizardForm);
   IntroUnsigned.Parent := IntroPage.Surface;
   IntroUnsigned.SetBounds(0, ScaleY(210), IntroPage.SurfaceWidth, ScaleY(28));

@@ -9,7 +9,7 @@ let selectedChannel = location.pathname.endsWith('/control') ? location.pathname
 let bugVideoTimer = null, bugVideoOpen = false;
 let completedJob = null;
 let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
-let voicesKey = '', historyKey = '', channelKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
+let voicesKey = '', historyKey = '', channelKey = '', channelLinksKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
 function stopAllAudio() { stopBugVideo(); document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
 
 function el(tag, attrs = {}, ...children) {
@@ -26,7 +26,7 @@ function el(tag, attrs = {}, ...children) {
 function error(message) { $('error').textContent = t(message); $('error').hidden = false; }
 function action(fn) { return async event => { try { await fn(event); } catch (e) { error(e.message); } }; }
 function button(text, fn, cls = 'secondary small-button') { return window.Locale.bind(el('button', {type: 'button', class: cls, onclick: action(fn)}), text); }
-function link(text, href, download = false) { return window.Locale.bind(el('a', {href, ...(download ? {download: ''} : {})}), text); }
+function link(text, href, download = false) { return window.Locale.bind(el('a', {href, ...(download ? {download: ''} : {target: '_blank', rel: 'noopener noreferrer'})}), text); }
 function bytes(value) { return value == null ? t('N/A') : `${(value / 1073741824).toFixed(2)} GiB`; }
 function duration(value) { const n = Math.max(0, value || 0); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${(n % 60).toFixed(1).padStart(4, '0')}`; }
 async function api(url, options = {}) {
@@ -112,7 +112,13 @@ function clearResult() {
 }
 function renderMonitor(job) {
   lastMonitor = job; lastMonitorAt = performance.now();
+  const voice = state.voices.find(v => v.id === job.voice_id);
+  const source = [job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
+  $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
+  $('live-generation').hidden = !runtimeSetup.ready;
   $('status').textContent = job.error || `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`;
+  $('live-generation-status').textContent = $('status').textContent;
+  $('live-generation-cancel').hidden = !['queued', 'running'].includes(job.status);
   $('overall-progress').value = job.progress || 0;
   $('cancel-job').hidden = !['queued', 'running'].includes(job.status);
   $('stage-list').replaceChildren();
@@ -137,15 +143,17 @@ function renderMonitor(job) {
 setInterval(() => {
   if (!lastMonitor) return;
   const delta = lastMonitor.status === 'running' ? (performance.now() - lastMonitorAt) / 1000 : 0;
-  $('timer').textContent = duration(lastMonitor.elapsed_seconds + delta);
+  $('timer').textContent = duration((lastMonitor.elapsed_seconds || 0) + delta);
+  $('live-generation-timer').textContent = $('timer').textContent;
   $('stage-timer').textContent = `${((lastMonitor.stage_elapsed_seconds || 0) + delta).toFixed(1)} s`;
 }, 100);
 async function watch(id) {
   while (true) {
-    const job = await api('/api/jobs/' + id); renderMonitor(job);
+    const job = await api('/api/jobs/' + id);
+    if (job.status === 'running' || !lastMonitor || (lastMonitor.id === job.id && !state.active_job)) renderMonitor(job);
     if (job.status === 'failed' || job.status === 'cancelled') { currentJob = null; throw new Error(job.error || t('Generation cancelled.')); }
     if (job.status === 'succeeded') {
-      $('status').textContent = t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds});
+      if (!state.active_job || state.active_job.id === job.id) { $('status').textContent = t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds}); $('live-generation-status').textContent = $('status').textContent; }
       $('player').src = job.output_url; $('player').hidden = false; $('actions').hidden = false;
       $('download').href = job.output_url; $('download').download = `pactts-${job.id}.mp3`;
       if ($('autoplay').checked && !suppressAutoplay) {
@@ -174,7 +182,10 @@ $('generate-form').addEventListener('submit', action(async event => {
     currentJob = job.id; await watch(job.id);
   } finally { busy = false; $('generate').disabled = !runtimeSetup.ready; }
 }));
-$('cancel-job').addEventListener('click', action(async () => { if (currentJob) await api(`/api/jobs/${currentJob}/cancel`, {method: 'POST'}); }));
+async function cancelMonitoredJob() { if (lastMonitor && ['queued', 'running'].includes(lastMonitor.status)) { await api(`/api/jobs/${lastMonitor.id}/cancel`, {method: 'POST'}); await refresh(); } }
+$('cancel-job').addEventListener('click', action(cancelMonitoredJob));
+$('live-generation-cancel').addEventListener('click', action(cancelMonitoredJob));
+$('view-monitor').addEventListener('click', () => { tab('studio'); $('monitor-source').scrollIntoView({behavior: 'smooth', block: 'center'}); });
 $('panic').addEventListener('click', action(async () => { stopAllAudio(); await api('/api/panic', {method: 'POST'}); }));
 $('cancel-all').addEventListener('click', action(async () => { stopAllAudio(); await api('/api/cancel-all', {method: 'POST'}); }));
 document.addEventListener('keydown', action(async e => {
@@ -297,6 +308,9 @@ function renderChannels() {
   }
   const c = selectedChannel === 'playbackMain' ? {name: 'playbackMain', connection: t('General playback')} : state.channels.find(c => c.name === selectedChannel);
   $('channel-connection').textContent = c ? `${c.name}: ${t(c.connection)}${c.connection_error ? ' · ' + c.connection_error : ''}` : t('Choose a saved channel.');
+  const linksKey = c?.name || '';
+  if (linksKey === channelLinksKey) return;
+  channelLinksKey = linksKey;
   $('channel-links').replaceChildren();
   if (c) $('channel-links').append(el('p', {}, link('Open OBS player', `/${c.name}`)), el('input', {readonly: '', value: `${location.origin}/${c.name}`, 'aria-label': 'OBS source URL'}),
     el('p', {}, link('Open separate control page', `/${c.name}/control`)));
@@ -318,6 +332,8 @@ $('config-form').addEventListener('submit', action(async event => {
 }));
 async function refresh() {
   state = await api('/api/state');
+  const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.find(j => j.status === 'queued') || state.jobs.find(j => j.id === lastMonitor?.id) || state.jobs[0];
+  if (monitored) renderMonitor(monitored);
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
@@ -407,6 +423,7 @@ function renderSetup(data) {
   runtimeSetup = data;
   document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
   $('generate').disabled = busy || !data.ready;
+  $('live-generation').hidden = !data.ready || !lastMonitor;
   $('tunnel-card').hidden = !data.ready;
   $('setup-start').disabled = data.status === 'running';
   $('setup-cancel').hidden = data.status !== 'running';

@@ -1,5 +1,6 @@
 import threading
 import time
+from datetime import UTC, datetime, timedelta
 
 from playwright.sync_api import expect
 
@@ -393,7 +394,9 @@ def test_bug_video_lazy_delay_cancel_and_locale(page, live_server):
     page.route("https://www.youtube-nocookie.com/**", video_route)
     page.goto(url)
     expect(page.locator("#generate")).to_be_enabled()
-    page.clock.install()
+    clock_start = datetime(2030, 1, 1, tzinfo=UTC)
+    page.clock.install(time=clock_start)
+    page.clock.pause_at(clock_start + timedelta(seconds=1))
     page.clock.run_for(3500)
     assert requests == []
     page.locator('[data-tab="bugs"]').click()
@@ -448,3 +451,95 @@ def test_local_autoqueue_checkbox_persists_and_queues_without_autoplay(page, liv
     page.locator("#generate").click()
     expect(page.locator("#status")).to_contain_text("MP3 ready", timeout=15000)
     assert len(app.state.studio.playback.items("playbackMain")) == 1
+
+
+def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_server):
+    url, app = live_server
+    app.state.studio.save_channel(ChannelConfig(name="testchannel"))
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    open_tab(page, "Twitch & OBS")
+    page.locator("#channel-select").select_option("testchannel")
+    player = page.get_by_role("link", name="Open OBS player", exact=True)
+    expect(player).to_have_attribute("target", "_blank")
+    # Polling must not replace a link while a physical click is in progress.
+    node = player.element_handle()
+    page.wait_for_timeout(1600)
+    assert node.evaluate("node => node.isConnected")
+    for label, path in [
+        ("Open OBS player", "/testchannel"),
+        ("Open separate control page", "/testchannel/control"),
+    ]:
+        with page.expect_popup() as popup:
+            page.get_by_role("link", name=label, exact=True).click()
+        popup.value.wait_for_url(url + path)
+        assert page.url == url + "/"
+        popup.value.close()
+    open_tab(page, "General playback")
+    for label, path in [
+        ("Open general OBS player", "/playbackMain"),
+        ("Open general control page", "/playbackMain/control"),
+    ]:
+        with page.expect_popup() as popup:
+            page.get_by_role("link", name=label, exact=True).click()
+        popup.value.wait_for_url(url + path)
+        assert page.url == url + "/"
+        popup.value.close()
+
+
+def test_monitor_follows_twitch_jobs_across_tabs_and_after_reload(page, live_server, mp3):
+    url, app = live_server
+    studio = app.state.studio
+    with mp3.open("rb") as reference:
+        voice = studio.voices.create(reference, "Monitor Voice", "voice.mp3", "Known transcript")
+    studio.save_channel(
+        ChannelConfig(name="monitortest", commands={"!voice": voice["id"]}, user_cooldown_seconds=0)
+    )
+    # Test chat ingestion without opening a real IRC connection.
+    studio.store.patch("channel", "monitortest", enabled=True)
+    original = studio.service.engine.synthesize
+    releases = [threading.Event(), threading.Event()]
+    entered = [threading.Event(), threading.Event()]
+    calls = []
+
+    def blocked(*args):
+        number = len(calls)
+        calls.append(number)
+        entered[number].set()
+        assert releases[number].wait(15)
+        return original(*args)
+
+    studio.service.engine.synthesize = blocked
+    try:
+        page.goto(url)
+        expect(page.locator("#generate")).to_be_enabled()
+        open_tab(page, "Twitch & OBS")
+        first = studio.receive("monitortest", "viewerone", "!voice First speech")
+        assert entered[0].wait(3)
+        expect(page.locator("#live-generation")).to_be_visible()
+        expect(page.locator("#live-generation-source")).to_contain_text(
+            "Twitch · #monitortest · viewerone"
+        )
+        expect(page.locator("#live-generation-source")).to_contain_text("Monitor Voice")
+        expect(page.locator("#live-generation-timer")).not_to_have_text("00:00.0")
+        second = studio.receive("monitortest", "viewertwo", "!voice Second speech")
+        page.wait_for_timeout(900)
+        expect(page.locator("#live-generation-source")).to_contain_text("viewerone")
+        page.reload()
+        expect(page.locator("#monitor-source")).to_contain_text("viewerone")
+        expect(page.locator("#cancel-job")).to_be_visible()
+        page.locator("#cancel-job").click()
+        releases[0].set()
+        assert entered[1].wait(5)
+        expect(page.locator("#monitor-source")).to_contain_text("viewertwo")
+        assert studio.service.get(first["id"])["status"] == "cancelled"
+        assert studio.service.get(second["id"])["status"] == "running"
+        # Monitoring a Twitch job must not autoplay it in the admin page.
+        expect(page.locator("#player")).to_be_hidden()
+        open_tab(page, "Configuration")
+        expect(page.locator("#live-generation-source")).to_contain_text("viewertwo")
+        page.locator("#view-monitor").click()
+        expect(page.locator("#pane-studio")).to_be_visible()
+    finally:
+        for release in releases:
+            release.set()

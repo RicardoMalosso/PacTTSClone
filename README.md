@@ -14,6 +14,8 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
   transcript. Blank samples are transcribed once locally and reused.
 - Per-channel Twitch commands, basic always-on slur filter, optional profanity
   levels, custom phrases, cooldowns and moderation countdown (default 5 seconds).
+- OBS player/control links always open a new tab; active generation monitoring follows
+  local/Twitch jobs across tabs and after reload.
 - Transparent OBS player, separate control page, replay/download/history, global
   Windows stop shortcut and playback mirroring for another OBS instance.
 - Optional homepage sharing button: temporary Cloudflare tunnel with separate
@@ -39,7 +41,7 @@ repository does not provide public downloads.
 4. Double-click **PacTTSClone.lnk** inside your selected root, or the Start Menu
    shortcut. Open **Initial Setup** in the browser and choose CPU or NVIDIA GPU.
    A compatible NVIDIA driver is required; setup never installs drivers.
-5. Click **Start initial setup**. The web interface installs the selected inference
+5. Click **Install / verify setup**. The web interface installs the selected inference
    packages, downloads OmniVoice and Whisper Small, verifies the files and unlocks
    the other tabs. Model progress shows real file bytes, cache verification and
    resumed downloads. Package installation shows actual log activity; it has no

@@ -246,3 +246,15 @@ fabricated byte total. Owner-only API supports cancel/retry/logs. See
 [web setup design](web-setup-design.md) and [installer design](installer-design.md).
 Validation pending RC4 Windows workflow; backend/browser results recorded below
 when completed. An automatic updater is not implemented.
+
+OBS player/control links open in a new tab with noopener/noreferrer. Channel link
+nodes remain stable during polling so a refresh between mousedown/mouseup cannot
+swallow the click. Browser acceptance covers actual popup URLs for both channel
+and general playback/control links.
+
+Generation monitoring follows the server's active job, independently of local form
+submission. A compact source/stage/timer/cancel strip remains visible across tabs;
+the full Generate monitor follows Twitch, preparation and queued local requests,
+including after reload. It prioritizes the running job over later queued work.
+Cancel targets the displayed job. Monitoring remote requests never autoplays them
+in the admin browser; OBS retains playback responsibility.

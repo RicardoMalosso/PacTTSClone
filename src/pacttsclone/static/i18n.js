@@ -1,6 +1,10 @@
 'use strict';
 (() => {
   const pt = {
+    'Local request': 'Pedido local',
+    'Voice preparation': 'Preparação de voz',
+    'View generation monitor': 'Ver monitor de geração',
+    'Cancel active generation': 'Cancelar geração atual',
     'Initial Setup': 'Configuração inicial',
     'Complete setup before opening the studio. Downloads and verification appear here.': 'Conclua a configuração antes de abrir o estúdio. Downloads e verificação aparecem aqui.',
     'CPU · smaller download, slower generation': 'CPU · download menor, geração mais lenta',

@@ -261,11 +261,11 @@ class RuntimeSetup:
             )
             process = self.process
         for line in process.stdout:
+            log.write(line)
+            log.flush()
             if line.startswith("@@PACTTS_SETUP@@"):
                 self.update(**json.loads(line[len("@@PACTTS_SETUP@@") :]))
                 continue
-            log.write(line)
-            log.flush()
             with self.lock:
                 self.lines.append(line.rstrip())
                 self.lines = self.lines[-100:]
