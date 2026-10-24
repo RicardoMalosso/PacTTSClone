@@ -42,3 +42,17 @@ are small enough to bundle, avoiding unauthenticated downloads from private rele
 assets. They are not labeled official upstream Windows binaries. Release includes
 build recipe/provenance/source references and licenses. No unsigned builder's
 precompiled FFmpeg is fetched by setup.
+
+## RC5 live setup progress
+
+Live updates are exposed via local SSE at `/api/setup/stream` and backed by the normal
+`/api/setup` snapshot. Initial model downloads use actual byte reports; dependency
+wheels use `pip --progress-bar raw` through a pipe, reporting each package's
+actual bytes and percent only when the server declares a total. Download speed
+and ETA are measured over the last emitted interval, not a promise.
+Timestamped stdout/stderr is persisted to runtime-setup.log and the UI shows
+its most recent 500 lines in an always-open scrollable panel. Browser refresh
+and server restart can restore the tail of this log.
+The once-only countermeasures offer is claimed server-side by an authenticated
+request before displaying the prompt; declined, closed and accepted offers are
+all consumed. An independent GIF overlay does not pause or cancel setup.
