@@ -543,7 +543,12 @@ function renderSetup(data) {
         'Waiting for measurable download bytes (time remaining unknown)';
     }
   } else $('setup-dependency-metrics').textContent = '';
-  $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
+  $('setup-download-status').textContent = d ?
+    `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${d.file_total ? (100 * (d.file_bytes || 0) / d.file_total).toFixed(1) + '%' : 'N/A'}` +
+    ` · ${formatTransferBytes(d.file_bytes)} / ${formatTransferBytes(d.file_total)}` +
+    (d.total_bytes ? ` · total ${(100 * modelDownloaded / d.total_bytes).toFixed(1)}%` : '') +
+    ` · ${d.reused_files || 0} ${t('verified cached files reused')}` :
+    (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
   if (!data.ready && !setupAvailable) return;
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
