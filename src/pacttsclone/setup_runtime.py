@@ -1,6 +1,8 @@
 """Explicit local-owner dependency installation; no inference imports in the web process."""
 
 import contextlib
+import re
+from datetime import datetime, timezone
 import importlib
 import importlib.metadata
 import json
@@ -126,7 +128,9 @@ class RuntimeSetup:
                 completed_steps=0,
                 total_steps=5,
                 download=None,
+                dependency_progress=None,
                 started_at=time.time(),
+                finished_at=None,
             )
             self.thread = threading.Thread(
                 target=self._run, args=(device,), daemon=True, name="runtime-setup"
@@ -265,13 +269,19 @@ class RuntimeSetup:
             )
             process = self.process
         for line in process.stdout:
-            log.write(line)
+            line = line.rstrip("\r\n")
+            timestamp = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+            log.write(f"[{timestamp}] {line}\n")
             log.flush()
             if line.startswith("@@PACTTS_SETUP@@"):
                 self.update(**json.loads(line[len("@@PACTTS_SETUP@@") :]))
                 continue
+            if self.state.get("stage") in {"pytorch", "inference"} and (
+                "Downloading " in line or "Prepared " in line or "Installed " in line
+            ):
+                self.update(dependency_progress={"message": line, "timestamp": time.time()})
             with self.lock:
-                self.lines.append(line.rstrip())
+                self.lines.append(f"[{timestamp}] {line}")
                 self.lines = self.lines[-100:]
             if self.cancelled.is_set():
                 self._kill()
@@ -285,12 +295,12 @@ class RuntimeSetup:
     def _run(self, device):
         try:
             with self.log_path.open("a", encoding="utf-8") as log:
-                log.write(f"\nSetup requested: {device}\n")
+                log.write(f"\n[{datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')}] Setup requested: {device}\n")
                 self.update(model_ids=self.state.get("model_ids") or list(self.model_ids))
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
-                    self.update(stage=stage, completed_steps=number - 1)
+                    self.update(stage=stage, completed_steps=number - 1, dependency_progress=None, download=None)
                     self._run_command(command, log)
                 importlib.invalidate_caches()
                 if self.cancelled.is_set():
@@ -307,9 +317,9 @@ class RuntimeSetup:
                 )
                 self._apply_models()
         except InterruptedError as exc:
-            self.update(status="cancelled", stage="cancelled", error=str(exc))
+            self.update(status="cancelled", stage="cancelled", error=str(exc), finished_at=time.time())
         except Exception as exc:
-            self.update(status="failed", stage="failed", error=str(exc))
+            self.update(status="failed", stage="failed", error=str(exc), finished_at=time.time())
         finally:
             with self.service._lock:
                 self.service.setup_busy = False
