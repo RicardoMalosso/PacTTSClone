@@ -385,3 +385,21 @@ those files and installing local metadata the above backend run passed.
 Windows compiled-binary smoke awaits GitHub Actions. No real Whisper/OmniVoice
 weights or physical GPU inference were executed locally; these results do not
 establish speech quality or end-to-end model inference.
+
+
+## RC5 Work-session reconciliation — 2026-10-24
+
+Reviewed PR #4 at `3be5ecad11523ee9b25d348e537e0f8651e0b128`, its recent
+commits and project documentation. Run 40139655898 passed fast checks, Windows
+FFmpeg and all four Windows/Linux Python 3.11/3.12 core jobs. Chromium had 25
+passing tests and one failure: the countermeasures test dismissed the video
+before waiting for its clock to advance. The test now checks playback before
+closing and observes two complete loop transitions plus decoded, unmuted audio.
+
+The old bundled file was a 9,308-byte 128x72 derivative. Restored the exact
+136,654-byte 640x360 original supplied by the user; digest and installed HTTP/
+FFmpeg acceptance protect that identity. Current-tree search found no Tenor or
+GIF dependency to remove. Local core suite: 142 passed; Ruff, Python compilation,
+JavaScript syntax, actual video/audio FFmpeg decode and wheel hash verification
+passed. All 26 local Chromium tests passed (69.20 seconds), including two observed
+full loops and audio decoding. Final GitHub/installer results remain pending; no model inference or physical audio-device claim is implied.

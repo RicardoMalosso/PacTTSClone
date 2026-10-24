@@ -36,7 +36,7 @@ repository does not provide public downloads.
    another data path. Red labels show estimated disk usage. Either can be on another drive.
    Data includes voices, MP3s, settings, model/download caches and setup logs.
 3. The installer downloads private Python and the base web packages. It bundles
-   project-built FFmpeg from pinned official FFmpeg source; it installs **no PyTorch,
+   SHA-256-verified FFmpeg Essentials from the Gyan distribution linked by FFmpeg; it installs **no PyTorch,
    CUDA packages or model weights**. Native setup logs: `data/logs/setup.log`.
 4. Double-click **PacTTSClone.lnk** inside your selected root, or the Start Menu
    shortcut. Open **Initial Setup** in the browser and choose CPU or NVIDIA GPU.
@@ -94,11 +94,14 @@ manifest, stage and verify the new application, preserve data, stop the old proc
 and offer rollback. Private release authentication and unsigned Windows binaries
 must be handled before unattended updating is offered.
 
-FFmpeg publishes source, not Windows executables. This project's tools are built
-in CI from pinned [official FFmpeg source](https://github.com/FFmpeg/FFmpeg), using
-MSYS2's signed compiler/LAME packages. The release's `FFmpeg-source-build.zip`
-contains sources, licenses, hashes and build provenance; recipe:
-[build-ffmpeg.sh](installer/build-ffmpeg.sh). No Gyan FFmpeg distribution is fetched.
+FFmpeg publishes source, not Windows executables. RC5 uses the Windows Essentials
+build from [Gyan Doshi](https://www.gyan.dev/ffmpeg/builds/), a distributor linked
+by [FFmpeg's download page](https://ffmpeg.org/download.html). CI verifies the
+archive against Gyan's SHA-256 and exercises the raw float32 decoder used by ASR.
+This is a third-party Windows build, not an official FFmpeg binary. The installer
+bundles ffmpeg/ffprobe; end users do not download them during setup. Its
+`FFmpeg-provenance.zip` records the distributor URL, archive digest and licenses.
+The older project source-build recipe remains for reference.
 
 ## Run or update from source
 

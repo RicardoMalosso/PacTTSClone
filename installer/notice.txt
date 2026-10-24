@@ -1,7 +1,7 @@
 PacTTSClone preview installer (unsigned)
 
 Requires Windows 10/11 x64 and an internet connection. The small installer contains
-application code and project-built FFmpeg from official source. It downloads an
+application code and the gyan.dev FFmpeg Essentials Windows build (GPLv3), verified by SHA-256 and bundled with provenance. It downloads an
 isolated Python runtime and base web packages during setup. CPU/NVIDIA inference
 packages and models are installed later through the browser Initial Setup tab. Total downloads and installed files can
 occupy several GB. NVIDIA drivers are not installed or changed.

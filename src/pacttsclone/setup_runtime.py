@@ -3,13 +3,16 @@
 import contextlib
 import importlib
 import importlib.metadata
+import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 import time
 from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import psutil
@@ -34,11 +37,16 @@ class RuntimeSetup:
             self.state = json.loads(self.state_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self.state = {"status": "idle", "stage": "idle", "device": None, "error": None}
+        self.state.setdefault("initial_setup_completed", self.state["status"] == "succeeded")
+        self.state.setdefault("countermeasures_offered", False)
         if self.state["status"] == "running":
             self.state.update(
                 status="cancelled", stage="interrupted", error="Setup was interrupted. Retry setup."
             )
-        self.lines = []
+        try:
+            self.lines = self.log_path.read_text(encoding="utf-8").splitlines()[-500:]
+        except OSError:
+            self.lines = []
         self.on_ready = lambda: None
         self._apply_models()
         service.setup_ready = lambda: self.snapshot()["ready"]
@@ -76,7 +84,7 @@ class RuntimeSetup:
                     )
                 )
             )
-            return {**self.state, "ready": ready, "lines": self.lines[-100:]}
+            return {**self.state, "ready": ready, "lines": self.lines[-500:]}
 
     def update(self, **values):
         with self.lock:
@@ -84,6 +92,19 @@ class RuntimeSetup:
             tmp = self.state_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.state), encoding="utf-8")
             tmp.replace(self.state_path)
+
+    def offer_countermeasures(self):
+        """Atomically claim the once-only prompt, including across browser reloads."""
+        with self.lock:
+            eligible = (
+                self.state["status"] == "running"
+                and not self.state.get("initial_setup_completed", False)
+                and not self.state.get("countermeasures_offered", False)
+                and time.time() - self.state.get("started_at", time.time()) >= 30
+            )
+            if eligible:
+                self.update(countermeasures_offered=True)
+            return {"offered": bool(eligible)}
 
     def _kill(self):
         with self.lock:
@@ -126,7 +147,9 @@ class RuntimeSetup:
                 completed_steps=0,
                 total_steps=5,
                 download=None,
+                dependency_progress=None,
                 started_at=time.time(),
+                finished_at=None,
             )
             self.thread = threading.Thread(
                 target=self._run, args=(device,), daemon=True, name="runtime-setup"
@@ -150,29 +173,21 @@ class RuntimeSetup:
             ),
             encoding="utf-8",
         )
-        uv = os.environ.get("PACTTS_SETUP_UV")
-        if uv and Path(uv).is_file():
-            prefix = [uv, "--color", "never", "pip", "install", "--python", sys.executable]
-            extra = [
-                "--index",
-                f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
-                "--index-strategy",
-                "unsafe-best-match",
-            ]
-        else:
-            prefix = [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--progress-bar",
-                "off",
-            ]
-            extra = [
-                "--extra-index-url",
-                f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
-            ]
+        # pip --progress-bar raw reports genuine byte counts through a pipe.
+        prefix = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-input",
+            "--progress-bar",
+            "raw",
+        ]
+        extra = [
+            "--extra-index-url",
+            f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
+        ]
         variant = "cu128" if device == "cuda" else "cpu"
         torch = [f"torch==2.8.0+{variant}", f"torchaudio==2.8.0+{variant}"]
         if sys.platform == "darwin" and device == "cpu":
@@ -235,6 +250,16 @@ class RuntimeSetup:
         )
         return commands
 
+    def _record_setup_line(self, log, message):
+        """Record application-authored milestones in both the saved and live log."""
+        now = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
+        line = f"[{now}] {message}"
+        log.write(line + "\n")
+        log.flush()
+        with self.lock:
+            self.lines.append(line)
+            self.lines = self.lines[-500:]
+
     def _run_command(self, command, log):
         env = {
             **os.environ,
@@ -244,6 +269,7 @@ class RuntimeSetup:
             "PYTHONUTF8": "1",
             "PYTHONIOENCODING": "utf-8",
             "PIP_CONFIG_FILE": os.devnull,
+            "PIP_PROGRESS_BAR": "raw",
             "TEMP": str(self.root / "temporary"),
             "TMP": str(self.root / "temporary"),
         }
@@ -251,8 +277,7 @@ class RuntimeSetup:
         with self.lock:
             if self.cancelled.is_set():
                 raise InterruptedError("Setup cancelled.")
-            log.write("Running: " + json.dumps(command) + "\n")
-            log.flush()
+            self._record_setup_line(log, "Running: " + json.dumps(command))
             self.process = subprocess.Popen(
                 command,
                 cwd=self.root,
@@ -264,15 +289,72 @@ class RuntimeSetup:
                 env=env,
             )
             process = self.process
-        for line in process.stdout:
-            log.write(line)
+        last_package = None
+        last_sample_bytes = 0
+        last_sample_at = time.monotonic()
+        for raw_line in process.stdout:
+            line = raw_line.rstrip("\r\n")
+            timestamp = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
+            formatted = f"[{timestamp}] {line}"
+            log.write(formatted + "\n")
             log.flush()
             if line.startswith("@@PACTTS_SETUP@@"):
                 self.update(**json.loads(line[len("@@PACTTS_SETUP@@") :]))
                 continue
+            if self.state.get("stage") in {"pytorch", "inference"}:
+                package = re.match(r"\s*(?:Downloading|Using cached)\s+(.+)", line)
+                if package:
+                    last_package = package.group(1)
+                    last_sample_bytes = 0
+                    last_sample_at = time.monotonic()
+                    self.update(
+                        dependency_progress={
+                            "package": last_package,
+                            "message": line.strip(),
+                            "phase": "downloading",
+                            "timestamp": time.time(),
+                        }
+                    )
+                else:
+                    progress = re.match(r"^Progress (\d+) of (\d+)$", line.strip())
+                    if progress:
+                        current, total = map(int, progress.groups())
+                        now = time.monotonic()
+                        elapsed = now - last_sample_at
+                        speed = max(0, current - last_sample_bytes) / elapsed if elapsed > 0 else 0
+                        self.update(
+                            dependency_progress={
+                                "package": last_package,
+                                "message": last_package or "Downloading package",
+                                "phase": "downloading",
+                                "downloaded_bytes": current,
+                                "total_bytes": total,
+                                "percent": round(100 * current / total, 1) if total else None,
+                                "speed_bytes_per_second": round(speed) if speed else None,
+                                "eta_seconds": (
+                                    round((total - current) / speed)
+                                    if total and speed else None
+                                ),
+                                "timestamp": time.time(),
+                            }
+                        )
+                        last_sample_at = now
+                        last_sample_bytes = current
+                    elif "Installing collected packages" in line:
+                        self.update(dependency_progress={
+                            "message": line.strip(),
+                            "phase": "installing",
+                            "timestamp": time.time(),
+                        })
+                    elif "Successfully installed" in line:
+                        self.update(dependency_progress={
+                            "message": line.strip(),
+                            "phase": "complete",
+                            "timestamp": time.time(),
+                        })
             with self.lock:
-                self.lines.append(line.rstrip())
-                self.lines = self.lines[-100:]
+                self.lines.append(formatted)
+                self.lines = self.lines[-500:]
             if self.cancelled.is_set():
                 self._kill()
         code = process.wait()
@@ -285,12 +367,30 @@ class RuntimeSetup:
     def _run(self, device):
         try:
             with self.log_path.open("a", encoding="utf-8") as log:
-                log.write(f"\nSetup requested: {device}\n")
+                log.write("\n")
+                self._record_setup_line(log, f"Setup requested: {device}")
                 self.update(model_ids=self.state.get("model_ids") or list(self.model_ids))
+                # uv venvs omit pip, so install pip once into the private runtime.
+                # This is only a dependency-installer bootstrap; the app stays local.
+                if importlib.util.find_spec("pip") is None:
+                    uv = os.environ.get("PACTTS_SETUP_UV")
+                    if uv and Path(uv).is_file():
+                        self._run_command(
+                            [uv, "pip", "install", "--python", sys.executable, "pip>=25,<27"],
+                            log,
+                        )
+                    else:
+                        self._run_command(
+                            [sys.executable, "-m", "ensurepip", "--upgrade"], log
+                        )
+                    importlib.invalidate_caches()
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
-                    self.update(stage=stage, completed_steps=number - 1)
+                    self.update(
+                        stage=stage, completed_steps=number - 1,
+                        dependency_progress=None, download=None,
+                    )
                     self._run_command(command, log)
                 importlib.invalidate_caches()
                 if self.cancelled.is_set():
@@ -303,13 +403,17 @@ class RuntimeSetup:
                         AppConfig(**{**self.service.config.model_dump(), "device": device})
                     )
                 self.update(
-                    status="succeeded", stage="ready", completed_steps=5, finished_at=time.time()
+                    status="succeeded", stage="ready", completed_steps=5,
+                    finished_at=time.time(), initial_setup_completed=True,
                 )
                 self._apply_models()
         except InterruptedError as exc:
-            self.update(status="cancelled", stage="cancelled", error=str(exc))
+            self.update(
+                status="cancelled", stage="cancelled", error=str(exc),
+                finished_at=time.time(),
+            )
         except Exception as exc:
-            self.update(status="failed", stage="failed", error=str(exc))
+            self.update(status="failed", stage="failed", error=str(exc), finished_at=time.time())
         finally:
             with self.service._lock:
                 self.service.setup_busy = False

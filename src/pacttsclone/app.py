@@ -1,3 +1,5 @@
+import asyncio
+import json
 import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -5,7 +7,7 @@ from typing import Annotated
 from urllib.parse import unquote, urlsplit
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
@@ -186,6 +188,28 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.post("/api/setup/cancel")
     def setup_cancel():
         return runtime_setup.cancel()
+
+    @app.get("/api/setup/stream")
+    async def setup_stream():
+        async def events():
+            previous = None
+            while True:
+                snapshot = runtime_setup.snapshot()
+                payload = json.dumps(snapshot, ensure_ascii=False)
+                if payload != previous:
+                    previous = payload
+                    yield f"data: {payload}\n\n"
+                await asyncio.sleep(0.25)
+
+        return StreamingResponse(
+            events(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.post("/api/setup/countermeasures/offer")
+    def setup_countermeasures_offer():
+        return runtime_setup.offer_countermeasures()
 
     @app.get("/api/setup/log")
     def setup_log():

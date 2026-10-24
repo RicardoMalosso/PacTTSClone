@@ -12,7 +12,7 @@ from pacttsclone.config import Settings
 
 
 @pytest.fixture
-def live_server(tmp_path, engine):
+def live_server(tmp_path, engine, page):
     # Bind before starting the server, retaining the socket to avoid port races.
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -36,6 +36,13 @@ def live_server(tmp_path, engine):
             raise AssertionError("Server did not start")
         yield url, app
     finally:
+        # Browser's persistent EventSource must disconnect before Uvicorn drains
+        # active HTTP streams during graceful shutdown.
+        try:
+            if not page.is_closed():
+                page.goto("about:blank", wait_until="commit", timeout=5000)
+        except Exception:
+            pass
         server.should_exit = True
         thread.join(10)
         sock.close()
@@ -141,6 +148,8 @@ def test_small_viewport_and_counter(page, live_app):
 
 def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     state = dict(ready=False, status="idle", stage="idle", completed_steps=0)
+    # The test mocks polling state; block the real SSE stream from overwriting it.
+    page.route("**/api/setup/stream", lambda route: route.abort())
     page.route("**/api/setup", lambda route: route.fulfill(json=state))
 
     def start(route):
@@ -185,3 +194,52 @@ def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     expect(page.locator('[data-tab="voices"]')).to_be_enabled()
     page.locator('[data-tab="voices"]').click()
     expect(page.locator("#pane-voices")).to_be_visible()
+
+
+def test_initial_setup_countermeasures_prompt_once(page, live_server):
+    url, app = live_server
+    setup = app.state.runtime_setup
+    setup.update(
+        status="running",
+        stage="pytorch",
+        device="cpu",
+        completed_steps=0,
+        total_steps=5,
+        initial_setup_completed=False,
+        started_at=time.time() - 31,
+    )
+    page.goto(url)
+    expect(page.locator("#setup-too-long")).to_be_visible(timeout=5000)
+    expect(page.locator("#setup-elapsed")).not_to_have_text("00:00.0")
+    page.locator("#setup-too-long-yes").click()
+    expect(page.locator("#countermeasure-loading")).to_be_visible()
+    expect(page.locator("#countermeasure-video")).to_be_visible(timeout=5000)
+    page.wait_for_function(
+        'document.querySelector("#countermeasure-video")?.videoWidth > 0',
+        timeout=10000,
+    )
+    video = page.locator("#countermeasure-video")
+    expect(video).to_have_attribute("loop", "")
+    page.wait_for_function(
+        'document.querySelector("#countermeasure-video")?.currentTime > 0',
+        timeout=10000,
+    )
+    assert video.evaluate("(v) => !v.muted && v.volume > 0 && !v.paused")
+    # Observe two real end-to-start wraps, rather than merely checking loop=true.
+    video.evaluate("""(v) => {
+        window.clipWraps = 0;
+        let previous = v.currentTime;
+        v.addEventListener('timeupdate', () => {
+            if (previous > v.duration - 1 && v.currentTime < 1) window.clipWraps++;
+            previous = v.currentTime;
+        });
+    }""")
+    page.wait_for_function("window.clipWraps >= 2", timeout=15000)
+    assert video.evaluate("(v) => v.webkitAudioDecodedByteCount > 0")
+    assert video.evaluate("(v) => v.videoWidth === 640 && v.videoHeight === 360")
+    assert video.evaluate("(v) => !v.paused && !v.ended && !v.muted && v.volume > 0")
+    page.locator("#countermeasure-close").click()
+    expect(page.locator("#countermeasure-modal")).to_be_hidden()
+    assert video.evaluate("(v) => v.paused && v.currentTime === 0")
+    page.reload()
+    expect(page.locator("#setup-too-long")).to_be_hidden()

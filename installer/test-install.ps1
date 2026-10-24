@@ -37,6 +37,12 @@ try {
         } catch { Start-Sleep -Seconds 1 }
     }
     if (-not $ready) { throw 'Installed launcher did not serve HTTP.' }
+    # Verify the installed wheel serves the exact original bundled media.
+    $clip = Join-Path $root 'installed-jingling-keys.webm'
+    Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:7860/static/jingling-keys.webm' -OutFile $clip
+    if ((Get-FileHash $clip -Algorithm SHA256).Hash.ToLower() -ne '01f5003f1ad001452249af8939afdecd6cb7470d29772af7d18d038c41d3c894') { throw 'Installed WebM differs from original user upload.' }
+    & ffmpeg -nostdin -v error -i $clip -map 0:v:0 -map 0:a:0 -f null -
+    if ($LASTEXITCODE -ne 0) { throw 'Installed WebM video/audio decode failed.' }
     $initial = Invoke-RestMethod 'http://127.0.0.1:7860/api/setup'
     if ($initial.ready) { throw 'Initial Setup gate was bypassed.' }
     $session = Invoke-RestMethod 'http://127.0.0.1:7860/api/session'

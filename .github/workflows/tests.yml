@@ -59,7 +59,12 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: FFmpeg (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo timeout 120s apt-get update
+            sudo timeout 120s apt-get install -y ffmpeg
+          fi
+          ffmpeg -version
       - uses: actions/download-artifact@v4
         if: runner.os == 'Windows'
         with:
@@ -92,7 +97,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo timeout 120s apt-get update
+            sudo timeout 120s apt-get install -y ffmpeg
+          fi
+          ffmpeg -version
       - run: python -m pip install -e ".[dev,browser]"
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest tests/browser --browser chromium -q
