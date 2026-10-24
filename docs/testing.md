@@ -262,3 +262,11 @@ Downloaded the workflow ZIP and independently verified every SHA256SUMS entry;
 installer/wheel/FFmpeg archive hashes also match GitHub release asset digests.
 No unfinished feature or auto-updater was added to this snapshot. Future feature
 work must preserve these RC4 artifacts and use a new version for another installer.
+
+## RC5 setup test additions
+
+- Backend test: raw dependency byte output yields a real package-specific 50% indicator, with timestamped log lines.
+- Backend test: 30-second countermeasures offer requires the local CSRF token and can be claimed exactly once across RuntimeSetup restarts.
+- Chromium test: a 31-second running setup displays the prompt, Yes opens the two-second progress window, then a locally served GIF, and reload never repeats the prompt.
+- Installer tests continue to verify shortcut startup, HTTP reachability, reinstall and uninstall on Windows. They do not reproduce a physically clean Windows installation.
+- Browser/installer CI bundles the GIF before running tests/building wheels. Verify `naturalWidth > 0` in Chromium and inspect the wheel before declaring artifact readiness.
