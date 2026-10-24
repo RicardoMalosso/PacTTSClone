@@ -1,16 +1,26 @@
 name: Windows installer preview
 on:
-  push:
-    branches: [main, fix/setup-progress-and-countermeasures]
-    paths: ['src/**', 'installer/**', 'scripts/**', '.github/workflows/installer.yml', 'pyproject.toml']
   workflow_dispatch:
+    inputs:
+      publish_draft:
+        description: 'Create a draft prerelease (main branch only)'
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: write
 concurrency:
-  group: installer-preview
+  group: installer-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  quality-gate:
+    name: Full test suite
+    permissions:
+      contents: read
+    uses: ./.github/workflows/tests.yml
+
   windows-setup:
+    needs: quality-gate
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -55,6 +65,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          retention-days: 7
           name: installer-diagnostics
           path: |
             ${{ runner.temp }}/PacTTSClone installation test/PacTTSClone/data/logs/*.log
@@ -73,6 +84,7 @@ jobs:
           } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 14
           name: PacTTSClone-Windows-setup
           path: |
             dist/*.exe
@@ -80,6 +92,7 @@ jobs:
             dist/SHA256SUMS.txt
             dist/FFmpeg-provenance.zip
       - name: Prepare draft prerelease
+        if: ${{ inputs.publish_draft && github.ref == 'refs/heads/main' }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -87,10 +100,6 @@ jobs:
           $tag = 'v0.3.0-rc.5'
           $existing = @(gh release list --json tagName,isDraft --limit 100 | ConvertFrom-Json) | Where-Object tagName -eq $tag
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect releases.' }
-          if ($existing) {
-            if (-not $existing.isDraft) { throw 'Refusing to replace a published release.' }
-            gh release delete $tag --yes
-            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft.' }
-          }
+          if ($existing) { throw "Release $tag already exists; refusing to overwrite or delete assets." }
           gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.5 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.5.md dist/*.exe dist/*.whl dist/FFmpeg-provenance.zip dist/SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
