@@ -214,6 +214,49 @@ Locale is detected from the browser/system preference, then overridden by bottom
 flag controls. User voice names, filenames, transcripts and chat text are never
 translated. Machine-readable report field names stay stable.
 
+## Community hardware benchmarks
+
+Anonymized measurements supplied by a user from local OmniVoice generation logs.
+Voice labels are arbitrary; names, speech/transcript text, filenames, job IDs,
+usernames, channel names, paths and timestamps are omitted. The raw log is not
+published. These are observed runs on one machine, not a controlled comparison.
+
+| Hardware | CPU | System RAM | GPU | VRAM | OS |
+|---|---|---|---|---|---|
+| H1 | AMD Ryzen 5 5600X (6 cores / 12 threads) | 16 GB | NVIDIA GeForce GTX 1660 SUPER | 6 GB | Windows 11 |
+
+Settings: `k2-fsa/OmniVoice`, CUDA generation, 32 steps, speed 1.0,
+4 CPU threads, keep-model-loaded enabled. Language selection is listed per run.
+
+| Hardware | Voice | Completed generation | Output audio (seconds) | Total elapsed (seconds) | Model state | Language |
+|---|---|---:|---|---:|---|---|
+| H1 | Voice A | 1 | Not recorded | 199.33 | Loaded during this job | auto |
+| H1 | Voice A | 2 | Not recorded | 84.94 | Already loaded | auto |
+| H1 | Voice A | 3 | Not recorded | 77.56 | Already loaded | en |
+| H1 | Voice A | 4 | Not recorded | 187.61 | Loaded during this job | pt |
+| H1 | Voice A | 5 | Not recorded | 71.56 | Already loaded | pt |
+
+Elapsed time includes setup, reference decoding, any model loading and MP3 encoding.
+“Already loaded” means this job had no model-loading stage. The fourth completed
+run loaded the model again; warm/resident settings do not guarantee it remains
+loaded across cancellation, worker replacement or app restarts. Text/language varied
+between runs, so differences cannot be attributed to warming alone.
+
+Output durations are absent from this log and the generated MP3s were not supplied.
+They cannot be inferred from generation time or text length; real-time factors are
+therefore not reported. One cancelled generation is excluded from completed-run
+numbering. No successful Voice B speech generation is present in the supplied log.
+
+### Separate first-use voice preparation
+
+Preparation transcribes a reference; it produces no speech MP3 and is not counted
+as a generation above. Whisper transcription uses CPU; OmniVoice may also be loaded.
+
+| Hardware | Voice | Preparation | Elapsed (seconds) | Model state |
+|---|---|---|---:|---|
+| H1 | Voice A | 1 | 19.03 | Already loaded |
+| H1 | Voice B | 1 | 174.27 | Loaded during this job |
+
 ## Tests
 
 ```bash

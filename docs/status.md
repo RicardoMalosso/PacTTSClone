@@ -203,3 +203,14 @@ persist autoqueue_general; backend completion queues successful local speech onc
 to playbackMain and saves the item ID. Browser closure does not prevent queueing.
 Channel jobs are not copied; rejection is surfaced through saved playback_error
 and a separate queue-status label. Validation results recorded after test completion.
+
+## Anonymized community benchmark documentation
+
+README now records five successful CUDA generation timings and two separate
+reference-preparation timings from a user-supplied local JSONL log. Only hardware,
+non-content settings, aggregate wall time and model-loading state are published.
+Voice labels A/B replace identifiers; raw logs, texts, transcripts, names, filenames,
+paths, channels and timestamps are excluded. Output duration is explicitly missing
+from the source, so no audio length or real-time factor is invented. Voice B has
+preparation only; no successful speech run was fabricated. Table values and
+anonymization were checked against the private input during documentation update.
