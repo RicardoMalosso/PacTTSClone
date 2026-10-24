@@ -1,18 +1,18 @@
 """Explicit local-owner dependency installation; no inference imports in the web process."""
 
 import contextlib
-from datetime import datetime, timezone
 import importlib
 import importlib.metadata
+import importlib.util
 import json
 import os
 import re
-import importlib.util
 import subprocess
 import sys
 import threading
 import time
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psutil
@@ -267,7 +267,8 @@ class RuntimeSetup:
         with self.lock:
             if self.cancelled.is_set():
                 raise InterruptedError("Setup cancelled.")
-            log.write(f"[{datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')}] Running: " + json.dumps(command) + "\n")
+            now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+            log.write(f"[{now}] Running: {json.dumps(command)}\n")
             log.flush()
             self.process = subprocess.Popen(
                 command,
@@ -358,7 +359,8 @@ class RuntimeSetup:
     def _run(self, device):
         try:
             with self.log_path.open("a", encoding="utf-8") as log:
-                log.write(f"\n[{datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')}] Setup requested: {device}\n")
+                now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+                log.write(f"\n[{now}] Setup requested: {device}\n")
                 self.update(model_ids=self.state.get("model_ids") or list(self.model_ids))
                 # uv venvs omit pip, so install pip once into the private runtime.
                 # This is only a dependency-installer bootstrap; the app stays local.
@@ -377,7 +379,10 @@ class RuntimeSetup:
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
-                    self.update(stage=stage, completed_steps=number - 1, dependency_progress=None, download=None)
+                    self.update(
+                        stage=stage, completed_steps=number - 1,
+                        dependency_progress=None, download=None,
+                    )
                     self._run_command(command, log)
                 importlib.invalidate_caches()
                 if self.cancelled.is_set():
@@ -390,11 +395,15 @@ class RuntimeSetup:
                         AppConfig(**{**self.service.config.model_dump(), "device": device})
                     )
                 self.update(
-                    status="succeeded", stage="ready", completed_steps=5, finished_at=time.time(), initial_setup_completed=True
+                    status="succeeded", stage="ready", completed_steps=5,
+                    finished_at=time.time(), initial_setup_completed=True,
                 )
                 self._apply_models()
         except InterruptedError as exc:
-            self.update(status="cancelled", stage="cancelled", error=str(exc), finished_at=time.time())
+            self.update(
+                status="cancelled", stage="cancelled", error=str(exc),
+                finished_at=time.time(),
+            )
         except Exception as exc:
             self.update(status="failed", stage="failed", error=str(exc), finished_at=time.time())
         finally:
