@@ -36,7 +36,7 @@ try {
     $envRoot = Join-Path $AppRoot "environments\$version-$Device"
     Invoke-Checked $uv @('venv','--allow-existing','--python',$managedPython,$envRoot)
     $python = Join-Path $envRoot 'Scripts\python.exe'
-    Write-Host '[3/6] Installing project-built FFmpeg from official upstream source'
+    Write-Host '[3/6] Installing verified gyan.dev FFmpeg Essentials binaries'
     $ffBin = Join-Path $AppRoot 'runtime\ffmpeg\bin'
     New-Item -ItemType Directory -Force -Path $ffBin | Out-Null
     foreach ($tool in @('ffmpeg.exe','ffprobe.exe')) {
