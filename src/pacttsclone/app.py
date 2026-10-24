@@ -4,15 +4,18 @@ from pathlib import Path
 from typing import Annotated
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, Engine, GenerationRequest, UserError
-from .engine import OmniVoiceEngine, dependencies_available
+from .engine import dependencies_available
+from .models import AppConfig, ChannelConfig
 from .service import GenerationService
+from .studio import Studio
+from .tunnel import TUNNEL_HOST, Tunnel
 
 STATIC = Path(__file__).parent / "static"
 
@@ -20,14 +23,21 @@ STATIC = Path(__file__).parent / "static"
 class LocalBoundary:
     """Check local browser access and bound multipart bytes before form parsing."""
 
-    def __init__(self, app):
+    def __init__(self, app, token, tunnel):
         self.app = app
+        self.token = token
+        self.tunnel = tunnel
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
         headers = {k.lower(): v.decode("latin1") for k, v in scope["headers"]}
         host = headers.get(b"host", "")
+        public = self.tunnel.public_host()
+        remote = host == TUNNEL_HOST or bool(public and host == public)
+        path = scope.get("path", "")
+        method = scope["method"]
+        origin = headers.get(b"origin")
         try:
             parsed = urlsplit("http://" + host)
             allowed = (
@@ -35,19 +45,35 @@ class LocalBoundary:
                 and parsed.netloc == host
                 and "@" not in host
             )
-            port = parsed.port  # validate port too
-            origin = headers.get(b"origin")
-            if origin:
+            _port = parsed.port  # validate malformed port strings
+            if remote:
+                allowed = bool(public) and (not origin or origin == "https://" + public)
+                if method in {"POST", "PUT", "PATCH", "DELETE"} and not origin:
+                    allowed = False
+            elif origin:
                 source = urlsplit(origin)
                 allowed = allowed and source.scheme == "http" and source.netloc == host
-            if not port and ":" in host and not host.endswith("]"):
-                allowed = False
         except ValueError:
             allowed = False
         if not allowed:
             return await JSONResponse(
-                {"detail": "Acesso permitido apenas pela interface local."}, status_code=403
+                {"detail": "Local access or an active authorized tunnel is required."},
+                status_code=403,
             )(scope, receive, send)
+        bootstrap = remote and path == "/api/remote/session" and method == "POST"
+        if remote and path.startswith("/api/") and not bootstrap:
+            capability = self.tunnel.request_capability(headers.get(b"cookie", ""))
+            if not self.tunnel.permitted(capability, path, method):
+                return await JSONResponse(
+                    {"detail": "Open the complete shared admin or OBS link."}, status_code=403
+                )(scope, receive, send)
+        scope.setdefault("state", {})["remote_access"] = remote
+        if method in {"POST", "PUT", "PATCH", "DELETE"} and not bootstrap:
+            supplied = headers.get(b"x-pactts-token", "")
+            if not secrets.compare_digest(supplied.encode(), self.token.encode()):
+                return await JSONResponse(
+                    {"detail": "Session expired. Refresh this page."}, status_code=403
+                )(scope, receive, send)
         try:
             length = int(headers.get(b"content-length", "0"))
         except ValueError:
@@ -58,7 +84,7 @@ class LocalBoundary:
             )(scope, receive, send)
 
         # Buffer only mutation bodies, bounded, before multipart creates spool files.
-        if scope["method"] == "POST":
+        if scope["method"] in {"POST", "PUT", "PATCH", "DELETE"}:
             chunks = []
             total = 0
             while True:
@@ -90,19 +116,31 @@ class LocalBoundary:
 
 def create_app(settings: Settings | None = None, engine: Engine | None = None) -> FastAPI:
     settings = settings or Settings()
-    service = GenerationService(
-        settings, engine if engine is not None else OmniVoiceEngine(settings)
-    )
+    service = GenerationService(settings, engine)
+    studio = Studio(service)
+    tunnel = Tunnel(service)
     token = secrets.token_urlsafe(32)
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        service.close()
+        studio.start()
+        try:
+            yield
+        finally:
+            tunnel.close()
+            studio.close()
 
     app = FastAPI(title="PacTTSClone", lifespan=lifespan, docs_url=None, redoc_url=None)
     app.state.service = service
-    app.add_middleware(LocalBoundary)
+    app.state.studio = studio
+    app.state.tunnel = tunnel
+    app.add_middleware(LocalBoundary, token=token, tunnel=tunnel)
+
+    @app.exception_handler(UserError)
+    async def user_error(request, exc):
+        return JSONResponse(
+            {"detail": str(exc)}, status_code=409 if isinstance(exc, BusyError) else 422
+        )
 
     @app.get("/")
     def index():
@@ -150,7 +188,13 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             except ValidationError as exc:
                 raise HTTPException(422, "Verifique texto, idioma, velocidade e passos.") from exc
             try:
-                return service.submit(reference.file, request)
+                return service.submit(
+                    reference.file,
+                    request,
+                    original_filename=reference.filename.replace("\\", "/").rsplit("/", 1)[-1][
+                        :255
+                    ],
+                )
             except BusyError as exc:
                 raise HTTPException(409, str(exc)) from exc
             except UserError as exc:
@@ -181,6 +225,219 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             filename=f"pactts-{job_id}.mp3",
             content_disposition_type="inline",
         )
+
+    @app.post("/api/remote/session")
+    def remote_session(request: Request, value: dict):
+        if not request.state.remote_access:
+            raise HTTPException(403, "This endpoint is only for shared tunnel links.")
+        key = value.get("key")
+        capability = tunnel.capability(key)
+        if not capability:
+            raise HTTPException(403, "This share link has expired or is invalid.")
+        if capability[0] == "player" and capability[1] != value.get("channel"):
+            raise HTTPException(403, "The OBS key belongs to another channel.")
+        name = "pactts_admin" if capability[0] == "admin" else "pactts_play_" + capability[1]
+        response = JSONResponse({"ok": True, "role": capability[0]})
+        response.set_cookie(name, key, httponly=True, secure=True, samesite="strict", path="/")
+        return response
+
+    @app.get("/api/tunnel")
+    def tunnel_status():
+        return tunnel.snapshot()
+
+    @app.post("/api/tunnel/start")
+    def start_tunnel(request: Request):
+        return tunnel.start(request.url.port or 7860)
+
+    @app.post("/api/tunnel/stop")
+    def stop_tunnel():
+        tunnel.close()
+        return tunnel.snapshot()
+
+    @app.get("/api/config")
+    def configuration():
+        return {**service.config.model_dump(), "hotkey_status": studio.hotkey.status}
+
+    @app.put("/api/config")
+    def configure(value: AppConfig):
+        return studio.configure(value)
+
+    @app.get("/api/resources")
+    def resources():
+        return {
+            "hardware": service.resources.hardware(),
+            "live": service.resources.sample(service.runner.pid),
+            "worker_pid": service.runner.pid,
+            "note": "GPU utilization and total VRAM are device-wide; N/A means unavailable.",
+        }
+
+    @app.get("/api/state")
+    def state():
+        return {
+            "jobs": [service.get(j["id"]) for j in service.history(100)],
+            "voices": service.store.all("voice"),
+            "channels": studio.channels(),
+            "hotkey_status": studio.hotkey.status,
+            "panic_revision": studio.playback.panic_revision,
+        }
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    def cancel_job(job_id: str):
+        result = studio.cancel_job(job_id)
+        if result is None:
+            raise HTTPException(404, "Job not found.")
+        return result
+
+    @app.post("/api/cancel-all")
+    def cancel_all():
+        studio.cancel_all()
+        return {"ok": True}
+
+    @app.post("/api/panic")
+    def panic():
+        studio.playback.panic()
+        return {"ok": True}
+
+    @app.get("/api/jobs/{job_id}/report")
+    def report(job_id: str):
+        value = service.get(job_id)
+        if value is None:
+            raise HTTPException(404, "Job not found.")
+        return JSONResponse(
+            value,
+            headers={"Content-Disposition": f'attachment; filename="pactts-{job_id}-report.json"'},
+        )
+
+    @app.get("/api/logs")
+    def logs():
+        path = service.logs / "generation.jsonl"
+        if not path.is_file():
+            raise HTTPException(404, "No generation logs yet.")
+        return FileResponse(path, media_type="application/x-ndjson", filename="generation.jsonl")
+
+    @app.get("/api/voices")
+    def voices():
+        return service.store.all("voice")
+
+    @app.post("/api/voices", status_code=201)
+    def add_voice(
+        reference: Annotated[UploadFile, File()],
+        title: str = Form(...),
+        transcript: str = Form(""),
+        thumbnail: Annotated[UploadFile | None, File()] = None,
+    ):
+        try:
+            thumb = thumbnail.file.read(2 * 1024 * 1024 + 1) if thumbnail else None
+            return studio.voices.create(
+                reference.file, title, reference.filename or "", transcript, thumb
+            )
+        finally:
+            reference.file.close()
+            if thumbnail:
+                thumbnail.file.close()
+
+    @app.put("/api/voices/{voice_id}")
+    def edit_voice(voice_id: str, value: dict):
+        if set(value) - {"title", "transcript"}:
+            raise HTTPException(422, "Only title and transcript can be edited here.")
+        if not all(isinstance(value.get(k), str) for k in ("title", "transcript")):
+            raise HTTPException(422, "Title and transcript must be strings.")
+        result = studio.voices.update(voice_id, value["title"], value["transcript"])
+        if result is None:
+            raise HTTPException(404, "Voice not found.")
+        return result
+
+    @app.delete("/api/voices/{voice_id}")
+    def delete_voice(voice_id: str):
+        studio.voices.delete(voice_id)
+        return {"ok": True}
+
+    @app.post("/api/voices/{voice_id}/prepare")
+    def prepare_voice(voice_id: str):
+        return studio.voices.prepare(voice_id)
+
+    @app.post("/api/voices/{voice_id}/generate", status_code=202)
+    def generate_voice(voice_id: str, value: GenerationRequest):
+        return studio.voices.generate(voice_id, value)
+
+    @app.get("/api/voices/{voice_id}/{asset}")
+    def voice_asset(voice_id: str, asset: str):
+        if not service.store.get("voice", voice_id) or asset not in {"thumbnail", "reference"}:
+            raise HTTPException(404, "Asset not found.")
+        path = (
+            studio.voices.root
+            / voice_id
+            / ("thumbnail.jpg" if asset == "thumbnail" else "reference.mp3")
+        )
+        if not path.is_file():
+            raise HTTPException(404, "Asset not found.")
+        return FileResponse(path, media_type="image/jpeg" if asset == "thumbnail" else "audio/mpeg")
+
+    @app.get("/api/channels")
+    def channels():
+        return studio.channels()
+
+    @app.put("/api/channels/{channel}")
+    def save_channel(channel: str, value: ChannelConfig):
+        if channel != value.name:
+            raise HTTPException(422, "Channel name does not match the URL.")
+        return studio.save_channel(value)
+
+    @app.get("/api/channels/{channel}/state")
+    def channel_state(channel: str):
+        snapshot = studio.playback.snapshot(channel)
+        return {
+            **snapshot,
+            "jobs": [
+                service.get(j["id"]) for j in service.history(200) if j.get("channel") == channel
+            ],
+            "chat": [c for c in service.store.all("chat", 1000) if c["channel"] == channel][:100],
+        }
+
+    @app.post("/api/channels/{channel}/pause")
+    def pause(channel: str, value: dict):
+        if not isinstance(value.get("paused"), bool):
+            raise HTTPException(422, "paused must be true or false.")
+        return studio.playback.pause(channel, value["paused"])
+
+    @app.post("/api/playback/{item_id}/cancel")
+    def cancel_playback(item_id: str):
+        item = studio.playback.cancel(item_id)
+        if not item:
+            raise HTTPException(404, "Playback item not found.")
+        return item
+
+    @app.post("/api/channels/{channel}/replay/{job_id}", status_code=201)
+    def replay(channel: str, job_id: str):
+        value = service.get(job_id)
+        if not value or value.get("channel") != channel:
+            raise HTTPException(404, "Channel audio not found.")
+        return studio.playback.enqueue(value, replay=True)
+
+    @app.post("/api/channels/{channel}/player/tick")
+    def player_tick(channel: str, value: dict):
+        return studio.playback.tick(channel, str(value.get("client_id", "")))
+
+    @app.post("/api/channels/{channel}/player/ack")
+    def player_ack(channel: str, value: dict):
+        return studio.playback.acknowledge(
+            channel,
+            str(value.get("client_id", "")),
+            str(value.get("item_id", "")),
+            str(value.get("status", "")),
+        )
+
+    @app.get("/{channel}/control")
+    def channel_control(channel: str):
+        if not service.store.get("channel", channel):
+            raise HTTPException(404, "Configure this channel in the main studio first.")
+        return FileResponse(STATIC / "index.html")
+
+    @app.get("/{channel}")
+    def obs(channel: str):
+        if not service.store.get("channel", channel):
+            raise HTTPException(404, "Configure this channel in the main studio first.")
+        return FileResponse(STATIC / "obs.html")
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app

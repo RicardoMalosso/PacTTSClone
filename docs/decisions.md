@@ -64,3 +64,35 @@ Verified real CPU generation separately from fake-engine application tests, then
 verified cached offline and blank-transcript/Whisper generation. Hardware claims
 remain limited to the measured CPU runs in status.md; GTX 1660 SUPER is untested.
 The earlier Gradio proposal is superseded; no remaining design conflict found.
+
+## V2 scope changes — 2026-10-24
+
+The user's new request explicitly supersedes v1's no-Twitch/no-cancellation/no-voice
+library exclusions, and adds optional sharing and locale controls. Read
+requirements.md and v2-design.md for the current contract.
+
+- Isolate inference with spawn rather than attempt to interrupt a Python thread or
+  an in-flight CUDA kernel. Termination frees the worker's model memory; a later
+  job loads a fresh worker. Normal completion can retain it for latency.
+- Use SQLite for resumable configuration/history, but cancel unfinished work on
+  startup rather than unexpectedly speaking stale messages into a stream.
+- Do not present phase wall time as exact CPU/GPU compute time. Process CPU time
+  counts all threads; per-stage RAM peaks are sampled; CUDA stream intervals
+  include gaps; NVML utilization is device-wide and may include the game/OBS.
+- Native Windows RegisterHotKey avoids a keyboard-hook dependency. Other platforms
+  expose unavailable status and focused-browser fallback, not a fake global binding.
+- Keep Twitch anonymous/read-only; public command triggers do not verify paid
+  redemptions. Treat chat as untrusted text and filter before job/file allocation.
+- Keep one playback coordinator with optional mirrors so local and remote OBS can
+  hear the same channel without racing to advance the queue.
+- Cloudflare Quick Tunnel is a user-click action, never automatic startup. Distinct
+  admin/player capabilities, forced origin Host and cookie ACLs prevent sharing an
+  OBS link from granting full machine administration. Automatic binary installation
+  requires the official asset digest; never silently execute an unverified download.
+- Browser language first, then persisted choice. Translate interface strings only;
+  preserve presets, transcripts, messages and technical log data.
+
+Reviewed current requirements, architecture, tests, UI and upgrade instructions for
+consistency. Replaced v1 scope statements in current docs; historical v1 evidence is
+preserved separately in v1-validation.md. Exact GPU timing, physical global-hotkey
+operation and external routing remain separate from deterministic fake-engine tests.

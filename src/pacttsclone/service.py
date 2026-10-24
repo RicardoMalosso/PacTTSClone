@@ -1,125 +1,321 @@
+import contextlib
+import copy
+import json
 import logging
 import shutil
 import tempfile
 import threading
 import time
 import uuid
-from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import BinaryIO
 
 from .audio import AudioPipeline
 from .config import MAX_UPLOAD_BYTES, Settings
-from .domain import BusyError, Engine, GenerationRequest, UserError
+from .domain import BusyError, UserError
+from .models import AppConfig
+from .resources import Resources
+from .store import Store
+from .worker import Cancelled, InlineRunner, ProcessRunner
 
 logger = logging.getLogger(__name__)
+TERMINAL = {"succeeded", "failed", "cancelled"}
+STAGES = ["configure", "decode", "load_model", "transcribe", "inference", "encode"]
 
 
 class GenerationService:
-    def __init__(self, settings: Settings, engine: Engine):
+    def __init__(self, settings: Settings, engine=None, runner=None):
         self.settings = settings
         self.engine = engine
-        self.audio = AudioPipeline(settings)
+        self.store = Store(settings.data_dir)
         self.outputs = settings.data_dir / "outputs"
         self.temporary = settings.data_dir / "temporary"
-        self.outputs.mkdir(parents=True, exist_ok=True)
-        self.temporary.mkdir(parents=True, exist_ok=True)
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pactts")
-        self._lock = threading.Lock()
-        self._busy = False
+        self.logs = settings.data_dir / "logs"
+        for path in (self.outputs, self.temporary, self.logs):
+            path.mkdir(parents=True, exist_ok=True)
+        self.audio = AudioPipeline(settings)
+        self.resources = Resources()
+        self.runner = runner or (
+            InlineRunner(settings, engine) if engine is not None else ProcessRunner(settings)
+        )
+        self._lock = threading.RLock()
+        self._stop = threading.Event()
+        self._wake = threading.Event()
         self._closed = False
-        self._jobs: OrderedDict[str, dict] = OrderedDict()
+        self.active_id = None
+        self.active_start = None
+        self.cancel_event = threading.Event()
+        self.on_finished = lambda job: None
+        default = AppConfig(
+            device=settings.device,
+            cpu_threads=min(4, self.resources.hardware()["logical_cpus"] or 1),
+        )
+        self.config = AppConfig(**(self.store.get("config", "main") or default.model_dump()))
+        for old in self.store.all("job", 100000):
+            if old["status"] not in TERMINAL:
+                self.store.patch(
+                    "job",
+                    old["id"],
+                    status="cancelled",
+                    stage="Interrupted on restart",
+                    error="Application restarted; work was not replayed.",
+                )
+                if old.get("workspace"):
+                    # Restrict cleanup to the application's own job directory.
+                    path = Path(old["workspace"])
+                    if path.parent == self.temporary and path.name.startswith("job-"):
+                        shutil.rmtree(path, ignore_errors=True)
+        self.thread = threading.Thread(target=self._dispatch, name="generation-queue", daemon=True)
+        self.thread.start()
 
-    def submit(self, stream: BinaryIO, request: GenerationRequest) -> dict:
+    def pending(self):
+        return self.store.pending_jobs()
+
+    def configure(self, config):
+        with self._lock:
+            if self.pending():
+                raise BusyError("Wait for generation or cancel the queue before changing hardware.")
+            self.runner.reset()
+            self.config = config
+            self.store.put("config", "main", config.model_dump())
+
+    def submit(
+        self,
+        stream,
+        request,
+        *,
+        allow_queue=False,
+        voice_id=None,
+        channel=None,
+        username=None,
+        kind="speech",
+        original_filename=None,
+    ):
         with self._lock:
             if self._closed:
                 raise UserError("O aplicativo está encerrando.")
-            if self._busy:
+            pending = self.pending()
+            if pending and not allow_queue:
                 raise BusyError("Já existe uma geração em andamento. Aguarde a conclusão.")
-            self._busy = True
-        workspace = None
-        try:
+            if len(pending) >= self.config.max_queue:
+                raise BusyError("Generation queue is full.")
             workspace = Path(tempfile.mkdtemp(prefix="job-", dir=self.temporary))
-            reference = workspace / "reference.mp3"
-            total = 0
-            with reference.open("wb") as target:
-                while chunk := stream.read(1024 * 1024):
-                    total += len(chunk)
-                    if total > MAX_UPLOAD_BYTES:
-                        raise UserError("MP3 excede o limite de 20 MiB.")
-                    target.write(chunk)
-            if not total:
-                raise UserError("Selecione um MP3 não vazio.")
-            job_id = uuid.uuid4().hex
-            with self._lock:
-                self._jobs[job_id] = {
+            try:
+                total = 0
+                with (workspace / "reference.mp3").open("wb") as target:
+                    while chunk := stream.read(1024 * 1024):
+                        total += len(chunk)
+                        if total > MAX_UPLOAD_BYTES:
+                            raise UserError("MP3 excede o limite de 20 MiB.")
+                        target.write(chunk)
+                if not total:
+                    raise UserError("Selecione um MP3 não vazio.")
+                job_id = uuid.uuid4().hex
+                job = {
                     "id": job_id,
+                    "kind": kind,
                     "status": "queued",
-                    "stage": "Aguardando processamento",
+                    "stage": "queued",
+                    "created_at": time.time(),
+                    "started_at": None,
+                    "finished_at": None,
+                    "elapsed_seconds": 0,
+                    "stage_elapsed_seconds": 0,
+                    "progress": 0,
                     "error": None,
                     "output_url": None,
-                    "elapsed_seconds": 0,
+                    "workspace": str(workspace),
+                    "request": request.model_dump(),
+                    "voice_id": voice_id,
+                    "channel": channel,
+                    "username": username,
+                    "original_filename": original_filename,
+                    "config": self.config.model_dump(),
+                    "resources": {},
+                    "metrics": {},
+                    "stages": [],
                 }
-                while len(self._jobs) > 100:
-                    self._jobs.popitem(last=False)
-            self._executor.submit(self._run, job_id, workspace, request)
-            return self.get(job_id)
-        except Exception:
-            if workspace is not None:
+                self.store.put("job", job_id, job)
+                self._wake.set()
+                return self.get(job_id)
+            except Exception:
                 shutil.rmtree(workspace, ignore_errors=True)
-            with self._lock:
-                self._busy = False
-            raise
+                raise
 
-    def _update(self, job_id: str, **changes):
+    def get(self, job_id):
         with self._lock:
-            self._jobs[job_id].update(changes)
+            value = self.store.get("job", job_id)
+            if value and value["status"] == "running" and self.active_id == job_id:
+                value["elapsed_seconds"] = round(time.monotonic() - self.active_start, 2)
+            return value
 
-    def get(self, job_id: str) -> dict | None:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            return dict(job) if job is not None else None
+    def history(self, limit=100):
+        return self.store.all("job", limit)
 
-    def output_path(self, job_id: str) -> Path:
-        # Called only after successful lookup; no user-controlled path components.
+    def output_path(self, job_id):
         return self.outputs / f"{job_id}.mp3"
 
-    def _run(self, job_id: str, workspace: Path, request: GenerationRequest):
-        start = time.monotonic()
+    def cancel(self, job_id):
+        with self._lock:
+            job = self.get(job_id)
+            if not job:
+                return None
+            if job["status"] == "queued":
+                job = self.store.patch(
+                    "job", job_id, status="cancelled", stage="cancelled", finished_at=time.time()
+                )
+                shutil.rmtree(job["workspace"], ignore_errors=True)
+                self._log(job)
+                try:
+                    self.on_finished(copy.deepcopy(job))
+                except Exception:
+                    logger.exception("Cancellation notification failed")
+            elif job["status"] == "running":
+                self.store.patch("job", job_id, stage="cancelling")
+                self.cancel_event.set()
+            return self.get(job_id)
+
+    def cancel_all(self):
+        with self._lock:
+            for job in self.pending():
+                self.cancel(job["id"])
+            if self.active_id is None:
+                self.runner.reset()
+
+    def _dispatch(self):
+        while not self._stop.is_set():
+            with self._lock:
+                waiting = [j for j in self.pending() if j["status"] == "queued"]
+                job = waiting[0] if waiting else None
+                if job:
+                    self.active_id = job["id"]
+                    self.active_start = time.monotonic()
+                    self.cancel_event = threading.Event()
+                    self.store.patch(
+                        "job", job["id"], status="running", stage="starting", started_at=time.time()
+                    )
+            if not job:
+                self._wake.wait(0.3)
+                self._wake.clear()
+                continue
+            self._execute(job)
+
+    def _execute(self, job):
+        job_id = job["id"]
+        last_progress = {}
+
+        def on_event(event):
+            if event["type"] == "transcript":
+                self.store.patch("job", job_id, transcript=event["text"])
+            elif event["type"] == "progress":
+                last_progress.update(event)
+                stage = event["stage"]
+                # Milestone completion, not estimated time or model download percentage.
+                progress = STAGES.index(stage) / len(STAGES) if stage in STAGES else 0
+                self.store.patch(
+                    "job",
+                    job_id,
+                    stage=stage,
+                    device=event["device"],
+                    progress=progress,
+                    stage_elapsed_seconds=event["stage_elapsed_seconds"],
+                    resources=event["resources"],
+                    stages=event["stages"],
+                )
+
+        result = {}
         outcome = {}
         try:
-            self._update(job_id, status="running", stage="Preparando MP3 de referência")
-            wav = workspace / "reference.wav"
-            self.audio.decode(workspace / "reference.mp3", wav)
-            self._update(job_id, stage="Carregando modelo / gerando fala (pode demorar)")
-            waveform = self.engine.synthesize(str(wav), request)
-            self._update(job_id, stage="Convertendo resultado para MP3")
-            self.audio.encode(waveform, workspace, self.output_path(job_id))
+            task = {
+                "workspace": job["workspace"],
+                "request": job["request"],
+                "output": str(self.output_path(job_id)),
+                "kind": job["kind"],
+            }
+            result = self.runner.execute(task, job["config"], on_event, self.cancel_event)
+            if self.cancel_event.is_set():
+                raise Cancelled("Cancelled by the streamer.")
+            if not result["ok"]:
+                raise UserError(result["error"])
             outcome = dict(
                 status="succeeded",
-                stage="MP3 pronto",
-                output_url=f"/api/jobs/{job_id}/audio",
+                stage="complete",
+                progress=1,
+                device=result.get("device"),
+                transcript=result.get("transcript"),
+                output_url=f"/api/jobs/{job_id}/audio" if job["kind"] == "speech" else None,
             )
         except Exception as exc:
-            logger.exception("Generation failed for job %s", job_id)
+            cancelled = isinstance(exc, Cancelled) or self.cancel_event.is_set()
+            if not cancelled:
+                logger.exception("Generation failed: %s", job_id)
+            self.output_path(job_id).unlink(missing_ok=True)
             outcome = dict(
-                status="failed",
-                stage="Falha na geração",
+                status="cancelled" if cancelled else "failed",
+                stage="cancelled" if cancelled else "failed",
                 error=str(exc)
                 if isinstance(exc, UserError)
-                else "Falha inesperada. Consulte o terminal e tente novamente.",
+                else "Unexpected generation error. See terminal.",
             )
         finally:
-            shutil.rmtree(workspace, ignore_errors=True)
+            shutil.rmtree(job["workspace"], ignore_errors=True)
+            metrics = result.get("metrics", {})
+            if not metrics and last_progress:
+                metrics = {
+                    k: v
+                    for k, v in last_progress.items()
+                    if k
+                    in {
+                        "stages",
+                        "worker_cpu_seconds",
+                        "peak_ram_bytes",
+                        "peak_cuda_allocated_bytes",
+                    }
+                }
+                metrics["hardware"] = self.resources.hardware()
+                metrics["interrupted_stage"] = {
+                    "name": last_progress.get("stage"),
+                    "wall_seconds": last_progress.get("stage_elapsed_seconds"),
+                }
+                metrics["partial"] = True
+                metrics["accounting_note"] = "Partial metrics sampled before process cancellation."
+            metrics["model"] = self.settings.model
+            metrics["asr_model"] = self.settings.asr_model
             with self._lock:
-                self._jobs[job_id].update(
+                finished = self.store.patch(
+                    "job",
+                    job_id,
                     **outcome,
-                    elapsed_seconds=round(time.monotonic() - start, 2),
+                    metrics=metrics,
+                    finished_at=time.time(),
+                    elapsed_seconds=round(time.monotonic() - self.active_start, 2),
                 )
-                self._busy = False
+                self.active_id = None
+                self.active_start = None
+                self._log(finished)
+                if not job["config"]["keep_model_loaded"]:
+                    self.runner.reset()
+            try:
+                self.on_finished(copy.deepcopy(finished))
+            except Exception:
+                logger.exception("Completion notification failed")
+
+    def _log(self, job):
+        # One structured record per completed/failed/cancelled job, not raw chat console output.
+        record = {k: v for k, v in job.items() if k not in {"workspace", "resources"}}
+        with self._lock, (self.logs / "generation.jsonl").open("a", encoding="utf-8") as log:
+            log.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     def close(self):
         with self._lock:
+            if self._closed:
+                return
             self._closed = True
-        self._executor.shutdown(wait=True)
+            self._stop.set()
+            self.cancel_all()
+            self._wake.set()
+        self.thread.join(8)
+        self.runner.reset()
+        if self.thread.is_alive():
+            self.thread.join(2)
+        with contextlib.suppress(Exception):
+            self.store.close()

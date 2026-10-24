@@ -26,6 +26,8 @@ class OmniVoiceEngine:
         self.model = None
         self.device = None
         self.asr_loaded = False
+        self.observer = lambda *args: None
+        self.last_gpu_seconds = None
         if settings.offline:
             os.environ["HF_HUB_OFFLINE"] = "1"
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -33,6 +35,7 @@ class OmniVoiceEngine:
     def _load(self):
         if self.model is not None:
             return
+        self.observer("load_model", "cpu")
         try:
             import torch
             from omnivoice import OmniVoice
@@ -41,6 +44,8 @@ class OmniVoiceEngine:
                 "Dependências de inferência ausentes/incompatíveis. Instale PyTorch e .[inference]."
             ) from exc
         self.device = choose_device(torch, self.settings.device)
+        if self.device != "cpu":
+            self.observer("load_model", self.device)
         self.model = OmniVoice.from_pretrained(
             self.settings.model,
             device_map=self.device,
@@ -52,6 +57,14 @@ class OmniVoiceEngine:
         )
         self.model.eval()
 
+    def transcribe(self, reference: str) -> str:
+        self._load()
+        self.observer("transcribe", "cpu")
+        if not self.asr_loaded:
+            self.model.load_asr_model(model_name=self.settings.asr_model, device="cpu")
+            self.asr_loaded = True
+        return self.model.transcribe(reference)
+
     def synthesize(self, reference: str, request: GenerationRequest) -> Waveform:
         try:
             self._load()
@@ -61,6 +74,16 @@ class OmniVoiceEngine:
             if not request.ref_text and not self.asr_loaded:
                 self.model.load_asr_model(model_name=self.settings.asr_model, device="cpu")
                 self.asr_loaded = True
+            self.observer("inference", self.device)
+            events = None
+            if self.device == "cuda" and hasattr(torch.cuda, "Event"):
+                torch.cuda.synchronize()
+                torch.cuda.reset_peak_memory_stats()
+                events = (
+                    torch.cuda.Event(enable_timing=True),
+                    torch.cuda.Event(enable_timing=True),
+                )
+                events[0].record()
             with torch.inference_mode():
                 audio = self.model.generate(
                     text=request.text,
@@ -70,6 +93,10 @@ class OmniVoiceEngine:
                     speed=request.speed,
                     generation_config=OmniVoiceGenerationConfig(num_step=request.steps),
                 )
+            if events:
+                events[1].record()
+                torch.cuda.synchronize()
+                self.last_gpu_seconds = events[0].elapsed_time(events[1]) / 1000
             return Waveform(audio[0], self.model.sampling_rate)
         except UserError:
             raise

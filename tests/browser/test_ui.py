@@ -12,7 +12,7 @@ from pacttsclone.config import Settings
 
 
 @pytest.fixture
-def live_app(tmp_path, engine):
+def live_server(tmp_path, engine):
     # Bind before starting the server, retaining the socket to avoid port races.
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -34,7 +34,7 @@ def live_app(tmp_path, engine):
             time.sleep(0.02)
         else:
             raise AssertionError("Server did not start")
-        yield url
+        yield url, app
     finally:
         server.should_exit = True
         thread.join(10)
@@ -42,9 +42,14 @@ def live_app(tmp_path, engine):
         assert not thread.is_alive()
 
 
+@pytest.fixture
+def live_app(live_server):
+    return live_server[0]
+
+
 def prepare(page, live_app, mp3):
     page.goto(live_app)
-    expect(page.get_by_role("button", name="Gerar MP3")).to_be_enabled()
+    expect(page.get_by_role("button", name="Generate MP3")).to_be_enabled()
     page.locator("#reference").set_input_files(mp3)
     page.locator("#text").fill("Olá, este é um teste local.")
     page.locator("#ref-text").fill("Referência.")
@@ -54,7 +59,7 @@ def test_generate_play_download_stop(page, live_app, mp3, tmp_path):
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     prepare(page, live_app, mp3)
-    page.get_by_role("button", name="Gerar MP3").click()
+    page.get_by_role("button", name="Generate MP3").click()
     player = page.locator("#player")
     expect(player).to_be_visible(timeout=15000)
     expect(player).to_have_attribute("controls", "")
@@ -64,10 +69,10 @@ def test_generate_play_download_stop(page, live_app, mp3, tmp_path):
     page.locator("#player").evaluate("async el => { el.volume = .4; await el.play(); }")
     page.wait_for_function("!document.getElementById('player').paused")
     page.locator("#player").evaluate("el => { el.pause(); el.currentTime = .5; }")
-    page.get_by_role("button", name="Parar / voltar ao início").click()
+    page.get_by_role("button", name="Stop / restart").click()
     assert player.evaluate("el => el.paused && el.currentTime === 0")
     with page.expect_download() as info:
-        page.get_by_role("link", name="Baixar MP3").click()
+        page.get_by_role("link", name="Download MP3").click()
     target = tmp_path / info.value.suggested_filename
     info.value.save_as(target)
     assert target.stat().st_size > 1000
@@ -78,12 +83,12 @@ def test_error_message_and_retry(page, live_app, mp3, tmp_path):
     bad = tmp_path / "broken.mp3"
     bad.write_bytes(b"not mp3")
     prepare(page, live_app, bad)
-    page.get_by_role("button", name="Gerar MP3").click()
+    page.get_by_role("button", name="Generate MP3").click()
     expect(page.locator("#error")).to_be_visible(timeout=15000)
     expect(page.locator("#error")).to_contain_text("MP3")
     expect(page.locator("#player")).to_be_hidden()
     page.locator("#reference").set_input_files(mp3)
-    page.get_by_role("button", name="Gerar MP3").click()
+    page.get_by_role("button", name="Generate MP3").click()
     expect(page.locator("#player")).to_be_visible(timeout=15000)
     expect(page.locator("#error")).to_be_hidden()
 
@@ -94,10 +99,10 @@ def test_blocked_autoplay_has_manual_fallback(page, live_app, mp3):
     )
     prepare(page, live_app, mp3)
     page.locator("#autoplay").check()
-    page.get_by_role("button", name="Gerar MP3").click()
-    expect(page.locator("#playback-note")).to_contain_text("bloqueou", timeout=15000)
+    page.get_by_role("button", name="Generate MP3").click()
+    expect(page.locator("#playback-note")).to_contain_text("blocked", timeout=15000)
     expect(page.locator("#player")).to_be_visible()
-    expect(page.get_by_role("link", name="Baixar MP3")).to_be_visible()
+    expect(page.get_by_role("link", name="Download MP3")).to_be_visible()
     page.reload()
     expect(page.locator("#autoplay")).to_be_checked()
 

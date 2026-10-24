@@ -134,13 +134,22 @@ def test_corrupt_audio_returns_job_error(client, app, tmp_path):
 
 def test_upload_body_limit(client):
     response = client.post(
-        "/api/jobs", content=b"x", headers={"Content-Length": str(MAX_BODY_BYTES + 1)}
+        "/api/jobs",
+        content=b"x",
+        headers={
+            "Content-Length": str(MAX_BODY_BYTES + 1),
+            "X-PacTTS-Token": client.get("/api/session").json()["token"],
+        },
     )
     assert response.status_code == 413
 
 
 def test_chunked_body_limit(client):
-    response = client.post("/api/jobs", content=iter([b"x" * MAX_BODY_BYTES, b"y"]))
+    response = client.post(
+        "/api/jobs",
+        content=iter([b"x" * MAX_BODY_BYTES, b"y"]),
+        headers={"X-PacTTS-Token": client.get("/api/session").json()["token"]},
+    )
     assert response.status_code == 413
 
 

@@ -1,58 +1,65 @@
-# Architecture
+# Architecture — v0.2
 
-## Components
+## State and processes
 
-FastAPI serves static HTML/CSS/JS on loopback. A multipart POST validates the
-request, copies the upload into a unique temporary workspace, reserves one worker
-and returns a job ID. A single background worker decodes the reference with
-FFmpeg, calls an Engine, encodes PCM to MP3, atomically publishes the output and
-updates the job. The UI polls a read-only status endpoint and plays/downloads the
-result. No CDN assets, frontend build chain or cloud inference.
+FastAPI serves local HTML/CSS/JS and a bounded multipart/JSON API. Store is a locked
+SQLite WAL document store with indexes for pending jobs and channel playback.
+GenerationService serializes queued jobs. ProcessRunner uses multiprocessing spawn
+and keeps one OmniVoice engine warm; device/thread changes or cancellation replace
+that worker. POSIX process groups / Windows child-process termination cover FFmpeg
+children. Normal idle shutdown is graceful before bounded termination fallback.
+InlineRunner is only explicit test injection, never normal application fallback.
 
-Engine is an injected protocol returning a mono NumPy waveform + sample rate.
-OmniVoiceEngine lazy-loads torch and omnivoice, caches the model, selects CUDA
-FP16 or CPU FP32, uses SDPA (no FlashAttention installation), and uses
-`load_asr=False`. If a transcript is absent it calls `load_asr_model` once with
-`asr_device='cpu'`. The worker serializes model and ASR access.
+Worker stages: configure, decode, load model, optional CPU ASR, inference, encode.
+Reporter samples at 500 ms and phase boundaries, emits progress events over IPC,
+and records wall and process CPU seconds, RAM peaks, CUDA allocation and stream
+elapsed time when available. Loading is indeterminate. No false GPU-busy counter.
+The manager commits final state+metrics atomically before exposing completion and
+appends generation.jsonl. Cancelled partial metrics are marked partial.
 
-The real engine is always used in normal startup. Tests explicitly inject a fake
-engine; there is no UI checkbox or production fallback generating fake speech.
+Voices manages validated MP3s, safe thumbnails and transcripts. A preparation job
+transcribes a blank sample once and saves its text; later jobs reuse it. SQLite
+retains voices, settings, channels, job reports, recent moderation and playback.
+After restart interrupted work is cancelled, never silently replayed. Voice
+preparation interrupted on restart becomes retryable.
 
-## HTTP contract
+## Twitch and playback
 
-| Endpoint | Contract |
-|---|---|
-| GET / | Local UI |
-| GET /api/session | Ephemeral mutation token, application limits |
-| GET /api/health | FFmpeg and inference package availability; does not load weights |
-| POST /api/jobs | multipart: reference, text, ref_text, language, speed, steps; session header `X-PacTTS-Token`; 202 job snapshot; 409 busy; 4xx validation |
-| GET /api/jobs/{id} | id, status, stage, error, output_url, elapsed_seconds |
-| GET /api/jobs/{id}/audio | Completed audio/mpeg only; supports native browser file serving |
+Studio connects configured channels through anonymous WSS IRC on Twitch port 443,
+reads only, handles frames/PING/RECONNECT/tags and deduplicates IDs. Commands select
+voice presets. Moderation and cooldown run before submission. No PRIVMSG is sent.
 
-States: queued → running → succeeded/failed. Progress is coarse (decode, model,
-encode), never invented percentage. Unknown IDs return 404; unfinished audio 409.
-Retain at most 100 recent job snapshots; MP3s are not deleted by state pruning.
+Playback has independent per-channel FIFO items. Delay starts when the next item
+reaches the head and a player polls. One renewable lease coordinates readiness,
+start/end/error acknowledgments. Mirrors may receive current playing audio with
+its start timestamp but cannot advance the FIFO. Hotkey/panic cancels playing and
+countdown items and pauses channels; cancel-all also disconnects chat and cancels
+all queued/generating work. Replay reuses MP3 and applies current filter/countdown.
 
-## Local access boundary
+The OBS page polls every 250 ms; a local watchdog stops audio after 2.5 s without a
+successful server response. Lease loss interrupts and pauses rather than replaying.
+The dashboard is silent except explicit preview / manual autoplay.
 
-Bind only 127.0.0.1. Reject non-loopback Host and foreign Origin before routing.
-Browser sends an ephemeral token for POST; no permissive CORS. This is a local
-single-user boundary, not authentication against other processes on the same PC.
-Never use the uploaded filename for filesystem paths. FFmpeg uses argument arrays,
-no shell; protocol whitelist and execution timeout restrict decoding. Only
-generated outputs are exposed through job IDs; no arbitrary file-serving route.
+## Access and sharing
 
-## Storage and lifecycle
+LocalBoundary validates Host/Origin, limits bodies before multipart parsing, and
+checks per-process CSRF token on all mutations. Default bind remains loopback.
+Tunnel is opt-in; cloudflared is verified against official release SHA-256 before
+first installation into data-dir/tools, or reused from PATH. Its HTTP Host override
+is pacttsclone-tunnel.internal, ensuring tunneled requests never inherit local
+owner privileges. Only the active generated hostname is accepted as remote Origin.
 
-Default data directory is ~/.pacttsclone, overridable with --data-dir. Outputs live
-in outputs/ and job temporaries in temporary directories removed by finally blocks.
-On graceful shutdown wait for current worker; no hard cancellation mid-inference.
-An abrupt power loss may leave temporary files; no automatic broad deletion.
-Frontend stores autoplay preference only; no reference, transcript or text in
-localStorage. Configuration is CLI/environment, no credential handling.
+Shared admin and per-channel player keys are independent. URL fragments bootstrap
+Secure, HttpOnly, SameSite cookies; secrets do not appear in server request paths.
+Remote player ACL allows only session token, its own player tick/ack and its own
+channel's successful audio. Remote admin can administer the app but cannot start,
+stop or inspect tunnel capabilities. Stopping sharing revokes cookies server-side
+by discarding keys. Quick Tunnel URLs are temporary and have no uptime guarantee.
 
-## Future extension
+## UI and locale
 
-Future event adapters should submit validated GenerationRequests to the service.
-Introduce a bounded queue and playback scheduler only then. Keep Twitch credentials
-and event validation outside the model engine. No Twitch implementation in v1.
+Generate, Voices, Twitch & OBS, History and Configuration tabs share polling state.
+/channel/control selects its channel; /channel loads the transparent audio page.
+Locale module detects preferred browser language, supports en-CA/pt-BR and persists
+manual override. Static UI and explicit dynamic labels translate; user content and
+machine-readable diagnostic keys do not. Canadian/Brazilian flags are inline SVG.

@@ -65,12 +65,10 @@ def smoke():
     args = arguments.parse_args()
     settings = settings_from(args)
     from .domain import GenerationRequest
-    from .engine import OmniVoiceEngine
     from .service import GenerationService
 
     logging.basicConfig(level=logging.INFO)
-    engine = OmniVoiceEngine(settings)
-    service = GenerationService(settings, engine)
+    service = GenerationService(settings)
     try:
         with args.reference.open("rb") as reference:
             job = service.submit(
@@ -81,7 +79,7 @@ def smoke():
             job = service.get(job["id"])
         if job["status"] != "succeeded":
             raise SystemExit(job["error"])
-        print(f"Device: {engine.device}; elapsed: {job['elapsed_seconds']} s")
+        print(f"Device: {job.get('device')}; elapsed: {job['elapsed_seconds']} s")
         print(service.output_path(job["id"]))
     finally:
         service.close()

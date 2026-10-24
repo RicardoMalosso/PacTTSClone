@@ -1,0 +1,261 @@
+import threading
+import time
+
+from playwright.sync_api import expect
+
+from pacttsclone.models import ChannelConfig
+
+from .test_ui import live_server as live_server
+
+
+def open_tab(page, name):
+    page.get_by_role("button", name=name, exact=True).click()
+
+
+def wait_until(check, timeout=10):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if check():
+            return
+        time.sleep(0.03)
+    raise AssertionError("Condition did not become true")
+
+
+def test_voice_screen_transcription_edit_config_persistence(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    open_tab(page, "Voices")
+    page.locator("#voice-title").fill("Lula test")
+    page.locator("#voice-reference").set_input_files(mp3)
+    page.get_by_role("button", name="Save voice", exact=True).click()
+    card = page.locator(".voice-card").filter(has=page.get_by_role("heading", name="Lula test"))
+    expect(card.locator(".pill")).to_have_text("ready", timeout=15000)
+    expect(card.get_by_label("Saved transcript")).not_to_have_value("")
+    card.get_by_label("Saved transcript").fill("An edited reference transcript.")
+    card.get_by_role("button", name="Save edits").click()
+    wait_until(
+        lambda: (
+            app.state.service.store.all("voice")[0]["transcript"]
+            == "An edited reference transcript."
+        )
+    )
+    open_tab(page, "Configuration")
+    page.locator("#config-device").select_option("cpu")
+    page.locator("#config-threads").fill("2")
+    page.locator("#config-hotkey").fill("Ctrl+Alt+F8")
+    page.get_by_role("button", name="Save configuration").click()
+    expect(page.locator("#health")).to_contain_text("Configuration saved")
+    page.reload()
+    expect(page.locator("#generate")).to_be_enabled()
+    open_tab(page, "Configuration")
+    expect(page.locator("#config-device")).to_have_value("cpu")
+    expect(page.locator("#config-threads")).to_have_value("2")
+    expect(page.locator("#config-hotkey")).to_have_value("Ctrl+Alt+F8")
+
+
+def test_progress_timer_and_cancel_interface(page, live_server, mp3):
+    url, app = live_server
+    engine = app.state.service.engine
+    original = engine.synthesize
+    release = threading.Event()
+    entered = threading.Event()
+
+    def blocked(*args):
+        entered.set()
+        assert release.wait(10)
+        return original(*args)
+
+    engine.synthesize = blocked
+    try:
+        page.goto(url)
+        expect(page.locator("#generate")).to_be_enabled()
+        page.locator("#reference").set_input_files(mp3)
+        page.locator("#ref-text").fill("Known text")
+        page.locator("#text").fill("Cancel this generation")
+        page.locator("#generate").click()
+        expect(page.locator("#cancel-job")).to_be_visible()
+        assert entered.wait(3)
+        expect(page.locator("#timer")).not_to_have_text("00:00.0")
+        assert page.locator("#overall-progress").count() == 1
+        assert page.locator("#stage-list progress").count() == 6
+        page.locator("#cancel-job").click()
+        release.set()
+        expect(page.locator("#error")).to_contain_text("Cancelled", timeout=15000)
+        expect(page.locator("#player")).to_be_hidden()
+        expect(page.locator("#generate")).to_be_enabled()
+    finally:
+        release.set()
+
+
+def test_obs_countdown_cancel_and_replay(browser, page, live_server, mp3):
+    url, app = live_server
+    studio = app.state.studio
+    with mp3.open("rb") as ref:
+        voice = studio.voices.create(ref, "Lula", "lula.mp3", "Exact reference")
+    studio.save_channel(ChannelConfig(name="localtest", commands={"!lula": voice["id"]}))
+    # Inject an IRC message through the production handler, without making a network connection.
+    studio.store.patch("channel", "localtest", enabled=True)
+    page.goto(url + "/localtest/control")
+    expect(page.locator("#generate")).to_be_enabled()
+    expect(page.locator("#pane-channels")).to_be_visible()
+    obs = page.context.new_page()
+    obs.goto(url + "/localtest")
+    obs.locator("body").click(position={"x": 1, "y": 1}, force=True)
+    try:
+        job = studio.receive("localtest", "viewer", "!lula bom dia")
+        assert job
+        expect(page.locator("#channel-queue")).to_contain_text("countdown", timeout=15000)
+        page.get_by_role("button", name="Cancel audio", exact=True).click()
+        wait_until(lambda: studio.playback.items("localtest")[0]["status"] == "cancelled")
+        assert obs.locator("#audio").evaluate("a => a.paused")
+        studio.store.patch("channel", "localtest", delay_seconds=0)
+        open_tab(page, "History")
+        page.get_by_role("button", name="Replay on OBS").click()
+        wait_until(lambda: len(studio.playback.items("localtest")) == 2)
+        # Chromium's test policy may block autoplay, exactly as a normal browser can.
+        wait_until(
+            lambda: (
+                studio.playback.items("localtest")[-1]["status"] in {"playing", "played", "error"}
+            )
+        )
+        item = studio.playback.items("localtest")[-1]
+        if item["status"] == "error":
+            expect(obs.locator("#enable")).to_be_visible()
+        else:
+            wait_until(lambda: studio.playback.items("localtest")[-1]["status"] == "played")
+        assert len(studio.service.history()) == 1  # replay did not regenerate
+        with page.expect_download() as download:
+            page.get_by_role("link", name="Download MP3", exact=True).click()
+        assert download.value.suggested_filename.endswith(".mp3")
+    finally:
+        obs.close()
+
+
+def test_channel_form_defaults_and_custom_filters(page, live_server, mp3):
+    url, app = live_server
+    studio = app.state.studio
+    with mp3.open("rb") as ref:
+        v = studio.voices.create(ref, "Dilma", "dilma.mp3", "Reference transcript")
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    open_tab(page, "Twitch & OBS")
+    expect(page.locator("#channel-delay")).to_have_value("5")
+    expect(page.locator("#channel-filter")).to_have_value("slurs")
+    page.locator("#channel-name").fill("testchannel")
+    page.locator(".command-row input").fill("!dilma")
+    page.locator(".command-row select").select_option(v["id"])
+    page.locator("#channel-custom").fill("private phrase\nother phrase")
+    page.get_by_role("button", name="Save channel", exact=True).click()
+    expect(page.get_by_label("OBS source URL")).to_have_value(url + "/testchannel")
+    studio.store.patch("channel", "testchannel", enabled=True)
+    assert studio.receive("testchannel", "viewer", "!dilma private phrase") is None
+    expect(page.locator("#chat-events")).to_contain_text("custom word filter")
+    assert studio.service.history() == []
+
+
+def test_browser_language_auto_detection_and_flag_override(browser, live_server):
+    url, app = live_server
+    context = browser.new_context(locale="pt-BR")
+    page = context.new_page()
+    try:
+        page.goto(url)
+        expect(page.locator("#generate")).to_be_enabled()
+        expect(page.get_by_role("heading", name="Suas vozes. Seu computador.")).to_be_visible()
+        expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
+        page.get_by_role("button", name="English (Canada)", exact=True).click()
+        expect(page.get_by_role("heading", name="Your voices. Your machine.")).to_be_visible()
+        expect(page.locator("html")).to_have_attribute("lang", "en-CA")
+        page.reload()
+        expect(page.locator("#generate")).to_be_enabled()
+        expect(page.get_by_role("heading", name="Your voices. Your machine.")).to_be_visible()
+        page.get_by_role("button", name="Português (Brasil)", exact=True).click()
+        page.get_by_role("button", name="Configuração", exact=True).click()
+        expect(page.get_by_role("button", name="Salvar configuração", exact=True)).to_be_visible()
+        assert app.state.service.history() == []
+    finally:
+        context.close()
+
+
+def test_tunnel_buttons_and_scoped_links(page, live_server, monkeypatch):
+    url, app = live_server
+    tunnel = app.state.tunnel
+
+    def start(port):
+        assert port == int(url.rsplit(":", 1)[1])
+        tunnel.url = "https://test-sharing.trycloudflare.com"
+        tunnel.status = "running"
+        tunnel.admin_key = "test-admin-key"
+        return tunnel.snapshot()
+
+    monkeypatch.setattr(tunnel, "start", start)
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.get_by_role("button", name="Start secure tunnel", exact=True).click()
+    expect(page.locator("#tunnel-stop")).to_be_visible()
+    expect(page.locator("#tunnel-links input").first).to_have_value(
+        "https://test-sharing.trycloudflare.com/#admin=test-admin-key"
+    )
+    page.get_by_role("button", name="Stop sharing", exact=True).click()
+    expect(page.locator("#tunnel-start")).to_be_visible()
+    assert tunnel.url is None
+
+
+def test_shared_admin_and_obs_cookie_bootstrap(browser, live_server):
+    from pacttsclone.models import ChannelConfig
+    from pacttsclone.tunnel import TUNNEL_HOST
+
+    url, app = live_server
+    app.state.studio.save_channel(ChannelConfig(name="sharedchannel"))
+    tunnel = app.state.tunnel
+    tunnel.url = "https://pactts-test.trycloudflare.com"
+    tunnel.status = "running"
+    tunnel.admin_key = "test-admin-" + "x" * 40
+    tunnel.player_keys = {"sharedchannel": "test-player-" + "x" * 40}
+    context = browser.new_context()
+    obs_context = browser.new_context()
+
+    def forward(route):
+        # Emulate cloudflared's forced origin Host; no public internet required.
+        request = route.request
+        headers = {**request.all_headers(), "host": TUNNEL_HOST}
+        response = route.fetch(url=url + request.url.split(".com", 1)[1], headers=headers)
+        route.fulfill(response=response)
+
+    context.route("https://pactts-test.trycloudflare.com/**", forward)
+    obs_context.route("https://pactts-test.trycloudflare.com/**", forward)
+    try:
+        page = context.new_page()
+        page.goto(tunnel.url + "/#admin=" + tunnel.admin_key)
+        expect(page.locator("#generate")).to_be_enabled(timeout=15000)
+        assert "#" not in page.url
+        assert page.evaluate("document.cookie") == ""  # capability is HttpOnly
+        expect(page.locator("#tunnel-card")).to_be_hidden()
+        obs = obs_context.new_page()
+        obs.goto(tunnel.url + "/sharedchannel#play=" + tunnel.player_keys["sharedchannel"])
+        obs.wait_for_function("!location.hash")
+        assert obs.evaluate("async () => (await fetch('/api/config')).status") == 403
+        assert obs.evaluate("async () => (await fetch('/api/session')).status") == 200
+        assert obs.evaluate("document.cookie") == ""
+    finally:
+        context.unroute_all(behavior="ignoreErrors")
+        obs_context.unroute_all(behavior="ignoreErrors")
+        context.close()
+        obs_context.close()
+
+
+def test_backend_panic_stops_browser_audio_without_key_focus(page, live_server, mp3):
+    url, app = live_server
+    with mp3.open("rb") as ref:
+        voice = app.state.studio.voices.create(ref, "Preview voice", "ref.mp3", "Known text")
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator("#player").evaluate(
+        "async (audio, src) => { audio.src = src; audio.hidden = false; await audio.play(); }",
+        f"/api/voices/{voice['id']}/reference",
+    )
+    assert page.locator("#player").evaluate("audio => !audio.paused")
+    # Exactly the backend callback invoked by the native Windows hotkey.
+    app.state.studio.playback.panic()
+    page.wait_for_function("document.getElementById('player').paused")
+    assert page.locator("#player").evaluate("audio => audio.currentTime === 0")

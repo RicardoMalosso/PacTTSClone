@@ -1,81 +1,80 @@
-# Implementation status
-
-## Initial checkpoint — 2026-10-24
-
-Design documents completed and reviewed before implementation. Repository was
-empty. Source API and package version verified through the GitHub connector.
+# PacTTSClone v0.2 — status
 
 ## Implemented
 
-- Python/venv app with Windows install/start scripts; local FastAPI interface.
-- MP3 reference validation, optional exact transcript or lazy CPU Whisper.
-- Official OmniVoice 0.2.1 adapter, default k2-fsa/OmniVoice model, auto CUDA/CPU.
-- One generation at a time, job status/errors, bounded upload/text and temp cleanup.
-- Atomic MP3 output at 48 kHz / 192 kbps, native browser audio controls, stop,
-  download and optional autoplay with blocked-playback feedback.
-- Loopback Host/Origin boundary and ephemeral session token; no public listener.
-- Engine protocol for later event adapters; no Twitch/IRC code in v1.
-- Linux/Windows CI configuration and browser CI.
+- Spawned, reusable OmniVoice worker; bounded queues; real process-tree cancellation
+  and recovery; idle model unloading; persisted CPU/CUDA/Automatic settings.
+- Wall/stage timers, milestone/indeterminate progress, system CPU/RAM, worker RAM,
+  optional NVIDIA data and structured per-stage hardware/time reports + JSONL logs.
+- Saved voice title/original MP3/thumbnail/transcript, one-time automatic ASR,
+  transcript editing, cancellation/restart recovery and persisted history.
+- Per-channel read-only anonymous Twitch WSS IRC, command-to-voice mapping,
+  mandatory basic slur filtering, optional profanity levels/custom phrases,
+  cooldowns, text/queue limits, moderation history.
+- Separate OBS/control pages; default 5-second moderation countdown; cancellation,
+  replay/download, coordinator lease and remote OBS mirrors; Windows global panic.
+- Homepage Cloudflare Quick Tunnel button, verified binary auto-download, independent
+  admin/OBS capability links, secure cookie bootstrap, remote ACL and revocation.
+- Browser-language detection + English/Brazilian Portuguese override, Canada/Brazil
+  flag controls; original user content remains untranslated.
 
-## Executed validation — Linux / Python 3.12.14
+Current documents replace stale v1 exclusions; previous validation is archived in
+v1-validation.md. V2 design and added scope: v2-design.md.
+
+## Local execution evidence — 2026-10-24
+
+Linux / Python 3.12.14. Deterministic results at the final local checkpoint:
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q` | 66 passed; includes real FFmpeg integration, API/security/concurrency, fake engine contracts |
-| `python -m pytest tests/browser --browser chromium -q` | 4 passed; actual Chromium browser with injected test engine |
-| `python -m ruff check .` / format check | Passed |
-| `python -m compileall -q src` | Passed |
-| `python -m pip wheel --no-deps . -w dist` | Built; HTML/CSS/JS assets verified inside wheel |
-| `pip check` in isolated inference environment | No broken requirements |
-| Real OmniVoice CPU smoke, manual reference transcript | Passed: actual weights downloaded, model loaded, generated MP3 probed with FFprobe |
-| Real OmniVoice offline CPU smoke | Passed: new process with `--offline`, cached weights, manual transcript, MP3 generated |
-| Real OmniVoice CPU smoke with blank transcript | Passed: Whisper-small loaded/transcribed locally on CPU and MP3 generated |
+| Core/API/process/FFmpeg tests | 114 passed |
+| Chromium tests | 12 passed |
+| Ruff check + formatting | Passed |
+| JavaScript syntax (app, OBS, locale) | Passed |
+| Build wheel | Passed; includes static HTML/CSS/JS |
+| Actual spawned-worker cancellation/recovery | Passed with explicit test engine |
+| Physical global hotkey | Native message-loop simulation passed; physical keypress pending |
 
-Real smoke used torch/torchaudio 2.8.0+cpu, omnivoice 0.2.1,
-transformers 5.20.2, NumPy 2.5.4, librosa 1.0.0; OMP/MKL threads=2.
-Downloaded model revision: `c5fdb5ccb189668d56333f77ba2629f4cd7535f4`.
-Reference was a 4.932-second English synthetic speech clip from FFmpeg flite
-(not a personal recording); Portuguese target: “Olá, este é um teste de geração
-local.” Output: 2.400 seconds, MP3, 48 kHz, 192 kbps, 58,221 bytes.
-Total first-job elapsed: 180.24 s, including approximately 84 s of model downloads.
-This is an execution smoke test, not a perceptual quality benchmark or a claim
-about generation speed on the user's PC. Browser tests use a fake model and are
-reported separately from this actual model invocation.
+### Actual OmniVoice, not a fake engine
 
-Offline smoke used target “Olá.” and the same 4.932 s reference: 79.01 s including
-loading in a fresh process. Peak child RSS measured by `resource.getrusage` was
-3,251,668 KiB (about 3.10 GiB). This single short, no-ASR CPU run does not establish
-an upper bound for RAM or any GPU's VRAM requirements. Persistent server reuses
-loaded models; these CLI results are not warm-server benchmarks.
+The production process worker generated a valid MP3 using cached real weights in
+CPU/offline mode. A second real preset workflow automatically transcribed the MP3,
+saved the transcript and reused it for generation with no second ASR stage:
 
-Blank-transcript smoke used target “Olá, mundo.” and downloaded Whisper-small
-revision `973afd24965f72e36ca33b3055d56a652f456b4d`; total 151.98 s including its
-initial download. Result: 1.200 s, 48 kHz / 192 kbps MP3, 29,421 bytes. The default
-upstream ASR loader snapshots the model repository, including other framework
-formats, so the first ASR download can use substantially more disk than the single
-PyTorch weight file. Manual reference transcripts bypass that download entirely.
+| Task | Wall seconds | Worker CPU seconds | Sampled peak worker RAM |
+|---|---:|---:|---:|
+| Real preset preparation / ASR | 11.83 | 28.9768 | 2,704,650,240 bytes |
+| Speech using that saved transcript | 53.08 | 207.0595 | 5,102,972,928 bytes |
 
-Final GitHub Actions validation for commit `edec9cc`:
-https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40062503334
-All four core jobs passed (Windows/Linux × Python 3.11/3.12), including lint,
-tests, wheel build and PowerShell syntax check on Windows. Chromium job passed.
-Superseded diagnostic runs were cancelled; their pending/aborted checks are not
-the final validation result. Final cleanup removes the one-off cancellation job;
-ordinary workflow concurrency handles superseded runs going forward.
+Hardware: AMD EPYC 9V74 host, 9 logical CPUs exposed, 4 inference threads,
+10,451,439,616 bytes system RAM, no GPU. Torch/torchaudio 2.8.0+cpu,
+omnivoice 0.2.1, transformers 5.20.2, reference 4.932 seconds (synthetic English
+flite speech), Portuguese target “Olá, bom dia.”. CPU totals exceed elapsed time
+because threads run in parallel. The speech job had decode/inference/encode stages
+and no transcription stage. JSONL persisted the transcript and measurements.
+These are short execution smokes, not real-time or perceptual-quality claims.
 
-Fresh venv verification also passed: 66 tests in 3.89 s with NumPy 2.5.4 and
-the current base dependencies. An oversized autogenerated test ID was found in
-the 20 MiB upload-limit case and replaced with `over-20MiB`. The full verbose
-test log is now 6,371 bytes rather than containing the binary payload as text.
-CI includes bounded steps and cancellation of superseded validation runs.
+### Network integration evidence
 
-## Remaining hardware validation / next work
+- cloudflared 2026.10.3 was actually downloaded from the official release, its
+  SHA-256 verified, and its CLI accepted the HTTP Host override flag.
+- A real Quick Tunnel startup was attempted. This execution environment rejected
+  outbound DNS/network to api.trycloudflare.com (“network is unreachable”). No
+  public tunnel was left running. External routing therefore remains unverified.
+- Actual anonymous Twitch WSS handshake was attempted; the environment timed out
+  connecting through its HTTP proxy. Live Twitch connectivity remains unverified
+  here. IRC parsing/framing/reconnection are covered by deterministic socket tests.
+- Real browser tests emulate a public origin with forwarded Host and verify admin
+  bootstrap, HttpOnly cookies, URL-fragment removal and OBS-only access restrictions.
+  Those tests are separate from external network routing.
 
-Interactive Windows installation and GPU benchmark remain hardware-dependent.
-Windows application tests passed on hosted runners, but no real GPU was used.
-Current UI intentionally does
-not provide a voice library, pause tags, cancellation or Twitch integration.
+## CI and remaining validation
 
-Pending hardware validation: Windows installation and GTX 1660 SUPER 6 GB
-latency/VRAM. The initial execution environment had no torch; an isolated CPU
-inference environment was subsequently installed for the real smoke above.
+GitHub Windows/Linux Python 3.11/3.12 and Chromium validation is being run for the
+v0.2 implementation commit; final run link/results will be recorded after completion.
+
+Still hardware/environment dependent: GTX 1660 SUPER 6 GB latency/VRAM, physical
+Windows shortcut delivery, real OBS CEF behavior, external Cloudflare and live
+Twitch connection on the user's PC. No GPU allocation/timing or network success
+has been fabricated when unavailable. Basic lexical filters do not guarantee all
+Twitch policy compliance or detect every evasion.
