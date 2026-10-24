@@ -149,3 +149,12 @@ Remaining acceptance: interactive wizard on a physical Windows PC, GPU dependenc
 installation and generation on that installed build. CI uses a Windows runner,
 not a pristine consumer Windows VM. No model inference or CUDA performance claim
 is inferred from the CPU installation/import/HTTP smoke.
+
+## RC2 installer UX — implementation checkpoint
+
+Added first-page large red storage/model/unsigned notice with a five-second
+interactive Next gate. Default data is a sibling PacTTSClone-data directory;
+checkbox unlocks a custom data path. Small red bold estimates sit beside both
+pickers. Existing native uninstaller gains explicit Start Menu/app-folder links.
+Windows CI now checks the interactive wizard and performs actual default-sibling
+CPU install/reinstall/uninstall with retained data. Validation pending new run.

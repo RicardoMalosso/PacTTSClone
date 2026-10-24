@@ -46,3 +46,22 @@ repeat setup and preserve a data marker, uninstall and preserve that marker.
 GPU install/runtime and interactive wizard on a physical Windows PC remain separate
 acceptance checks. Publish unsigned artifacts/checksums to a draft GitHub prerelease
 only after those tests pass. Private repository release access stays private.
+
+## RC2 folder and onboarding changes
+
+Default app/data directories are siblings under the chosen app parent. The data
+picker is disabled unless “Choose a separate data location” is checked; explicit
+/DATADIR and existing custom data paths retain that choice for unattended upgrades.
+Both path pickers have small red bold planning estimates to their right: app
+4–12 GB; data 8–20+ GB. These are conservative capacity ranges, not exact usage or
+limits; cache layout, CPU/CUDA packages, optional ASR and recordings change usage.
+OmniVoice repository files total about 3.27 GB (rounded to 3.3 GB in the notice):
+https://huggingface.co/k2-fsa/OmniVoice/tree/c5fdb5ccb189668d56333f77ba2629f4cd7535f4
+
+The first interactive page uses large red text, mentions downloads/model size and
+unsigned status, and disables Next for five monotonic seconds. Back/forward cannot
+bypass the initial delay; unattended setup does not need human reading time.
+The existing native Inno uninstaller now has explicit Start Menu/app-folder links.
+Deletion rules still preserve the sibling or custom data directory. RC2 requires
+interactive wizard timing/path-toggle tests plus a real default-sibling install,
+repeat setup and uninstall preserving user data. No certificate/signing added.

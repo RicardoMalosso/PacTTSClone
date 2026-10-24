@@ -125,3 +125,13 @@ Version 0.3.0rc1 / release v0.3.0-rc.1 is a draft preview, not a stable declarat
 Official uv 0.9.5 and Gyan FFmpeg 8.0.1 SHA-256 values were retrieved from their
 GitHub release metadata. No certificate enrollment, signing claim or public access
 change. No blanket project license is invented for the repository or model weights.
+
+## RC2 installer UX — 2026-10-24
+
+Use sibling folders by default rather than unrelated app/data defaults. Explicit
+custom data paths remain supported via checkbox and /DATADIR. Existing custom
+upgrade paths are preserved. Budget labels are estimates, not limits; model files
+are approximately 3.3 GB per official repository listing, while total app/data
+usage depends on CPU/CUDA, ASR and growing caches/recordings. The requested red
+five-second notice applies to interactive setup only. Reuse Inno's existing
+uninstaller, add visible shortcuts, and keep user data outside deletion rules.

@@ -23,12 +23,14 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.1.exe` when the preview is available. Draft releases are
+`PacTTSClone-Setup-0.3.0-rc.2.exe` when the preview is available. Draft releases are
 visible only to repository collaborators with the appropriate access; a private
 repository does not provide public downloads.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
-2. Choose separate application and data folders. Either can be on another drive.
+2. Choose the application folder. Data defaults to the sibling `PacTTSClone-data`
+   folder beside `PacTTSClone`; tick **Choose a separate data location** to unlock
+   another path. Red labels show estimated disk usage. Either can be on another drive.
    Data includes voices, MP3s, settings, model/download caches and setup logs.
 3. Choose Automatic, CPU or NVIDIA CUDA. Automatic detects NVIDIA; a compatible
    NVIDIA driver is still required. AMD/Intel/Apple GPU acceleration is unsupported.
@@ -38,13 +40,19 @@ repository does not provide public downloads.
 5. Start **PacTTSClone** from the Start Menu or optional desktop shortcut. Models
    download on first generation; a blank reference transcript also downloads ASR.
 
+The first red **STEP 1** page explains downloads, including about 3.3 GB for the
+OmniVoice model on first use, and waits five seconds before enabling Next. Folder
+labels budget roughly 4–12 GB for the app and 8–20+ GB for data/models/caches, not
+fixed limits or an exact download size.
+
 The preview installer is **unsigned**. `SHA256SUMS.txt` detects file changes but is
 not a trusted publisher signature. Build/validation details: [installer design](docs/installer-design.md).
 No signing certificate is purchased or installed.
 
 Upgrade: stop the app with Ctrl+C, run the newer installer and keep the same data
 folder. Existing voices, audio and settings are preserved. Uninstall removes the
-application/runtime and leaves the separate data folder intact; delete that folder
+application/runtime and leaves the data folder intact. Open **Uninstall PacTTSClone**
+from the Start Menu or application folder, or use Windows Installed Apps; delete that folder
 manually only if you also want to remove your recordings and models.
 
 Large caches use the chosen data drive; the setup executable and Windows may still

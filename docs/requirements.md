@@ -34,3 +34,9 @@ FFmpeg and selected CPU/CUDA dependencies during setup, accepts separate app/dat
 locations, creates shortcuts, preserves user data on upgrade/uninstall, and produces
 logs/checksums. No signing enrollment or repository visibility change. See
 installer-design.md for acceptance and release gates.
+
+R17: Installer defaults to app/data sibling directories, with a checkbox to choose
+custom data storage. Path pickers show small red bold capacity estimates at their
+right. First interactive page uses large red storage/download/unsigned wording and
+a five-second Next delay. Uninstaller is discoverable in Start Menu and app folder
+and preserves data by default.

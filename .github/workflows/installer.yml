@@ -36,6 +36,9 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
           $setup = Get-Item dist/PacTTSClone-Setup-*.exe
           if ($setup.Length -gt 10MB) { throw 'Bootstrap installer exceeds 10 MiB.' }
+      - name: Interactive wizard folder and delay checks
+        shell: powershell
+        run: ./installer/test-wizard.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
       - name: Actual CPU install, HTTP launch, repeat setup and uninstall
         shell: powershell
         run: ./installer/test-install.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
@@ -50,8 +53,9 @@ jobs:
         with:
           name: installer-diagnostics
           path: |
-            ${{ runner.temp }}/PacTTSClone installation test/Data with spaces/logs/setup.log
+            ${{ runner.temp }}/PacTTSClone installation test/PacTTSClone-data/logs/setup.log
             ${{ runner.temp }}/PacTTSClone installation test-setup.log
+            ${{ runner.temp }}/pactts-wizard-*.png
           if-no-files-found: ignore
       - name: Checksums
         shell: pwsh
@@ -71,7 +75,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'v0.3.0-rc.1'
+          $tag = 'v0.3.0-rc.2'
           $existing = @(gh release list --json tagName,isDraft --limit 100 | ConvertFrom-Json) | Where-Object tagName -eq $tag
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect releases.' }
           if ($existing) {
@@ -79,5 +83,5 @@ jobs:
             gh release delete $tag --yes
             if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft.' }
           }
-          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.1 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.1.md dist/*.exe dist/*.whl dist/SHA256SUMS.txt
+          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.2 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.2.md dist/*.exe dist/*.whl dist/SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }

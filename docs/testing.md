@@ -86,3 +86,10 @@ The generated executable is 2,171,921 bytes. Its SHA-256 and wheel checksum were
 independently verified from the downloaded Actions artifact; the PE certificate
 entry is empty (unsigned). This is a hosted Windows runner install, not a clean-VM
 or physical GPU acceptance result.
+
+RC2 adds Windows UI Automation checks against the actual compiled installer:
+initial disabled Next and countdown release, visible path estimates, sibling data
+path, checkbox unlock/relock and default restoration. Screenshots are retained.
+The real CPU installation test omits /DATADIR to exercise the default sibling
+layout, verifies both uninstaller shortcuts, and retains user data on uninstall.
+Explicit /DATADIR still unlocks custom storage for unattended setup.

@@ -1,9 +1,9 @@
 param([Parameter(Mandatory=$true)][string]$SetupExe)
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:RUNNER_TEMP 'PacTTSClone installation test'
-$app = Join-Path $root 'Application with spaces'
-$data = Join-Path $root 'Data with spaces'
-$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$app`"","/DATADIR=`"$data`"",'/DEVICE=cpu',"/LOG=`"$root-setup.log`"")
+$app = Join-Path $root 'PacTTSClone'
+$data = Join-Path $root 'PacTTSClone-data'
+$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$app`"",'/DEVICE=cpu',"/LOG=`"$root-setup.log`"")
 function Install-Checked {
     $process = Start-Process -FilePath $SetupExe -ArgumentList $arguments -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
@@ -11,6 +11,10 @@ function Install-Checked {
 Install-Checked
 $config = Get-Content -Raw (Join-Path $app 'active.json') | ConvertFrom-Json
 if ($config.data_dir -ne $data -or $config.device -ne 'cpu') { throw 'Incorrect setup selection.' }
+foreach ($shortcut in @((Join-Path $app 'Uninstall PacTTSClone.lnk'),
+    (Join-Path ([Environment]::GetFolderPath('Programs')) 'PacTTSClone\Uninstall PacTTSClone.lnk'))) {
+    if (-not (Test-Path -LiteralPath $shortcut)) { throw "Missing uninstaller shortcut: $shortcut" }
+}
 . (Join-Path $app 'launcher\common.ps1')
 Set-LocalEnvironment $app $data
 $env:PATH = "$($config.ffmpeg_bin);$env:PATH"
