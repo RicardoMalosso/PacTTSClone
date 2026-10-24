@@ -34,8 +34,11 @@ try {
     $uv = @(Get-ChildItem -LiteralPath $uvRoot -Filter uv.exe -Recurse)[0].FullName
     Write-Host '[2/6] Downloading isolated Python runtime'
     Invoke-Checked $uv @('python','install',$manifest.python)
-    $managedPython = (& $uv python find --managed-python $manifest.python | Select-Object -Last 1)
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $managedPython)) { throw 'Managed Python was not found.' }
+    $managedPython = Join-Path $env:UV_PYTHON_INSTALL_DIR "cpython-$($manifest.python)-windows-x86_64-none\python.exe"
+    if (-not (Test-Path -LiteralPath $managedPython)) {
+        throw "Managed Python was not found at $managedPython"
+    }
+    Write-Host "Using private Python: $managedPython"
     $envRoot = Join-Path $AppRoot "environments\$version-$Device"
     Invoke-Checked $uv @('venv','--allow-existing','--python',$managedPython,$envRoot)
     $python = Join-Path $envRoot 'Scripts\python.exe'
