@@ -6,6 +6,8 @@ import importlib
 import importlib.metadata
 import json
 import os
+import re
+import importlib.util
 import subprocess
 import sys
 import threading
@@ -36,6 +38,7 @@ class RuntimeSetup:
         except (OSError, ValueError):
             self.state = {"status": "idle", "stage": "idle", "device": None, "error": None}
         self.state.setdefault("initial_setup_completed", self.state["status"] == "succeeded")
+        self.state.setdefault("countermeasures_offered", False)
         if self.state["status"] == "running":
             self.state.update(
                 status="cancelled", stage="interrupted", error="Setup was interrupted. Retry setup."
@@ -89,6 +92,19 @@ class RuntimeSetup:
             tmp = self.state_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.state), encoding="utf-8")
             tmp.replace(self.state_path)
+
+    def offer_countermeasures(self):
+        """Atomically claim the once-only prompt, including across browser reloads."""
+        with self.lock:
+            eligible = (
+                self.state["status"] == "running"
+                and not self.state.get("initial_setup_completed", False)
+                and not self.state.get("countermeasures_offered", False)
+                and time.time() - self.state.get("started_at", time.time()) >= 30
+            )
+            if eligible:
+                self.update(countermeasures_offered=True)
+            return {"offered": bool(eligible)}
 
     def _kill(self):
         with self.lock:
@@ -157,29 +173,21 @@ class RuntimeSetup:
             ),
             encoding="utf-8",
         )
-        uv = os.environ.get("PACTTS_SETUP_UV")
-        if uv and Path(uv).is_file():
-            prefix = [uv, "--color", "never", "pip", "install", "--python", sys.executable]
-            extra = [
-                "--index",
-                f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
-                "--index-strategy",
-                "unsafe-best-match",
-            ]
-        else:
-            prefix = [
-                sys.executable,
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--progress-bar",
-                "off",
-            ]
-            extra = [
-                "--extra-index-url",
-                f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
-            ]
+        # pip --progress-bar raw reports genuine byte counts through a pipe.
+        prefix = [
+            sys.executable,
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--no-input",
+            "--progress-bar",
+            "raw",
+        ]
+        extra = [
+            "--extra-index-url",
+            f"https://download.pytorch.org/whl/{'cu128' if device == 'cuda' else 'cpu'}",
+        ]
         variant = "cu128" if device == "cuda" else "cpu"
         torch = [f"torch==2.8.0+{variant}", f"torchaudio==2.8.0+{variant}"]
         if sys.platform == "darwin" and device == "cpu":
@@ -251,6 +259,7 @@ class RuntimeSetup:
             "PYTHONUTF8": "1",
             "PYTHONIOENCODING": "utf-8",
             "PIP_CONFIG_FILE": os.devnull,
+            "PIP_PROGRESS_BAR": "raw",
             "TEMP": str(self.root / "temporary"),
             "TMP": str(self.root / "temporary"),
         }
