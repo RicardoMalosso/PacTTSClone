@@ -96,7 +96,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'v0.3.0-rc.4'
+          $tag = 'v0.3.0-rc.5'
           $existing = @(gh release list --json tagName,isDraft --limit 100 | ConvertFrom-Json) | Where-Object tagName -eq $tag
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect releases.' }
           if ($existing) {
@@ -104,5 +104,5 @@ jobs:
             gh release delete $tag --yes
             if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft.' }
           }
-          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.4 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.4.md dist/*.exe dist/*.whl dist/FFmpeg-source-build.zip dist/SHA256SUMS.txt
+          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.5 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.5.md dist/*.exe dist/*.whl dist/FFmpeg-source-build.zip dist/SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
