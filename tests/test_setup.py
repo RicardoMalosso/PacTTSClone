@@ -143,9 +143,11 @@ def test_first_setup_blocks_generation_and_survives_interrupt(tmp_path, monkeypa
             == 200
         )
         deadline = time.monotonic() + 5
-        while not setup.snapshot()["lines"] and time.monotonic() < deadline:
+        while time.monotonic() < deadline:
+            if any("installing" in line for line in setup.snapshot()["lines"]):
+                break
             time.sleep(0.01)
-        assert "installing" in setup.snapshot()["lines"]
+        assert any("installing" in line for line in setup.snapshot()["lines"])
         assert (
             client.post("/api/setup/start", json={"device": "cpu"}, headers=headers).status_code
             == 409
@@ -157,6 +159,13 @@ def test_first_setup_blocks_generation_and_survives_interrupt(tmp_path, monkeypa
         assert not setup.snapshot()["ready"]
         assert not app.state.service.setup_busy
         assert "installing" in client.get("/api/setup/log").text
+        # Logs carry per-line timestamps and survive a Python process restart.
+        original_lines = setup.snapshot()["lines"]
+        assert any(line.startswith("[20") and "installing" in line for line in original_lines)
+        from pacttsclone.setup_runtime import RuntimeSetup
+
+        restored = RuntimeSetup(app.state.service)
+        assert any("installing" in line for line in restored.snapshot()["lines"])
         monkeypatch.setattr(
             setup,
             "_commands",
@@ -247,5 +256,55 @@ def test_dependency_constraints_use_relative_path_in_directory_with_spaces(
         for _stage, command in commands[:2]:
             assert command[command.index("--constraint") + 1] == "base-constraints.txt"
         assert (setup.root / "base-constraints.txt").is_file()
+    finally:
+        app.state.studio.close()
+
+def test_dependency_progress_reports_actual_bytes_and_timestamp(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    setup = app.state.runtime_setup
+    setup.update(stage="pytorch")
+    output = io.StringIO()
+    try:
+        setup._run_command(
+            [
+                sys.executable,
+                "-c",
+                "print('Downloading torch-2.8.0.whl (20 bytes)', flush=True); "
+                "print('Progress 10 of 20', flush=True)",
+            ],
+            output,
+        )
+        progress = setup.snapshot()["dependency_progress"]
+        assert progress["package"] == "torch-2.8.0.whl (20 bytes)"
+        assert progress["downloaded_bytes"] == 10
+        assert progress["total_bytes"] == 20
+        assert progress["percent"] == 50.0
+        assert any(line.startswith("[20") for line in setup.snapshot()["lines"])
+        assert "[20" in output.getvalue()
+    finally:
+        app.state.studio.close()
+
+
+def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    setup = app.state.runtime_setup
+    setup.update(
+        status="running",
+        started_at=time.time() - 31,
+        initial_setup_completed=False,
+        countermeasures_offered=False,
+    )
+    try:
+        with TestClient(app, base_url="http://127.0.0.1:7860") as client:
+            headers = {"X-PacTTS-Token": client.get("/api/session").json()["token"]}
+            path = "/api/setup/countermeasures/offer"
+            assert client.post(path).status_code == 403
+            assert client.post(path, headers=headers).json() == {"offered": True}
+            assert client.post(path, headers=headers).json() == {"offered": False}
+        assert setup.state["countermeasures_offered"] is True
+        from pacttsclone.setup_runtime import RuntimeSetup
+
+        restored = RuntimeSetup(app.state.service)
+        assert restored.offer_countermeasures() == {"offered": False}
     finally:
         app.state.studio.close()
