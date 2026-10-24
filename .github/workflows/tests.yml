@@ -60,6 +60,7 @@ jobs:
       - run: python -m ruff check .
       - run: python -m pytest -vv --timeout=15
         timeout-minutes: 3
+      - run: python scripts/fetch-countermeasure-gif.py
       - run: python -m pip wheel --no-deps . -w dist
       - name: Check PowerShell syntax
         if: runner.os == 'Windows'
@@ -79,6 +80,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python scripts/fetch-countermeasure-gif.py
       - run: python -m pip install -e ".[dev,browser]"
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest tests/browser --browser chromium -q
