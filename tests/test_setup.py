@@ -145,7 +145,7 @@ def test_first_setup_blocks_generation_and_survives_interrupt(tmp_path, monkeypa
         deadline = time.monotonic() + 5
         while not setup.snapshot()["lines"] and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert "installing" in setup.snapshot()["lines"]
+        assert any("installing" in line for line in setup.snapshot()["lines"])
         assert (
             client.post("/api/setup/start", json={"device": "cpu"}, headers=headers).status_code
             == 409
@@ -157,6 +157,13 @@ def test_first_setup_blocks_generation_and_survives_interrupt(tmp_path, monkeypa
         assert not setup.snapshot()["ready"]
         assert not app.state.service.setup_busy
         assert "installing" in client.get("/api/setup/log").text
+        # Logs carry per-line timestamps and survive a Python process restart.
+        original_lines = setup.snapshot()["lines"]
+        assert any(line.startswith("[20") and "installing" in line for line in original_lines)
+        from pacttsclone.setup_runtime import RuntimeSetup
+
+        restored = RuntimeSetup(app.state.service)
+        assert any("installing" in line for line in restored.snapshot()["lines"])
         monkeypatch.setattr(
             setup,
             "_commands",
