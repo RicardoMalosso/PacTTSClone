@@ -1,0 +1,76 @@
+name: Promote validated RC5 draft
+on:
+  push:
+    branches: [release/rc5-draft]
+    paths: [.github/workflows/promote-rc5.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: promote-rc5-draft
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify successful acceptance and merged source
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/actions/runs/40140472214 > acceptance.json
+          gh api repos/$GH_REPO/actions/runs/40141216784 > main-tests.json
+          gh api repos/$GH_REPO/git/commits/e71b39bf8caaf7d4c01466c69da5df3ecf481551 > merged.json
+          gh api repos/$GH_REPO/git/commits/c617e22b42150592731728e56cb8f0f70a4b3804 > tested.json
+          gh api repos/$GH_REPO/releases > releases.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          read = lambda p: json.loads(Path(p).read_text())
+          acceptance, main = read('acceptance.json'), read('main-tests.json')
+          assert acceptance['status'] == 'completed' and acceptance['conclusion'] == 'success'
+          assert acceptance['head_sha'] == 'c617e22b42150592731728e56cb8f0f70a4b3804'
+          assert main['status'] == 'completed' and main['conclusion'] == 'success'
+          assert main['head_sha'] == 'e71b39bf8caaf7d4c01466c69da5df3ecf481551'
+          assert read('merged.json')['tree']['sha'] == read('tested.json')['tree']['sha']
+          assert not any(r['tag_name'] == 'v0.3.0-rc.5' for r in read('releases.json')), 'RC5 already exists; refusing to overwrite it'
+          PY
+      - name: Retrieve exact accepted build
+        run: gh run download 40140472214 -R "$GH_REPO" -n PacTTSClone-Windows-setup -D dist
+      - name: Verify every checksum and original bundled clip
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+          echo 'ff3305d4193fc602ab34f1c06ac0c5354fc705aa7de3d3f26cdeda5af3938528  PacTTSClone-Setup-0.3.0-rc.5.exe' | sha256sum --check -
+          python - <<'PY'
+          import hashlib, zipfile
+          with zipfile.ZipFile('pacttsclone-0.3.0rc5-py3-none-any.whl') as wheel:
+              data = wheel.read('pacttsclone/static/jingling-keys.webm')
+              assert hashlib.sha256(data).hexdigest() == '01f5003f1ad001452249af8939afdecd6cb7470d29772af7d18d038c41d3c894'
+          PY
+      - name: Create RC5 draft with validated assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api repos/$GH_REPO/contents/docs/release-0.3.0-rc.5.md?ref=e71b39bf8caaf7d4c01466c69da5df3ecf481551 --jq .content | base64 --decode > release-notes.md
+          cat >> release-notes.md <<'NOTES'
+
+          ## Confirmed release validation
+          Windows/Linux Python 3.11/3.12, Chromium and Windows installer acceptance passed.
+          Acceptance includes actual CPU runtime installation, verified model downloads,
+          installed original WebM, launcher, reinstall and data-preserving uninstall.
+          Post-merge CI passed. The merged tree matches the accepted source exactly.
+          This draft reuses the accepted build; no installer was rebuilt.
+
+          Acceptance: https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40140472214
+          Post-merge tests: https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40141216784
+
+          Installer SHA-256: ff3305d4193fc602ab34f1c06ac0c5354fc705aa7de3d3f26cdeda5af3938528
+          The Windows installer is unsigned.
+          NOTES
+          gh release create v0.3.0-rc.5 --repo "$GH_REPO" --draft --prerelease --target e71b39bf8caaf7d4c01466c69da5df3ecf481551 --title 'PacTTSClone 0.3.0-rc.5 — Windows bootstrap installer' --notes-file release-notes.md dist/PacTTSClone-Setup-0.3.0-rc.5.exe dist/pacttsclone-0.3.0rc5-py3-none-any.whl dist/FFmpeg-provenance.zip dist/SHA256SUMS.txt
