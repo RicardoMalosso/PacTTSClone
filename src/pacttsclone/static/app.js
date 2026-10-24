@@ -443,22 +443,25 @@ $('general-form').addEventListener('submit', action(async event => {
 
 $('prepare-voices').addEventListener('click', () => tab('voices'));
 
-const countermeasureKey = 'pactts-initial-setup-countermeasures-v1';
-let countermeasureClaimed = false, countermeasurePromptOpen = false;
-try { countermeasureClaimed = localStorage.getItem(countermeasureKey) === '1'; } catch { /* storage optional */ }
+let countermeasurePromptOpen = false, countermeasureOfferPending = false;
 function claimCountermeasures() {
-  countermeasureClaimed = true;
+  // The backend permanently claimed this prompt when it was displayed.
   countermeasurePromptOpen = false;
-  try { localStorage.setItem(countermeasureKey, '1'); } catch { /* storage optional */ }
   $('setup-too-long').hidden = true;
 }
 function refreshCountermeasurePrompt() {
   const eligible = runtimeSetup.status === 'running' && !runtimeSetup.initial_setup_completed &&
-    runtimeSetup.started_at && Date.now() / 1000 - runtimeSetup.started_at >= 30;
-  if (!countermeasureClaimed && !countermeasurePromptOpen && eligible) {
-    countermeasurePromptOpen = true;
-    countermeasureClaimed = true; // mark consumed on appearance, even across reload/cancel
-    try { localStorage.setItem(countermeasureKey, '1'); } catch { /* optional */ }
+    !runtimeSetup.countermeasures_offered && runtimeSetup.started_at &&
+    Date.now() / 1000 - runtimeSetup.started_at >= 30;
+  if (eligible && !countermeasureOfferPending && !countermeasurePromptOpen) {
+    countermeasureOfferPending = true;
+    api('/api/setup/countermeasures/offer', {method: 'POST'}).then(result => {
+      if (result.offered && runtimeSetup.status === 'running') {
+        countermeasurePromptOpen = true;
+        $('setup-too-long').hidden = false;
+      }
+    }).catch(error => console.warn('Countermeasures prompt:', error))
+      .finally(() => { countermeasureOfferPending = false; });
   }
   if (runtimeSetup.status !== 'running') countermeasurePromptOpen = false;
   $('setup-too-long').hidden = !countermeasurePromptOpen;
