@@ -3,7 +3,7 @@ on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 concurrency:
-  group: tests-${{ github.ref }}
+  group: tests-v1-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   supersede:
@@ -22,7 +22,13 @@ jobs:
             });
             for (const run of runs.data.workflow_runs) {
               if (run.id < context.runId) {
-                await github.rest.actions.cancelWorkflowRun({...context.repo, run_id: run.id});
+                try {
+                  await github.request('POST /repos/{owner}/{repo}/actions/runs/{run_id}/force-cancel', {
+                    ...context.repo, run_id: run.id
+                  });
+                } catch (error) {
+                  if (error.status !== 409) throw error;
+                }
               }
             }
   core:
