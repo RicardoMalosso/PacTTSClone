@@ -12,7 +12,7 @@ from pacttsclone.config import Settings
 
 
 @pytest.fixture
-def live_server(tmp_path, engine):
+def live_server(tmp_path, engine, page):
     # Bind before starting the server, retaining the socket to avoid port races.
     sock = socket.socket()
     sock.bind(("127.0.0.1", 0))
@@ -36,6 +36,13 @@ def live_server(tmp_path, engine):
             raise AssertionError("Server did not start")
         yield url, app
     finally:
+        # Browser's persistent EventSource must disconnect before Uvicorn drains
+        # active HTTP streams during graceful shutdown.
+        try:
+            if not page.is_closed():
+                page.goto("about:blank", wait_until="commit", timeout=5000)
+        except Exception:
+            pass
         server.should_exit = True
         thread.join(10)
         sock.close()
@@ -207,7 +214,10 @@ def test_initial_setup_countermeasures_prompt_once(page, live_server):
     page.locator("#setup-too-long-yes").click()
     expect(page.locator("#countermeasure-loading")).to_be_visible()
     expect(page.locator("#countermeasure-image")).to_be_visible(timeout=5000)
-    assert page.locator("#countermeasure-image").evaluate("(image) => image.naturalWidth") > 0
+    page.wait_for_function(
+        'document.querySelector("#countermeasure-image")?.naturalWidth > 0',
+        timeout=10000,
+    )
     page.locator("#countermeasure-close").click()
     expect(page.locator("#countermeasure-modal")).to_be_hidden()
     page.reload()
