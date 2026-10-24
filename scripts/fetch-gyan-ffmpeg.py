@@ -26,7 +26,7 @@ def get(url: str) -> bytes:
 
 def main() -> None:
     expected_text = get(BASE + NAME + ".sha256").decode("utf-8").strip()
-    match = re.search(r"(?i)\\b([a-f0-9]{64})\\b", expected_text)
+    match = re.search(r"(?i)\b([a-f0-9]{64})\b", expected_text)
     if not match:
         raise ValueError("No SHA256 in gyan.dev checksum response")
     expected = match.group(1).lower()
@@ -73,10 +73,10 @@ def main() -> None:
         if len(result.stdout) != 16000 * 4:
             raise AssertionError(f"Expected 64000 bytes of float32 PCM, got {len(result.stdout)}")
     (OUTPUT / "BUILD-PROVENANCE.txt").write_text(
-        "FFmpeg distributor: Gyan Doshi, gyan.dev\\n"
-        f"URL: {BASE}{NAME}\\nSHA256: {actual}\\n"
-        "Variant: Windows 64-bit release essentials (static, GPLv3)\\n"
-        "Verification: SHA256 and ffmpeg_read f32le PCM smoke test\\n",
+        "FFmpeg distributor: Gyan Doshi, gyan.dev\n"
+        f"URL: {BASE}{NAME}\nSHA256: {actual}\n"
+        "Variant: Windows 64-bit release essentials (static, GPLv3)\n"
+        "Verification: SHA256 and ffmpeg_read f32le PCM smoke test\n",
         encoding="utf-8",
     )
     print(f"Verified gyan.dev FFmpeg: {actual}")
