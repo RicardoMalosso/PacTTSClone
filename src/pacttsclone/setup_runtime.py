@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from dataclasses import replace
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import psutil
@@ -252,7 +252,7 @@ class RuntimeSetup:
 
     def _record_setup_line(self, log, message):
         """Record application-authored milestones in both the saved and live log."""
-        now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        now = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
         line = f"[{now}] {message}"
         log.write(line + "\n")
         log.flush()
@@ -294,7 +294,7 @@ class RuntimeSetup:
         last_sample_at = time.monotonic()
         for raw_line in process.stdout:
             line = raw_line.rstrip("\r\n")
-            timestamp = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+            timestamp = datetime.now(UTC).astimezone().isoformat(timespec="seconds")
             formatted = f"[{timestamp}] {line}"
             log.write(formatted + "\n")
             log.flush()
