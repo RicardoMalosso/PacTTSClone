@@ -227,3 +227,10 @@ shortcut HTTP launch passed. Web CPU setup exposed uv's constraint-path handling
 with spaces (upstream issue astral-sh/uv#12639); commands now use a relative
 constraint filename in an explicit setup working directory. Full CPU/model setup,
 repeat installation and uninstall await the next Windows acceptance run.
+
+Shared clients also receive the latest completed MP3 in Generate without needing
+to submit it in that browser. Controls show its source/requester; foreign results
+never trigger local autoplay or duplicate queueing, and active manual playback is
+not interrupted. Remote status gets only sanitized host setup activity (no owner
+logs or install controls). Browser requester IDs/names are site-origin scoped;
+a new Quick Tunnel hostname naturally has separate browser storage.

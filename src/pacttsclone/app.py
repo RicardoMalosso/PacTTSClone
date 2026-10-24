@@ -325,6 +325,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         return {
             "active_job": active,
             "setup_ready": service.setup_ready(),
+            "setup_activity": {
+                k: v
+                for k, v in runtime_setup.snapshot().items()
+                if k
+                in {"status", "stage", "completed_steps", "total_steps", "download", "started_at"}
+            },
             "player_links": tunnel.snapshot()["players"],
             "jobs": jobs,
             "request_history": service.request_history(),

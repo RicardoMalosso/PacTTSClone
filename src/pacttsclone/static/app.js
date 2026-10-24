@@ -3,6 +3,7 @@ const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
 const $ = id => document.getElementById(id);
+new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
@@ -115,7 +116,7 @@ function clearResult() {
 function renderMonitor(job) {
   lastMonitor = job; lastMonitorAt = performance.now();
   const voice = state.voices.find(v => v.id === job.voice_id);
-  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
+  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : job.origin === 'cloudflare' ? null : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
   $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
   $('live-generation').hidden = false;
   $('status').textContent = job.error || (job.status === 'succeeded' ? (job.kind === 'transcribe' ? t('Voice preparation ready') : t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds})) : `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`);
@@ -164,6 +165,7 @@ async function watch(id) {
         try { await $('player').play(); }
         catch { $('playback-note').textContent = t('The browser blocked autoplay. Press play to listen.'); }
       }
+      $('result-source').textContent = `${job.voice_title || t('Voice')} · ${job.requester_name || job.username || t('Local')} · ${t(job.origin || 'local')}`;
       completedJob = job.id; autoqueueNote(job); currentJob = null; return;
     }
     await sleep(500);
@@ -340,6 +342,8 @@ async function refresh() {
   const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.filter(j => j.status === 'queued').sort((a, b) => a.created_at - b.created_at)[0] || [...state.jobs].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
   if (monitored) renderMonitor(monitored);
   renderResidency(); renderGlobalStatus();
+  const latestAudio = state.jobs.filter(job => job.kind === 'speech' && job.status === 'succeeded' && job.output_url).sort((a, b) => b.finished_at - a.finished_at)[0];
+  if (!busy && latestAudio && latestAudio.id !== completedJob && $('player').paused) showSharedResult(latestAudio);
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
@@ -447,7 +451,7 @@ function renderSetup(data) {
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
 async function runtimeStatus() {
-  if (session?.remote_access) { renderSetup({ready: state.setup_ready ?? session.setup_ready, status: 'host', stage: 'Waiting for host setup'}); document.querySelector('[data-tab="setup"]').hidden = runtimeSetup.ready; $('setup-start').hidden = true; $('setup-cancel').hidden = true; $('setup-device').disabled = true; $('tunnel-card').hidden = true; return; }
+  if (session?.remote_access) { renderSetup({ready: state.setup_ready ?? session.setup_ready, status: 'host', stage: 'Waiting for host setup', ...(state.setup_activity || {})}); document.querySelector('[data-tab="setup"]').hidden = runtimeSetup.ready; $('setup-start').hidden = true; $('setup-cancel').hidden = true; $('setup-device').disabled = true; $('tunnel-card').hidden = true; return; }
   try { renderSetup(await api('/api/setup')); }
   catch (e) {
     // Shared administrators cannot install host software; generation remains
@@ -464,6 +468,16 @@ $('setup-start').addEventListener('click', setupAction(async () => {
 }));
 $('setup-cancel').addEventListener('click', setupAction(async () => { renderSetup(await api('/api/setup/cancel', {method: 'POST'})); }));
 window.addEventListener('localechange', () => { if (setupAvailable) renderSetup(runtimeSetup); });
+
+function showSharedResult(job) {
+  // A different browser or Twitch can finish this job. Expose its controls without
+  // causing another speaker to autoplay or enqueue the same clip twice.
+  completedJob = job.id;
+  $('player').src = job.output_url; $('player').hidden = false; $('actions').hidden = false;
+  $('download').href = job.output_url; $('download').download = `pactts-${job.id}.mp3`;
+  $('result-source').textContent = `${job.voice_title || t('Voice')} · ${job.requester_name || job.username || t('Local')} · ${t(job.origin || 'local')}`;
+  autoqueueNote(job);
+}
 
 function renderResidency() {
   const model = state.model_residency || {};
@@ -482,8 +496,8 @@ function renderGlobalStatus() {
     $('live-generation-cancel').hidden = true; return;
   }
   if (running) { renderMonitor(running); return; }
-  $('live-generation-source').textContent = t('Idle');
-  $('live-generation-status').textContent = state.jobs.some(job => job.status === 'queued') ? t('Waiting for queued work') : t('Ready for the next request');
+  $('live-generation-source').textContent = t(runtimeSetup.ready ? 'Idle' : 'Initial Setup');
+  $('live-generation-status').textContent = !runtimeSetup.ready ? t('Waiting for host setup') : state.jobs.some(job => job.status === 'queued') ? t('Waiting for queued work') : t('Ready for the next request');
   $('live-generation-progress').value = 0; $('live-generation-timer').textContent = '00:00.0'; $('live-generation-cancel').hidden = true;
 }
 

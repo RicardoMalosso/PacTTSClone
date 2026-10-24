@@ -353,6 +353,8 @@ are in **Configuration**.
 ## Shared access, requester identity and model status
 
 Shared administrators can browse saved voices, all TTS request history and audio.
+Generate also displays the latest completed MP3 from other browsers/Twitch, with
+manual playback/download controls and no extra autoplay.
 Copy the complete scoped OBS URL, including its `#play=...` fragment, when adding
 an OBS source on a different computer. A bare player path grants no authorization.
 An expired link stops retrying; obtain the current link from Configuration.

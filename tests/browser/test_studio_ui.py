@@ -653,6 +653,8 @@ def test_shared_admin_voices_history_scoped_obs_and_revocation(browser, live_ser
         page = contexts[0].new_page()
         page.goto(tunnel.url + "/#admin=" + tunnel.admin_key)
         expect(page.locator('[data-tab="voices"]')).to_be_enabled()
+        expect(page.locator("#player")).to_be_visible()
+        assert page.locator("#player").evaluate("audio => audio.paused")
         open_tab(page, "Voices")
         expect(page.locator(".voice-card")).to_contain_text("Remote voice")
         open_tab(page, "History")

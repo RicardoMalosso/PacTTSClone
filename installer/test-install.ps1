@@ -71,3 +71,7 @@ if (Test-Path $parentLauncher) { throw 'Uninstall left parent launcher shortcut.
 if (Test-Path $app) { throw 'Uninstall left app subfolder.' }
 if (-not (Test-Path $parent)) { throw 'Uninstall removed the root containing user data.' }
 Write-Host 'Minimal installer, real web CPU/model setup, launcher, repeat setup and uninstall smoke passed.'
+
+# All native command results above are checked explicitly. A best-effort taskkill
+# can leave LASTEXITCODE=1 even after every acceptance assertion passed.
+exit 0

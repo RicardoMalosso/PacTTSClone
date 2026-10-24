@@ -329,3 +329,20 @@ shortcut HTTP launch passed. Web CPU setup exposed uv's constraint-path handling
 with spaces (upstream issue astral-sh/uv#12639); commands now use a relative
 constraint filename in an explicit setup working directory. Full CPU/model setup,
 repeat installation and uninstall await the next Windows acceptance run.
+
+Shared clients also receive the latest completed MP3 in Generate without needing
+to submit it in that browser. Controls show its source/requester; foreign results
+never trigger local autoplay or duplicate queueing, and active manual playback is
+not interrupted. Remote status gets only sanitized host setup activity (no owner
+logs or install controls). Browser requester IDs/names are site-origin scoped;
+a new Quick Tunnel hostname naturally has separate browser storage.
+
+Windows acceptance at commit 77252c5 completed every assertion: minimal install,
+root shortcut HTTP launch, actual CPU PyTorch/OmniVoice imports, download and hash
+verification of 4,238,811,339 model bytes through the web setup API, repeat install
+reusing Python/download caches, and uninstall preserving data. The workflow then
+reported exit 1 because the test script inherited a best-effort cleanup command's
+LASTEXITCODE; the script now explicitly exits 0 only after all checked assertions
+pass. This does not skip any failed assertion. The next build packages that fix
+and the validated cross-browser result controls. No real-model synthesis/GPU
+performance is asserted by this installation/import/download test.
