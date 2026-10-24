@@ -474,14 +474,17 @@ function refreshCountermeasurePrompt() {
   if (runtimeSetup.status !== 'running') countermeasurePromptOpen = false;
   $('setup-too-long').hidden = !countermeasurePromptOpen;
 }
-function closeCountermeasures() { $('countermeasure-modal').hidden = true; }
+function closeCountermeasures() { $('countermeasure-modal').hidden = true; const video = $('countermeasure-video'); video.pause(); video.currentTime = 0; }
 $('setup-too-long-no').addEventListener('click', claimCountermeasures);
 $('setup-too-long-close').addEventListener('click', claimCountermeasures);
 $('setup-too-long-yes').addEventListener('click', async () => {
   claimCountermeasures();
   $('countermeasure-modal').hidden = false;
   $('countermeasure-loading').hidden = false;
-  $('countermeasure-image').hidden = true;
+  const video = $('countermeasure-video');
+  video.pause();
+  video.currentTime = 0;
+  video.hidden = true;
   const bar = $('countermeasure-bar');
   bar.value = 0;
   const started = performance.now();
@@ -492,7 +495,8 @@ $('setup-too-long-yes').addEventListener('click', async () => {
   if ($('countermeasure-modal').hidden) return;
   bar.value = 100;
   $('countermeasure-loading').hidden = true;
-  $('countermeasure-image').hidden = false;
+  video.hidden = false;
+  try { await video.play(); } catch (e) { console.warn('Jingling keys playback needs user interaction:', e); }
 });
 $('countermeasure-close').addEventListener('click', closeCountermeasures);
 
