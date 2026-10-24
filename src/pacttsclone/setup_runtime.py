@@ -250,6 +250,16 @@ class RuntimeSetup:
         )
         return commands
 
+    def _record_setup_line(self, log, message):
+        """Record application-authored milestones in both the saved and live log."""
+        now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        line = f"[{now}] {message}"
+        log.write(line + "\n")
+        log.flush()
+        with self.lock:
+            self.lines.append(line)
+            self.lines = self.lines[-500:]
+
     def _run_command(self, command, log):
         env = {
             **os.environ,
@@ -267,9 +277,7 @@ class RuntimeSetup:
         with self.lock:
             if self.cancelled.is_set():
                 raise InterruptedError("Setup cancelled.")
-            now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-            log.write(f"[{now}] Running: {json.dumps(command)}\n")
-            log.flush()
+            self._record_setup_line(log, "Running: " + json.dumps(command))
             self.process = subprocess.Popen(
                 command,
                 cwd=self.root,
@@ -359,8 +367,8 @@ class RuntimeSetup:
     def _run(self, device):
         try:
             with self.log_path.open("a", encoding="utf-8") as log:
-                now = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
-                log.write(f"\n[{now}] Setup requested: {device}\n")
+                log.write("\n")
+                self._record_setup_line(log, f"Setup requested: {device}")
                 self.update(model_ids=self.state.get("model_ids") or list(self.model_ids))
                 # uv venvs omit pip, so install pip once into the private runtime.
                 # This is only a dependency-installer bootstrap; the app stays local.
