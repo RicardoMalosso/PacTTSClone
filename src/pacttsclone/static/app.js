@@ -145,6 +145,11 @@ function renderMonitor(job) {
   $('report').textContent = JSON.stringify({elapsed_seconds: job.elapsed_seconds, device: job.device, ...job.metrics}, null, 2);
 }
 setInterval(() => {
+  if (runtimeSetup.status === 'running' && runtimeSetup.started_at) {
+    $('live-generation-timer').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
+    $('setup-elapsed').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
+    refreshCountermeasurePrompt();
+  }
   if (!lastMonitor) return;
   const delta = lastMonitor.status === 'running' ? (performance.now() - lastMonitorAt) / 1000 : 0;
   $('timer').textContent = duration((lastMonitor.elapsed_seconds || 0) + delta);
@@ -428,6 +433,40 @@ $('general-form').addEventListener('submit', action(async event => {
 
 $('prepare-voices').addEventListener('click', () => tab('voices'));
 
+const countermeasureKey = 'pactts-initial-setup-countermeasures-v1';
+let countermeasureClaimed = false;
+try { countermeasureClaimed = localStorage.getItem(countermeasureKey) === '1'; } catch { /* storage optional */ }
+function claimCountermeasures() {
+  countermeasureClaimed = true;
+  try { localStorage.setItem(countermeasureKey, '1'); } catch { /* storage optional */ }
+  $('setup-too-long').hidden = true;
+}
+function refreshCountermeasurePrompt() {
+  $('setup-too-long').hidden = countermeasureClaimed || runtimeSetup.status !== 'running' ||
+    !runtimeSetup.started_at || Date.now() / 1000 - runtimeSetup.started_at < 30;
+}
+function closeCountermeasures() { $('countermeasure-modal').hidden = true; }
+$('setup-too-long-no').addEventListener('click', claimCountermeasures);
+$('setup-too-long-close').addEventListener('click', claimCountermeasures);
+$('setup-too-long-yes').addEventListener('click', async () => {
+  claimCountermeasures();
+  $('countermeasure-modal').hidden = false;
+  $('countermeasure-loading').hidden = false;
+  $('countermeasure-image').hidden = true;
+  const bar = $('countermeasure-bar');
+  bar.value = 0;
+  const started = performance.now();
+  while (!($('countermeasure-modal').hidden) && performance.now() - started < 2000) {
+    bar.value = Math.min(100, (performance.now() - started) / 20);
+    await sleep(40);
+  }
+  if ($('countermeasure-modal').hidden) return;
+  bar.value = 100;
+  $('countermeasure-loading').hidden = true;
+  $('countermeasure-image').hidden = false;
+});
+$('countermeasure-close').addEventListener('click', closeCountermeasures);
+
 function renderSetup(data) {
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
@@ -442,10 +481,16 @@ function renderSetup(data) {
   $('setup-status').textContent = data.ready ? t('Setup ready. You can open the studio.') : t('Setup stage: ') + t(data.stage || 'idle');
   $('setup-error').hidden = !data.error;
   $('setup-error').textContent = data.error ? t(data.error) : '';
-  $('setup-log').textContent = (data.lines || []).join('\n');
+  const logPanel = $('setup-log');
+  const follow = logPanel.scrollTop + logPanel.clientHeight >= logPanel.scrollHeight - 36;
+  logPanel.textContent = (data.lines || []).join('\n');
+  if (follow) logPanel.scrollTop = logPanel.scrollHeight;
+  if (data.started_at) $('setup-elapsed').textContent = duration((data.finished_at || Date.now() / 1000) - data.started_at);
+  refreshCountermeasurePrompt();
   const d = data.download;
   $('setup-file-progress').hidden = !d;
   if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.file_bytes || 0; }
+  $('setup-package-status').textContent = data.stage === 'pytorch' || data.stage === 'inference' ? (data.dependency_progress?.message || 'Downloading / installing dependencies — package totals may be unavailable') : '';
   $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : t('Package installation has no reliable byte total; technical details show actual activity.');
   if (!data.ready && !setupAvailable) return;
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
