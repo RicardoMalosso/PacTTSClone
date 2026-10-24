@@ -39,8 +39,6 @@ jobs:
           & ./installer/test-common.ps1
       - name: Fetch verified Gyan FFmpeg Essentials
         run: python scripts/fetch-gyan-ffmpeg.py
-      - name: Bundle countermeasures GIF
-        run: python scripts/fetch-countermeasure-gif.py
       - name: Build application wheel
         run: python -m pip wheel --no-deps . -w dist
       - name: Compile small unsigned setup
