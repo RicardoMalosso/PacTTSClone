@@ -70,8 +70,18 @@ These are short execution smokes, not real-time or perceptual-quality claims.
 
 ## CI and remaining validation
 
-GitHub Windows/Linux Python 3.11/3.12 and Chromium validation is being run for the
-v0.2 implementation commit; final run link/results will be recorded after completion.
+All GitHub Actions jobs passed for implementation commit
+`2ec04019a0908d35fefb6ddea6a4470115e2b337`:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40068196955
+
+- Windows Python 3.11 and 3.12: core tests, lint, wheel build and PowerShell syntax.
+- Linux Python 3.11 and 3.12: core tests, lint and wheel build.
+- Linux Chromium: all browser tests.
+
+Final visual review inspected English/Portuguese studio and configuration screens.
+A small follow-up makes live resource labels and hotkey status switch language
+immediately instead of waiting for the next polling cycle; its locale browser
+regression test passed. No production worker/model behavior changed afterward.
 
 Still hardware/environment dependent: GTX 1660 SUPER 6 GB latency/VRAM, physical
 Windows shortcut delivery, real OBS CEF behavior, external Cloudflare and live

@@ -275,6 +275,8 @@ async function init() {
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
 window.addEventListener('localechange', () => {
+  document.querySelectorAll('.resources strong').forEach(node => { node.textContent = t(node.textContent); });
+  $('hotkey-status').textContent = t(state.hotkey_status || '');
   const drafts = [...document.querySelectorAll('.voice-card')].map(card => ({id: card.dataset.voiceId, title: card.querySelector('input')?.value, transcript: card.querySelector('textarea')?.value}));
   voicesKey = historyKey = ''; renderVoices(); renderHistory(); renderJobs(); renderChannels();
   for (const d of drafts) { const card = [...document.querySelectorAll('.voice-card')].find(c => c.dataset.voiceId === d.id); if (card) { card.querySelector('input').value = d.title; card.querySelector('textarea').value = d.transcript; } }
