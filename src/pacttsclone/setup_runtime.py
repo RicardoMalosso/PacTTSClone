@@ -35,6 +35,7 @@ class RuntimeSetup:
             self.state = json.loads(self.state_path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             self.state = {"status": "idle", "stage": "idle", "device": None, "error": None}
+        self.state.setdefault("initial_setup_completed", self.state["status"] == "succeeded")
         if self.state["status"] == "running":
             self.state.update(
                 status="cancelled", stage="interrupted", error="Setup was interrupted. Retry setup."
@@ -315,7 +316,7 @@ class RuntimeSetup:
                         AppConfig(**{**self.service.config.model_dump(), "device": device})
                     )
                 self.update(
-                    status="succeeded", stage="ready", completed_steps=5, finished_at=time.time()
+                    status="succeeded", stage="ready", completed_steps=5, finished_at=time.time(), initial_setup_completed=True
                 )
                 self._apply_models()
         except InterruptedError as exc:
