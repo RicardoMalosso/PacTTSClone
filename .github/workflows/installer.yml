@@ -41,6 +41,8 @@ jobs:
       - name: Build FFmpeg from pinned official source
         shell: msys2 {0}
         run: bash installer/build-ffmpeg.sh
+      - name: Bundle countermeasures GIF locally
+        run: python scripts/fetch-countermeasure-gif.py
       - name: Build application wheel
         run: python -m pip wheel --no-deps . -w dist
       - name: Compile small unsigned setup
@@ -49,7 +51,7 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/setup.iss
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
           $setup = Get-Item dist/PacTTSClone-Setup-*.exe
-          if ($setup.Length -gt 10MB) { throw 'Bootstrap installer exceeds 10 MiB.' }
+          if ($setup.Length -gt 30MB) { throw 'Bootstrap installer exceeds 30 MiB.' }
       - name: Interactive wizard folder and delay checks
         shell: powershell
         run: ./installer/test-wizard.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
