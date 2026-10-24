@@ -185,3 +185,28 @@ def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     expect(page.locator('[data-tab="voices"]')).to_be_enabled()
     page.locator('[data-tab="voices"]').click()
     expect(page.locator("#pane-voices")).to_be_visible()
+
+
+def test_initial_setup_countermeasures_prompt_once(page, live_server):
+    url, app = live_server
+    setup = app.state.runtime_setup
+    setup.update(
+        status="running",
+        stage="pytorch",
+        device="cpu",
+        completed_steps=0,
+        total_steps=5,
+        initial_setup_completed=False,
+        started_at=time.time() - 31,
+    )
+    page.goto(url)
+    expect(page.locator("#setup-too-long")).to_be_visible(timeout=5000)
+    expect(page.locator("#setup-elapsed")).not_to_have_text("00:00.0")
+    page.locator("#setup-too-long-yes").click()
+    expect(page.locator("#countermeasure-loading")).to_be_visible()
+    expect(page.locator("#countermeasure-image")).to_be_visible(timeout=5000)
+    assert page.locator("#countermeasure-image").evaluate("(image) => image.naturalWidth") > 0
+    page.locator("#countermeasure-close").click()
+    expect(page.locator("#countermeasure-modal")).to_be_hidden()
+    page.reload()
+    expect(page.locator("#setup-too-long")).to_be_hidden()
