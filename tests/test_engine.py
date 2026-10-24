@@ -5,7 +5,9 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+import soundfile as sf
 
+from pacttsclone.audio import AudioPipeline
 from pacttsclone.config import Settings
 from pacttsclone.domain import GenerationRequest, UserError
 from pacttsclone.engine import OmniVoiceEngine, choose_device
@@ -73,6 +75,33 @@ def test_blank_transcript_loads_asr_once_on_cpu(modules):
     model.load_asr_model.assert_called_once_with(model_name="openai/whisper-small", device="cpu")
     assert model.generate.call_args.kwargs["language"] is None
     assert model.generate.call_args.kwargs["ref_text"] is None
+
+
+def test_transcribe_decoded_mp3_passes_pcm_without_second_ffmpeg(
+    modules, mp3, tmp_path, monkeypatch
+):
+    _, model, _ = modules
+    reference = tmp_path / "reference.wav"
+    AudioPipeline(Settings()).decode(mp3, reference)
+    expected, rate = sf.read(reference, dtype="float32")
+    model.transcribe.return_value = "Reference transcript."
+    engine = OmniVoiceEngine(Settings())
+    # MP3 decoding above is real. The model is mocked; no inference is claimed.
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            "subprocess.Popen", Mock(side_effect=AssertionError("Unexpected second decoder"))
+        )
+        assert engine.transcribe(str(reference)) == "Reference transcript."
+        assert engine.transcribe(str(reference)) == "Reference transcript."
+    model.load_asr_model.assert_called_once_with(
+        model_name="openai/whisper-small", device="cpu"
+    )
+    for call in model.transcribe.call_args_list:
+        samples, sample_rate = call.args[0]
+        assert sample_rate == rate == 24000
+        assert samples.dtype == np.float32
+        assert samples.ndim == 1
+        np.testing.assert_array_equal(samples, expected)
 
 
 def test_cpu_uses_float32(modules):
@@ -147,3 +176,4 @@ def test_residency_is_shared_across_voice_changes_and_cleared_on_oom(modules):
     with pytest.raises(UserError, match="Memória"):
         engine.synthesize("voice-a.wav", request)
     assert events[-1] == (False, "cuda")
+

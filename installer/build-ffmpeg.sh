@@ -12,9 +12,9 @@ test "$(git rev-parse HEAD)" = "$commit"
 ./configure --disable-everything --disable-autodetect --disable-network \
   --disable-doc --disable-debug --disable-shared --enable-static --disable-ffplay \
   --enable-ffmpeg --enable-ffprobe --enable-small \
-  --enable-protocol=file,pipe --enable-demuxer=mp3,wav --enable-muxer=mp3,wav \
+  --enable-protocol=file,pipe --enable-demuxer=mp3,wav --enable-muxer=mp3,wav,f32le \
   --enable-decoder=mp3float,pcm_s16le,pcm_f32le,pcm_s24le,pcm_s32le \
-  --enable-encoder=libmp3lame,pcm_s16le --enable-parser=mpegaudio \
+  --enable-encoder=libmp3lame,pcm_s16le,pcm_f32le --enable-parser=mpegaudio \
   --enable-filter=aresample,aformat,anull --enable-libmp3lame \
   --pkg-config-flags=--static --extra-ldflags=-static
 make -j"$(nproc)" ffmpeg.exe ffprobe.exe
@@ -67,4 +67,20 @@ git archive --format=tar.gz --output="$output/ffmpeg-source.tar.gz" HEAD
 python -c 'import wave; w=wave.open("smoke.wav","wb"); w.setparams((1,2,24000,0,"NONE","NONE")); w.writeframes(bytes(48000)); w.close()'
 ./ffmpeg.exe -v error -y -i smoke.wav -ar 48000 -b:a 192k "$output/test.mp3"
 ./ffprobe.exe -v error -show_entries format=duration "$output/test.mp3"
+# Exercise the actual bundled executable with Transformers' ffmpeg_read protocol.
+# A successful WAV/MP3 round-trip alone does not cover raw float PCM output.
+python - <<'PYASR'
+import pathlib
+import subprocess
+
+result = subprocess.run(
+    ["./ffmpeg.exe", "-i", "pipe:0", "-ac", "1", "-ar", "16000",
+     "-f", "f32le", "-hide_banner", "-loglevel", "quiet", "pipe:1"],
+    input=pathlib.Path("smoke.wav").read_bytes(),
+    capture_output=True,
+    check=True,
+)
+assert len(result.stdout) == 16000 * 4, "ASR decoder returned invalid PCM length"
+PYASR
 rm -f "$output/test.mp3" smoke.wav
+

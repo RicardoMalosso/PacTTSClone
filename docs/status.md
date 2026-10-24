@@ -364,3 +364,24 @@ Downloaded the workflow ZIP and independently verified every SHA256SUMS entry;
 installer/wheel/FFmpeg archive hashes also match GitHub release asset digests.
 No unfinished feature or auto-updater was added to this snapshot. Future feature
 work must preserve these RC4 artifacts and use a new version for another installer.
+
+
+## Reference transcription regression — 2026-10-24
+
+The packaged minimal FFmpeg omitted the f32le muxer and pcm_f32le encoder used
+by Transformers ffmpeg_read. Enable both and execute that exact pipe protocol
+against the newly compiled Windows binary in the installer build. ASR receives
+already decoded float32 PCM through OmniVoice's tuple API, avoiding a second
+FFmpeg decode. A regression uses real MP3/WAV decoding, verifies every PCM sample
+and rate, blocks subprocess creation during transcription, and checks lazy ASR
+reuse; the model is mocked, not real inference.
+
+Local checks: 136 backend tests passed (tests/test_default_voices.py excluded
+because binary preset assets are unavailable in this connector checkout); all
+22 focused engine/audio tests passed; ruff and bash syntax checks passed. The new
+regression fails when the old path-based model call is restored. Initial broad
+run failed because the partial checkout lacked static files; after retrieving
+those files and installing local metadata the above backend run passed.
+Windows compiled-binary smoke awaits GitHub Actions. No real Whisper/OmniVoice
+weights or physical GPU inference were executed locally; these results do not
+establish speech quality or end-to-end model inference.
