@@ -113,3 +113,51 @@ def test_small_viewport_and_counter(page, live_app):
     page.locator("#text").fill("Olá")
     expect(page.locator("#count")).to_have_text("3 / 2000")
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
+    state = dict(ready=False, status="idle", stage="idle", completed_steps=0)
+    page.route("**/api/setup", lambda route: route.fulfill(json=state))
+
+    def start(route):
+        assert route.request.post_data_json == {"device": "cpu"}
+        state.update(
+            status="running",
+            stage="models",
+            completed_steps=3,
+            download=dict(
+                repo="owner/model",
+                file="weights.safetensors",
+                phase="resuming download",
+                file_bytes=50,
+                file_total=100,
+                reused_files=2,
+            ),
+        )
+        route.fulfill(json=state)
+
+    def cancel(route):
+        state.update(status="cancelled", stage="cancelled", error="Setup cancelled.")
+        route.fulfill(json=state)
+
+    page.route("**/api/setup/start", start)
+    page.route("**/api/setup/cancel", cancel)
+    page.goto(live_app)
+    expect(page.locator("#pane-setup")).to_be_visible()
+    for tab in ["studio", "voices", "channels"]:
+        expect(page.locator(f'[data-tab="{tab}"]')).to_be_disabled()
+    expect(page.locator("#tunnel-card")).to_be_hidden()
+    page.locator("#setup-device").select_option("cpu")
+    page.locator("#setup-start").click()
+    expect(page.locator("#setup-file-progress")).to_have_attribute("value", "50")
+    expect(page.locator("#setup-download-status")).to_contain_text("resuming download")
+    expect(page.locator("#setup-download-status")).to_contain_text("2 verified cached files reused")
+    expect(page.locator("#setup-start")).to_be_disabled()
+    page.locator("#setup-cancel").click()
+    expect(page.locator("#setup-error")).to_contain_text("Setup cancelled.")
+    expect(page.locator("#setup-start")).to_be_enabled()
+    expect(page.locator('[data-tab="voices"]')).to_be_disabled()
+    state.update(ready=True, status="succeeded", stage="ready", error=None)
+    expect(page.locator('[data-tab="voices"]')).to_be_enabled()
+    page.locator('[data-tab="voices"]').click()
+    expect(page.locator("#pane-voices")).to_be_visible()

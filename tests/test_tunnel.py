@@ -47,6 +47,16 @@ def test_remote_admin_bootstrap_cookie_scope_and_no_tunnel_control(shared_app):
         token = client.get("/api/session").json()["token"]
         assert client.get("/api/config").status_code == 200
         assert client.get("/api/tunnel").status_code == 403
+        assert client.get("/api/setup").status_code == 403
+        assert client.get("/api/setup/log").status_code == 403
+        assert (
+            client.post(
+                "/api/setup/start",
+                json={"device": "cpu"},
+                headers={**origin, "X-PacTTS-Token": token},
+            ).status_code
+            == 403
+        )
         assert (
             client.post("/api/tunnel/stop", headers={**origin, "X-PacTTS-Token": token}).status_code
             == 403

@@ -8,6 +8,8 @@ build/
 dist/
 test-results/
 playwright-report/
+installer/ffmpeg/
+build-sources/
 *.mp3
 *.wav
 *.pt

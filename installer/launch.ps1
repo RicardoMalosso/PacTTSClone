@@ -4,6 +4,8 @@ if (-not $AppRoot) { $AppRoot = Split-Path (Split-Path -Parent $PSCommandPath) -
 try {
     $config = Get-Content -Raw -LiteralPath (Join-Path $AppRoot 'active.json') | ConvertFrom-Json
     Set-LocalEnvironment $AppRoot $config.data_dir
+    $env:PACTTS_APP_ROOT = $AppRoot
+    $env:PACTTS_SETUP_UV = $config.uv
     $env:PATH = "$($config.ffmpeg_bin);$env:PATH"
     & $config.python -m pacttsclone.cli --data-dir $config.data_dir --device $config.device @AppArguments
     if ($LASTEXITCODE -ne 0) { throw "Application exited with code $LASTEXITCODE" }

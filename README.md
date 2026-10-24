@@ -23,36 +23,47 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.3.exe` when the preview is available. Draft releases are
+`PacTTSClone-Setup-0.3.0-rc.4.exe` when the preview is available. Draft releases are
 visible only to repository collaborators with the appropriate access; a private
 repository does not provide public downloads.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
-2. Choose the application folder. Data defaults to the sibling `PacTTSClone-data`
-   folder beside `PacTTSClone`; tick **Choose a separate data location** to unlock
-   another path. Red labels show estimated disk usage. Either can be on another drive.
+2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
+   puts application files in `foo/PacTTSClone/app` and data in
+   `foo/PacTTSClone/data`. Tick **Choose a separate data location** to unlock
+   another data path. Red labels show estimated disk usage. Either can be on another drive.
    Data includes voices, MP3s, settings, model/download caches and setup logs.
-3. Choose Automatic, CPU or NVIDIA CUDA. Automatic detects NVIDIA; a compatible
-   NVIDIA driver is still required. AMD/Intel/Apple GPU acceleration is unsupported.
-4. Follow download progress in the setup console. The executable is small; runtime
-   downloads and installed files can occupy several GB. Closing the console cancels
-   setup; rerun it to retry using cached downloads. Errors: `data-folder/logs/setup.log`.
-5. Double-click **PacTTSClone.lnk** in the parent **PacTTS** folder, or use the
-   Start Menu/optional desktop shortcut. Application and data live in its
-   `PacTTSClone` and `PacTTSClone-data` subfolders. Models
-   download on first generation; a blank reference transcript also downloads ASR.
+3. The installer downloads private Python and the base web packages. It bundles
+   project-built FFmpeg from pinned official FFmpeg source; it installs **no PyTorch,
+   CUDA packages or model weights**. Native setup logs: `data/logs/setup.log`.
+4. Double-click **PacTTSClone.lnk** inside your selected root, or the Start Menu
+   shortcut. Open **Initial Setup** in the browser and choose CPU or NVIDIA GPU.
+   A compatible NVIDIA driver is required; setup never installs drivers.
+5. Click **Start initial setup**. The web interface installs the selected inference
+   packages, downloads OmniVoice and Whisper Small, verifies the files and unlocks
+   the other tabs. Model progress shows real file bytes, cache verification and
+   resumed downloads. Package installation shows actual log activity; it has no
+   reliable combined byte percentage. Cancel/retry and a downloadable setup log
+   are available. Only then prepare the included voices.
 
 The first red **STEP 1** page explains downloads, including about 3.3 GB for the
-OmniVoice model on first use, and waits five seconds before enabling Next. Folder
-labels budget roughly 4–12 GB for the app and 8–20+ GB for data/models/caches, not
+OmniVoice model during Initial Setup, and waits five seconds before enabling Next. Folder
+labels budget roughly 12–32+ GB combined, or 4–12 GB for app-only with separate data storage
+plus 8–20+ GB for data/models/caches, not
 fixed limits or an exact download size.
 
 The preview installer is **unsigned**. `SHA256SUMS.txt` detects file changes but is
 not a trusted publisher signature. Build/validation details: [installer design](docs/installer-design.md).
 No signing certificate is purchased or installed.
 
+If dependency preparation fails, the installer must stay on its error page with
+Next disabled. Use **Open setup log**, Back to retry, or Cancel to exit. Installation
+failure does not require restarting Windows. An early failure may save
+`setup-error.log` at the root if `data/logs/setup.log` could not be created.
+
 Upgrade: stop the app with Ctrl+C, run the newer installer and keep the same data
-folder. Existing voices, audio and settings are preserved. Uninstall removes the
+folder. Existing voices, audio and settings are preserved. Previous custom/legacy data
+locations remain selected; setup does not silently move or delete that data. Uninstall removes the
 application/runtime and leaves the data folder intact. Open **Uninstall PacTTSClone**
 from the Start Menu or application folder, or use Windows Installed Apps; delete that folder
 manually only if you also want to remove your recordings and models.
@@ -62,6 +73,30 @@ create small temporary files or installer metadata on the system drive. Setup do
 not change global Python, system PATH, NVIDIA drivers or enable network sharing.
 CPU mode uses smaller dependencies and slower generation. There is no real-time
 generation guarantee. Keep several GB free for models and installation caches.
+
+### Cache reuse and updates
+
+Native setup verifies the cached uv archive by SHA-256 before reusing it. Managed
+Python and package installation reuse their existing installations/caches. The web
+model setup pins a model revision and checks file size and SHA-256 (or Git blob
+SHA-1 for small repository files). Exact files are reused, including matching
+Hugging Face snapshots; partial transfers resume when the server supports Range.
+Corrupt files are replaced. After setup, inference uses verified local model paths
+in offline mode. Startup performs a lightweight existence/size check; rerunning
+Initial Setup performs the full hashes again. It does not promise zero HTTP
+requests for package version/index checks.
+
+An updater is **not implemented**. For now, stop the app and run a newer installer
+with the same data folder. A future update feature should check a versioned release
+manifest, stage and verify the new application, preserve data, stop the old process,
+and offer rollback. Private release authentication and unsigned Windows binaries
+must be handled before unattended updating is offered.
+
+FFmpeg publishes source, not Windows executables. This project's tools are built
+in CI from pinned [official FFmpeg source](https://github.com/FFmpeg/FFmpeg), using
+MSYS2's signed compiler/LAME packages. The release's `FFmpeg-source-build.zip`
+contains sources, licenses, hashes and build provenance; recipe:
+[build-ffmpeg.sh](installer/build-ffmpeg.sh). No Gyan FFmpeg distribution is fetched.
 
 ## Run or update from source
 
@@ -109,10 +144,10 @@ For compatible NVIDIA drivers, replace `cpu` in the wheel URL with `cu128`.
 ## Included voices and first-use preparation
 
 The app includes **Akuma Lady**, **Dilma**, **Chrétien**, and **lula** as unprepared
-presets. Open **Voices** and click **Prepare for first use** for each voice you want.
-The card shows preparation/download status and cancellation; when ready, its saved
+presets. Complete **Initial Setup**, then open **Voices** and click **Prepare for first use** for each voice you want.
+The card shows preparation status and cancellation; when ready, its saved
 transcript is reused and the voice appears in Generate and Twitch command lists.
-No models are loaded merely by opening the app. You can edit a transcript manually
+Models are downloaded and verified during Initial Setup; opening the app does not load them for inference. You can edit a transcript manually
 instead, or delete unwanted defaults; upgrades do not recreate deleted presets.
 
 Samples were supplied by the project owner. Akuma Lady's source was 30.59 seconds;

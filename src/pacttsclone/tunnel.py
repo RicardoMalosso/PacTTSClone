@@ -70,7 +70,7 @@ class Tunnel:
     def permitted(self, capability, path, method):
         if not capability:
             return False
-        if path.startswith("/api/tunnel"):
+        if path.startswith(("/api/tunnel", "/api/setup")):
             return False  # Tunnel lifecycle stays local, even for shared admins.
         if capability[0] == "admin":
             return True

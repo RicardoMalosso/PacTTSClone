@@ -15,6 +15,7 @@ from .engine import dependencies_available
 from .models import AppConfig, ChannelConfig
 from .playback import GENERAL_PLAYER
 from .service import GenerationService
+from .setup_runtime import RuntimeSetup
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
 
@@ -120,6 +121,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     service = GenerationService(settings, engine)
     studio = Studio(service)
     tunnel = Tunnel(service)
+    runtime_setup = RuntimeSetup(service)
+    runtime_setup.on_ready = studio.start
     token = secrets.token_urlsafe(32)
 
     @asynccontextmanager
@@ -128,10 +131,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         try:
             yield
         finally:
+            runtime_setup.close()
             tunnel.close()
             studio.close()
 
     app = FastAPI(title="PacTTSClone", lifespan=lifespan, docs_url=None, redoc_url=None)
+    app.state.runtime_setup = runtime_setup
     app.state.service = service
     app.state.studio = studio
     app.state.tunnel = tunnel
@@ -152,6 +157,26 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         return JSONResponse(
             {"token": token, "max_upload_bytes": MAX_UPLOAD_BYTES, "max_text": 2000},
             headers={"Cache-Control": "no-store"},
+        )
+
+    @app.get("/api/setup")
+    def setup_status():
+        return runtime_setup.snapshot()
+
+    @app.post("/api/setup/start")
+    def setup_start(value: dict):
+        return runtime_setup.start(value.get("device"))
+
+    @app.post("/api/setup/cancel")
+    def setup_cancel():
+        return runtime_setup.cancel()
+
+    @app.get("/api/setup/log")
+    def setup_log():
+        if not runtime_setup.log_path.is_file():
+            raise HTTPException(404, "No dependency setup log yet.")
+        return FileResponse(
+            runtime_setup.log_path, media_type="text/plain", filename="runtime-setup.log"
         )
 
     @app.get("/api/health")
@@ -294,6 +319,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.post("/api/cancel-all")
     def cancel_all():
+        runtime_setup.cancel()
         studio.cancel_all()
         return {"ok": True}
 

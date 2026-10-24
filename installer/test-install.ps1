@@ -1,28 +1,31 @@
 param([Parameter(Mandatory=$true)][string]$SetupExe)
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:RUNNER_TEMP 'PacTTSClone installation test'
-$parent = Join-Path $root 'PacTTS'
-$app = Join-Path $parent 'PacTTSClone'
-$data = Join-Path $parent 'PacTTSClone-data'
+$parent = Join-Path $root 'PacTTSClone'
+$app = Join-Path $parent 'app'
+$data = Join-Path $parent 'data'
 $parentLauncher = Join-Path $parent 'PacTTSClone.lnk'
-$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$app`"",'/DEVICE=cpu',"/LOG=`"$root-setup.log`"")
+$arguments = @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',"/DIR=`"$parent`"",'/DEVICE=cpu',"/LOG=`"$root-setup.log`"")
 function Install-Checked {
     $process = Start-Process -FilePath $SetupExe -ArgumentList $arguments -Wait -PassThru
     if ($process.ExitCode -ne 0) { throw "Installer failed: $($process.ExitCode)" }
 }
 Install-Checked
 $config = Get-Content -Raw (Join-Path $app 'active.json') | ConvertFrom-Json
-if ($config.data_dir -ne $data -or $config.device -ne 'cpu') { throw 'Incorrect setup selection.' }
+if (-not $config.python.StartsWith($app + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Runtime escaped app subfolder.' }
+if ($config.data_dir -ne $data -or $config.device -ne 'auto') { throw 'Incorrect setup selection.' }
 if (-not (Test-Path -LiteralPath $parentLauncher)) { throw 'Missing parent-folder launcher.' }
-foreach ($shortcut in @((Join-Path $app 'Uninstall PacTTSClone.lnk'),
+foreach ($shortcut in @((Join-Path $parent 'Uninstall PacTTSClone.lnk'),
     (Join-Path ([Environment]::GetFolderPath('Programs')) 'PacTTSClone\Uninstall PacTTSClone.lnk'))) {
     if (-not (Test-Path -LiteralPath $shortcut)) { throw "Missing uninstaller shortcut: $shortcut" }
 }
 . (Join-Path $app 'launcher\common.ps1')
 Set-LocalEnvironment $app $data
 $env:PATH = "$($config.ffmpeg_bin);$env:PATH"
-& $config.python (Join-Path $PSScriptRoot 'verify-runtime.py') --device cpu
+& $config.python (Join-Path $PSScriptRoot 'verify-runtime.py') --device web
 if ($LASTEXITCODE -ne 0) { throw 'Installed runtime smoke failed.' }
+& $config.python -c "import importlib.util; assert importlib.util.find_spec('torch') is None; assert importlib.util.find_spec('omnivoice') is None"
+if ($LASTEXITCODE -ne 0) { throw 'Native installer installed inference packages.' }
 # Launch the actual user-facing parent shortcut, not a script command.
 $server = Start-Process -FilePath $parentLauncher -PassThru
 try {
@@ -34,6 +37,26 @@ try {
         } catch { Start-Sleep -Seconds 1 }
     }
     if (-not $ready) { throw 'Installed launcher did not serve HTTP.' }
+    $initial = Invoke-RestMethod 'http://127.0.0.1:7860/api/setup'
+    if ($initial.ready) { throw 'Initial Setup gate was bypassed.' }
+    $session = Invoke-RestMethod 'http://127.0.0.1:7860/api/session'
+    $headers = @{'X-PacTTS-Token'=$session.token}
+    Invoke-RestMethod 'http://127.0.0.1:7860/api/setup/start' -Method Post -Headers $headers -ContentType 'application/json' -Body '{"device":"cpu"}' | Out-Null
+    $deadline = [DateTime]::UtcNow.AddMinutes(20)
+    do {
+        Start-Sleep -Seconds 3
+        $state = Invoke-RestMethod 'http://127.0.0.1:7860/api/setup'
+        Write-Host "Web setup: $($state.status) / $($state.stage)"
+        if ($state.download) { Write-Host ($state.download | ConvertTo-Json -Compress) }
+        if ([DateTime]::UtcNow -gt $deadline) {
+            Invoke-RestMethod 'http://127.0.0.1:7860/api/setup/cancel' -Method Post -Headers $headers | Out-Null
+            throw 'Web setup exceeded its 20-minute test deadline.'
+        }
+    } while ($state.status -eq 'running')
+    if (-not $state.ready) { throw "Web CPU/model setup failed: $($state.error)" }
+    if ($state.models.files.Count -lt 2) { throw 'Model verification manifest missing.' }
+    & $config.python (Join-Path $PSScriptRoot 'verify-runtime.py') --device cpu
+    if ($LASTEXITCODE -ne 0) { throw 'Web-installed CPU runtime smoke failed.' }
 } finally {
     & taskkill.exe /PID $server.Id /T /F | Out-Null
 }
@@ -41,9 +64,10 @@ $marker = Join-Path $data 'keep-user-audio.txt'
 Set-Content $marker 'Preserve user data'
 Install-Checked
 if (-not (Test-Path $marker)) { throw 'Upgrade removed user data.' }
-$uninstall = Start-Process (Join-Path $app 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+$uninstall = Start-Process (Join-Path $parent 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
 if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed.' }
 if (-not (Test-Path $marker)) { throw 'Uninstall removed user data.' }
 if (Test-Path $parentLauncher) { throw 'Uninstall left parent launcher shortcut.' }
-if (Test-Path (Join-Path $app 'environments')) { throw 'Uninstall left application environments.' }
-Write-Host 'Real CPU installer, launcher, repeat setup and uninstall smoke passed.'
+if (Test-Path $app) { throw 'Uninstall left app subfolder.' }
+if (-not (Test-Path $parent)) { throw 'Uninstall removed the root containing user data.' }
+Write-Host 'Minimal installer, real web CPU/model setup, launcher, repeat setup and uninstall smoke passed.'

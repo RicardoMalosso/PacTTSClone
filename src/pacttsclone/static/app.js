@@ -1,6 +1,7 @@
 'use strict';
 const t = window.Locale.t;
 let initialHealth = null;
+let runtimeSetup = {ready: false}, setupAvailable = true;
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
@@ -36,7 +37,8 @@ async function api(url, options = {}) {
   const response = await fetch(url, opts);
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    throw new Error(typeof body.detail === 'string' ? body.detail : Array.isArray(body.detail) ? body.detail.map(x => x.msg).join('; ') : 'Request failed.');
+    const error = new Error(typeof body.detail === 'string' ? body.detail : Array.isArray(body.detail) ? body.detail.map(x => x.msg).join('; ') : 'Request failed.');
+    error.status = response.status; throw error;
   }
   return response.json();
 }
@@ -61,6 +63,7 @@ function openBugVideo() {
   }, 3000);
 }
 function tab(name) {
+  if (!runtimeSetup.ready && name !== 'setup') name = 'setup';
   window.Locale.apply();
   if (name === 'bugs') openBugVideo(); else stopBugVideo();
   const general = name === 'general';
@@ -169,7 +172,7 @@ $('generate-form').addEventListener('submit', action(async event => {
       job = await api('/api/jobs', {method: 'POST', body});
     }
     currentJob = job.id; await watch(job.id);
-  } finally { busy = false; $('generate').disabled = false; }
+  } finally { busy = false; $('generate').disabled = !runtimeSetup.ready; }
 }));
 $('cancel-job').addEventListener('click', action(async () => { if (currentJob) await api(`/api/jobs/${currentJob}/cancel`, {method: 'POST'}); }));
 $('panic').addEventListener('click', action(async () => { stopAllAudio(); await api('/api/panic', {method: 'POST'}); }));
@@ -344,9 +347,9 @@ async function init() {
     $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
-    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else commandRow();
-    $('generate').disabled = false;
-    const loop = async () => { try { await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
+    await runtimeStatus(); await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
+    $('generate').disabled = !runtimeSetup.ready;
+    const loop = async () => { try { await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
     const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
@@ -365,6 +368,7 @@ window.addEventListener('localechange', () => {
 init();
 
 async function tunnelStatus() {
+  if (!runtimeSetup.ready) { $('tunnel-card').hidden = true; return; }
   try {
     const data = await api('/api/tunnel');
     $('tunnel-start').hidden = ['starting', 'downloading', 'running'].includes(data.status);
@@ -397,3 +401,42 @@ $('general-form').addEventListener('submit', action(async event => {
 }));
 
 $('prepare-voices').addEventListener('click', () => tab('voices'));
+
+function renderSetup(data) {
+  const wasReady = runtimeSetup.ready;
+  runtimeSetup = data;
+  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
+  $('generate').disabled = busy || !data.ready;
+  $('tunnel-card').hidden = !data.ready;
+  $('setup-start').disabled = data.status === 'running';
+  $('setup-cancel').hidden = data.status !== 'running';
+  $('setup-device').disabled = data.status === 'running';
+  $('setup-progress').value = data.completed_steps || 0;
+  $('setup-status').textContent = data.ready ? t('Setup ready. You can open the studio.') : t('Setup stage: ') + t(data.stage || 'idle');
+  $('setup-error').hidden = !data.error;
+  $('setup-error').textContent = data.error ? t(data.error) : '';
+  $('setup-log').textContent = (data.lines || []).join('\n');
+  const d = data.download;
+  $('setup-file-progress').hidden = !d;
+  if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.file_bytes || 0; }
+  $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : t('Package installation has no reliable byte total; technical details show actual activity.');
+  if (!data.ready && !setupAvailable) return;
+  if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
+}
+async function runtimeStatus() {
+  try { renderSetup(await api('/api/setup')); }
+  catch (e) {
+    // Shared administrators cannot install host software; generation remains
+    // governed by the server readiness guard.
+    if (e.status === 403 && session && location.hostname !== '127.0.0.1' && location.hostname !== 'localhost') {
+      setupAvailable = false; runtimeSetup = {ready: true};
+      document.querySelector('[data-tab="setup"]').hidden = true;
+    } else throw e;
+  }
+}
+function setupAction(fn) { return async () => { try { await fn(); } catch (e) { $('setup-error').hidden = false; $('setup-error').textContent = t(e.message); } }; }
+$('setup-start').addEventListener('click', setupAction(async () => {
+  renderSetup(await api('/api/setup/start', {method: 'POST', body: {device: $('setup-device').value}}));
+}));
+$('setup-cancel').addEventListener('click', setupAction(async () => { renderSetup(await api('/api/setup/cancel', {method: 'POST'})); }));
+window.addEventListener('localechange', () => { if (setupAvailable) renderSetup(runtimeSetup); });

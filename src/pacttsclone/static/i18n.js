@@ -1,6 +1,23 @@
 'use strict';
 (() => {
   const pt = {
+    'Initial Setup': 'Configuração inicial',
+    'Complete setup before opening the studio. Downloads and verification appear here.': 'Conclua a configuração antes de abrir o estúdio. Downloads e verificação aparecem aqui.',
+    'CPU · smaller download, slower generation': 'CPU · download menor, geração mais lenta',
+    'NVIDIA CUDA · compatible NVIDIA driver required': 'NVIDIA CUDA · requer driver NVIDIA compatível',
+    'Setup installs inference libraries, downloads OmniVoice and the transcription model, then verifies every model file. Verified cached files are reused; partial downloads can resume.': 'A configuração instala as bibliotecas, baixa OmniVoice e o modelo de transcrição e verifica cada arquivo. Arquivos em cache verificados são reutilizados; downloads parciais podem continuar.',
+    'Install / verify setup': 'Instalar / verificar configuração', 'Cancel setup': 'Cancelar configuração',
+    'Setup ready. You can open the studio.': 'Configuração pronta. Você pode abrir o estúdio.',
+    'Setup stage: ': 'Etapa da configuração: ', 'Download setup log': 'Baixar log da configuração',
+    'Technical details': 'Detalhes técnicos', 'Bug reporting guide ↗': 'Guia para relatar problemas ↗',
+    'Package installation has no reliable byte total; technical details show actual activity.': 'A instalação dos pacotes não tem um total confiável de bytes; veja a atividade real nos detalhes técnicos.',
+    'verified cached files reused': 'arquivos verificados em cache reutilizados',
+    'verifying cache': 'verificando cache', 'verifying partial': 'verificando arquivo parcial',
+    'resuming download': 'retomando download', 'downloading': 'baixando',
+    'verifying download': 'verificando download', 'downloaded and verified': 'baixado e verificado',
+    'verified cache': 'cache verificado', 'checking cache': 'checando cache',
+    'pytorch': 'PyTorch', 'models': 'modelos', 'verify': 'verificar', 'activate': 'ativar', 'idle': 'aguardando',
+
     'Queue automatically on general OBS player': 'Adicionar automaticamente à fila do player OBS geral',
     'Automatic OBS queue failed: ': 'Falha ao adicionar automaticamente à fila OBS: ',
     'Queuing on general OBS player…': 'Adicionando à fila do player OBS geral…',

@@ -16,7 +16,7 @@ public static class NativeWizard {
 '@
 $root = Join-Path $env:RUNNER_TEMP 'Wizard layout test'
 $app = Join-Path $root 'PacTTSClone'
-$process = Start-Process -FilePath $SetupExe -ArgumentList @('/SP-','/LANG=english',"/DIR=`"$app`"") -PassThru
+$process = Start-Process -FilePath $SetupExe -ArgumentList @('/SP-','/NORESTART','/LANG=english',"/DIR=`"$app`"") -PassThru
 function Elements($window) { $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition) }
 function Find-Name($window, [string]$name) {
     @(Elements $window) | Where-Object { $_.Current.Name -eq $name } | Select-Object -First 1
@@ -57,7 +57,7 @@ try {
     if (-not (Find-Next $window).Current.IsEnabled -or $watch.Elapsed.TotalSeconds -lt [Math]::Max(0, $initialSeconds - 1.25)) { throw 'Unexpected notice countdown duration.' }
     Click (Find-Next $window)
     Start-Sleep -Milliseconds 300
-    if (-not (Find-Name $window "Est. 4-12 GB`r`ninstalled")) { throw 'App space estimate missing.' }
+    if (-not (Find-Name $window "Est. 12-32+ GB`r`napp + data")) { throw 'App space estimate missing.' }
     Screenshot 'application-path'
     Click (Find-Next $window)
     Start-Sleep -Milliseconds 300
@@ -67,8 +67,8 @@ try {
     $dataEdit = $edits | Where-Object { $_.Current.IsOffscreen -eq $false } | Select-Object -First 1
     if (-not $dataEdit -or $dataEdit.Current.IsEnabled) { throw 'Default data picker must be locked.' }
     $value = Read-Edit $dataEdit
-    if ($value -ne (Join-Path $root 'PacTTSClone-data')) { throw "Incorrect sibling default: $value" }
-    Screenshot 'sibling-data'
+    if ($value -ne (Join-Path $app 'data')) { throw "Incorrect contained data default: $value" }
+    Screenshot 'contained-data'
     Click $checkbox
     Start-Sleep -Milliseconds 200
     if (-not $dataEdit.Current.IsEnabled) { throw 'Checkbox did not unlock data picker.' }
@@ -76,8 +76,35 @@ try {
     Click $checkbox
     Start-Sleep -Milliseconds 200
     if ($dataEdit.Current.IsEnabled) { throw 'Checkbox did not relock data picker.' }
-    if ((Read-Edit $dataEdit) -ne (Join-Path $root 'PacTTSClone-data')) { throw 'Sibling default not restored.' }
+    if ((Read-Edit $dataEdit) -ne (Join-Path $app 'data')) { throw 'Contained default not restored.' }
     Write-Host 'Interactive notice delay, estimates and folder checkbox checks passed.'
+    # Deliberately select the protected app directory as data: bootstrap must fail
+    # before downloads. The user must never be advanced to a Finish/restart action.
+    Click $checkbox
+    [NativeWizard]::SetText([IntPtr]$dataEdit.Current.NativeWindowHandle, 0x000C, [IntPtr]::Zero, (Join-Path $app 'app')) | Out-Null
+    Click (Find-Next $window)
+    $install = $null
+    for ($i=0; $i -lt 6; $i++) {
+        Start-Sleep -Milliseconds 200
+        $install = @(Elements $window) | Where-Object { $_.Current.Name -match '^&?Install$' } | Select-Object -First 1
+        if ($install) { break }
+        Click (Find-Next $window)
+    }
+    if (-not $install -or -not $install.Current.IsEnabled) { throw 'Install action not reachable.' }
+    Click $install
+    Start-Sleep -Milliseconds 500
+    $failure = @(Elements $window) | Where-Object { $_.Current.Name -like '*Dependency setup failed or was cancelled*' } | Select-Object -First 1
+    if (-not $failure) { throw 'Expected preparation failure was not shown.' }
+    $next = Find-Next $window
+    if ($next -and $next.Current.IsEnabled) { throw 'Failure page incorrectly enables Next.' }
+    $finish = @(Elements $window) | Where-Object { $_.Current.Name -match '^&?Finish$' -and $_.Current.IsEnabled } | Select-Object -First 1
+    if ($finish) { throw 'Failure page incorrectly offers Finish/restart.' }
+    $openLog = Find-Name $window 'Open setup log'
+    if (-not $openLog -or -not $openLog.Current.IsEnabled) { throw 'Failure log button missing.' }
+    $errorLog = Join-Path $app 'setup-error.log'
+    if (-not (Test-Path $errorLog)) { throw 'Early failure diagnostic was not saved.' }
+    Screenshot 'failure-path'
+    Write-Host 'Failed preparation blocks Next/Finish and exposes the diagnostic log; no restart requested.'
 } catch {
     if ($window) { @(Elements $window) | ForEach-Object { Write-Host "$($_.Current.ClassName) $($_.Current.ControlType.ProgrammaticName) $($_.Current.Name)" } }
     Screenshot 'failure'

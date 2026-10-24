@@ -1,11 +1,11 @@
-#define AppVersion "0.3.0-rc.3"
+#define AppVersion "0.3.0-rc.4"
 [Setup]
 AppId={{7FF568CE-33A3-40B1-A7C0-15AA76F1DB84}
 AppName=PacTTSClone
 AppVersion={#AppVersion}
 AppVerName=PacTTSClone {#AppVersion}
-VersionInfoVersion=0.3.0.3
-DefaultDirName={localappdata}\Programs\PacTTS\PacTTSClone
+VersionInfoVersion=0.3.0.4
+DefaultDirName={localappdata}\Programs\PacTTSClone
 DefaultGroupName=PacTTSClone
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -19,6 +19,8 @@ WizardStyle=modern
 DisableProgramGroupPage=yes
 UninstallDisplayName=PacTTSClone
 CloseApplications=no
+AlwaysRestart=no
+RestartIfNeededByRun=no
 DisableWelcomePage=yes
 
 [Languages]
@@ -29,25 +31,30 @@ Name: "brazilianportuguese"; MessagesFile: "compiler:Languages\BrazilianPortugue
 Source: "bootstrap.ps1"; Flags: dontcopy
 Source: "dependencies.json"; Flags: dontcopy
 Source: "verify-runtime.py"; Flags: dontcopy
+Source: "ffmpeg\bin\*.exe"; Flags: dontcopy
+Source: "ffmpeg\BUILD-PROVENANCE.txt"; DestDir: "{app}\app\runtime\ffmpeg"; Flags: ignoreversion
+Source: "ffmpeg\licenses\*"; DestDir: "{app}\app\runtime\ffmpeg\licenses"; Flags: ignoreversion
 Source: "..\dist\pacttsclone-*.whl"; Flags: dontcopy
-Source: "common.ps1"; DestDir: "{app}\launcher"; Flags: ignoreversion
-Source: "launch.ps1"; DestDir: "{app}\launcher"; Flags: ignoreversion
+Source: "common.ps1"; DestDir: "{app}\app\launcher"; Flags: ignoreversion
+Source: "launch.ps1"; DestDir: "{app}\app\launcher"; Flags: ignoreversion
 Source: "common.ps1"; Flags: dontcopy
 
 [Icons]
-Name: "{group}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; WorkingDir: "{app}"
-Name: "{code:ParentFolder}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; WorkingDir: "{app}"
-Name: "{autodesktop}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; Tasks: desktopicon; WorkingDir: "{app}"
+Name: "{group}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\app\launcher\launch.ps1"""; WorkingDir: "{app}\app"
+Name: "{app}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\app\launcher\launch.ps1"""; WorkingDir: "{app}\app"
+Name: "{autodesktop}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\app\launcher\launch.ps1"""; Tasks: desktopicon; WorkingDir: "{app}\app"
 Name: "{group}\Uninstall PacTTSClone"; Filename: "{uninstallexe}"
 Name: "{app}\Uninstall PacTTSClone"; Filename: "{uninstallexe}"
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\environments"
-Type: filesandordirs; Name: "{app}\runtime"
-Type: files; Name: "{app}\active.json"
-Type: files; Name: "{app}\active.json.new"
+Type: filesandordirs; Name: "{app}\app\environments"
+Type: filesandordirs; Name: "{app}\app\runtime"
+Type: files; Name: "{app}\app\active.json"
+Type: files; Name: "{app}\app\active.json.new"
+
+Type: dirifempty; Name: "{app}\app"
 
 [Code]
 var
@@ -59,6 +66,9 @@ var
   IntroSeen: Boolean;
   IntroTimer: LongWord;
   DevicePage: TInputOptionWizardPage;
+  PreparationFailed: Boolean;
+  LogButton: TNewButton;
+  SetupLogPath: String;
 
 function SystemTicks: Int64;
   external 'GetTickCount64@kernel32.dll stdcall';
@@ -67,19 +77,16 @@ function SetTimer(Wnd, ID, Interval, Callback: LongWord): LongWord;
 function KillTimer(Wnd, ID: LongWord): Boolean;
   external 'KillTimer@user32.dll stdcall';
 
-function ParentFolder(Param: String): String;
+function DefaultDataPath: String;
 begin
-  Result := ExtractFileDir(RemoveBackslashUnlessRoot(ExpandConstant('{app}')));
-end;
-
-function SiblingDataPath: String;
-begin
-  Result := AddBackslash(ExtractFileDir(RemoveBackslashUnlessRoot(WizardDirValue))) + 'PacTTSClone-data';
+  Result := AddBackslash(WizardDirValue) + 'data';
 end;
 
 procedure SyncDataPath;
 begin
-  if not SeparateData.Checked then DataPage.Values[0] := SiblingDataPath;
+  if not SeparateData.Checked then DataPage.Values[0] := DefaultDataPath;
+  if SeparateData.Checked then AppSize.Caption := 'Est. 4-12 GB' + #13#10 + 'app only'
+  else AppSize.Caption := 'Est. 12-32+ GB' + #13#10 + 'app + data';
   DataPage.Edits[0].Enabled := SeparateData.Checked;
   DataPage.Buttons[0].Enabled := SeparateData.Checked;
 end;
@@ -123,9 +130,22 @@ begin
   LabelControl.Caption := CaptionText;
 end;
 
+procedure OpenSetupLog(Sender: TObject);
+var Code: Integer;
+begin
+  if FileExists(SetupLogPath) then
+    Exec(ExpandConstant('{sys}\notepad.exe'), '"' + SetupLogPath + '"', '', SW_SHOW, ewNoWait, Code);
+end;
+
 procedure InitializeWizard;
 var ExistingData: String;
 begin
+  LogButton := TNewButton.Create(WizardForm);
+  LogButton.Parent := WizardForm;
+  LogButton.SetBounds(ScaleX(8), WizardForm.NextButton.Top, ScaleX(140), WizardForm.NextButton.Height);
+  LogButton.Caption := 'Open setup log';
+  LogButton.OnClick := @OpenSetupLog;
+  LogButton.Visible := False;
   IntroPage := CreateCustomPage(wpWelcome, 'STEP 1 - Choose your folders carefully',
     'Downloads are large. Read this before choosing an installation drive.');
   IntroTitle := TNewStaticText.Create(WizardForm);
@@ -152,14 +172,16 @@ begin
   IntroUnsigned.AutoSize := False; IntroUnsigned.WordWrap := True;
   IntroUnsigned.Font.Size := 13; IntroUnsigned.Font.Style := [fsBold]; IntroUnsigned.Font.Color := clRed;
   IntroUnsigned.Caption := 'Unsigned for now, cause cba.';
+  WizardForm.SelectDirLabel.Caption := 'Choose the root folder. Application files go in its app subfolder; models and recordings go in data.';
+  WizardForm.DiskSpaceLabel.Visible := False;
   AppSize := TNewStaticText.Create(WizardForm);
   MakeSizeLabel(AppSize, WizardForm.DirEdit.Parent, WizardForm.DirEdit,
-    WizardForm.DirBrowseButton, 'Est. 4-12 GB' + #13#10 + 'installed');
+    WizardForm.DirBrowseButton, 'Est. 12-32+ GB' + #13#10 + 'app + data');
   DataPage := CreateInputDirPage(wpSelectDir, 'Data and model storage',
     'Choose where voices, audio, models and download caches are stored.',
-    'By default, PacTTSClone and PacTTSClone-data share one parent folder. Size labels are estimates; caches and recordings grow. Data is preserved on uninstall.', False, '');
+    'By default, app and data are inside the destination you selected. Only tick the checkbox to store data elsewhere. Estimates include growing caches and recordings; data is preserved on uninstall.', False, '');
   DataPage.Add('Data folder:');
-  ExistingData := GetPreviousData('DataRoot', SiblingDataPath);
+  ExistingData := GetPreviousData('DataRoot', DefaultDataPath);
   SeparateData := TNewCheckBox.Create(WizardForm);
   SeparateData.Parent := DataPage.Surface;
   SeparateData.SetBounds(0, DataPage.Edits[0].Top + ScaleY(48), DataPage.SurfaceWidth, ScaleY(25));
@@ -167,19 +189,13 @@ begin
   SeparateData.OnClick := @SeparateDataClick;
   DataPage.Values[0] := ExpandConstant('{param:DATADIR|' + ExistingData + '}');
   SeparateData.Checked := (ExpandConstant('{param:DATADIR|}') <> '') or
-    ((GetPreviousData('DataRoot', '') <> '') and (CompareText(ExistingData, SiblingDataPath) <> 0));
+    ((GetPreviousData('DataRoot', '') <> '') and (CompareText(ExistingData, DefaultDataPath) <> 0));
   DataSize := TNewStaticText.Create(WizardForm);
   MakeSizeLabel(DataSize, DataPage.Surface, DataPage.Edits[0], DataPage.Buttons[0],
     'Est. 8-20+ GB' + #13#10 + 'models/cache');
   SyncDataPath;
   IntroTimer := SetTimer(0, 0, 100, CreateCallback(@IntroTick));
-  DevicePage := CreateInputOptionPage(DataPage.ID, 'Processing device',
-    'Choose which dependencies to download.',
-    'Automatic detects NVIDIA with nvidia-smi. CPU is slower. CUDA requires a compatible NVIDIA driver. Models download on first use.', True, False);
-  DevicePage.Add('Automatic'); DevicePage.Add('CPU'); DevicePage.Add('NVIDIA GPU (CUDA)');
-  DevicePage.SelectedValueIndex := 0;
-  if ExpandConstant('{param:DEVICE|auto}') = 'cpu' then DevicePage.SelectedValueIndex := 1;
-  if ExpandConstant('{param:DEVICE|auto}') = 'cuda' then DevicePage.SelectedValueIndex := 2;
+
 end;
 
 procedure CurPageChanged(CurPageID: Integer);
@@ -190,9 +206,13 @@ begin
       IntroUntil := SystemTicks + 5000;
     end;
     IntroTick(0, 0, 0, 0);
-  end else begin
-    WizardForm.NextButton.Enabled := True;
-    WizardForm.NextButton.Caption := SetupMessage(msgButtonNext);
+  end;
+  if CurPageID = wpSelectDir then WizardForm.DiskSpaceLabel.Visible := False;
+  if PreparationFailed and (CurPageID = wpPreparing) then WizardForm.NextButton.Enabled := False;
+  if CurPageID = wpFinished then begin
+    { Never opt the user into restarting Windows from this private-runtime installer. }
+    WizardForm.NoRadio.Checked := True;
+    WizardForm.YesRadio.Enabled := False;
   end;
   if CurPageID = DataPage.ID then SyncDataPath;
 end;
@@ -200,6 +220,10 @@ end;
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
   Result := True;
+  if PreparationFailed and (CurPageID = wpPreparing) then begin
+    Result := False;
+    Exit;
+  end;
   if (CurPageID = IntroPage.ID) and not WizardSilent then
     Result := IntroSeen and (SystemTicks >= IntroUntil);
   if CurPageID = wpSelectDir then SyncDataPath;
@@ -224,19 +248,34 @@ function PrepareToInstall(var NeedsRestart: Boolean): String;
 var ExitCode: Integer; Device, Args: String;
 begin
   Result := '';
-  ForceDirectories(ExpandConstant('{app}'));
+  ExitCode := -1;
+  NeedsRestart := False;
+  PreparationFailed := False;
+  LogButton.Visible := False;
+  SetupLogPath := AddBackslash(DataPage.Values[0]) + 'logs\setup.log';
+  ForceDirectories(ExpandConstant('{app}\app'));
   ExtractTemporaryFile('bootstrap.ps1'); ExtractTemporaryFile('common.ps1');
+  ExtractTemporaryFile('ffmpeg.exe'); ExtractTemporaryFile('ffprobe.exe');
   ExtractTemporaryFile('dependencies.json'); ExtractTemporaryFile('verify-runtime.py');
   ExtractTemporaryFiles('{tmp}\pacttsclone-*.whl');
   Device := 'auto';
-  if DevicePage.SelectedValueIndex = 1 then Device := 'cpu';
-  if DevicePage.SelectedValueIndex = 2 then Device := 'cuda';
+  { CPU/CUDA selection now happens in the browser's Initial Setup tab. }
   Args := '-NoProfile -ExecutionPolicy Bypass -File "' + ExpandConstant('{tmp}\bootstrap.ps1') +
-    '" -PayloadDir "' + ExpandConstant('{tmp}') + '" -AppRoot "' + ExpandConstant('{app}') + '" -DataRoot "' + DataPage.Values[0] + '" -Device ' + Device;
+    '" -PayloadDir "' + ExpandConstant('{tmp}') + '" -AppRoot "' + ExpandConstant('{app}\app') + '" -DataRoot "' + DataPage.Values[0] + '" -Device ' + Device;
   WizardForm.StatusLabel.Caption := 'Downloading dependencies. Follow progress in the setup console. Closing it cancels setup.';
   if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args,
     ExpandConstant('{app}'), SW_SHOW, ewWaitUntilTerminated, ExitCode) then
     Result := 'Could not start dependency setup.'
   else if ExitCode <> 0 then
-    Result := 'Dependency setup failed or was cancelled. See ' + DataPage.Values[0] + '\logs\setup.log. Click Install to retry.';
+    Result := 'Dependency setup failed or was cancelled. Open the setup log for details. Go Back to retry, or Cancel to exit. No restart is required.';
+  PreparationFailed := Result <> '';
+  if PreparationFailed then begin
+    NeedsRestart := False;
+    WizardForm.NextButton.Enabled := False;
+    if not FileExists(SetupLogPath) then begin
+      SetupLogPath := ExpandConstant('{app}\setup-error.log');
+      SaveStringToFile(SetupLogPath, Result + #13#10 + 'Dependency setup exit code: ' + IntToStr(ExitCode) + #13#10, False);
+    end;
+    LogButton.Visible := FileExists(SetupLogPath);
+  end;
 end;

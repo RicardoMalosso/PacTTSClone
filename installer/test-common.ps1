@@ -3,6 +3,8 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid().ToString())
 New-Item -ItemType Directory -Force $root | Out-Null
 try {
     Assert-SeparatePaths (Join-Path $root 'app') (Join-Path $root 'data')
+    # The selected container may hold both; only the private app directory must not overlap data.
+    Assert-SeparatePaths (Join-Path $root 'PacTTSClone\app') (Join-Path $root 'PacTTSClone\data')
     $blocked = $false
     try { Assert-SeparatePaths $root (Join-Path $root 'child') } catch { $blocked = $true }
     if (-not $blocked) { throw 'Nested data folder accepted.' }

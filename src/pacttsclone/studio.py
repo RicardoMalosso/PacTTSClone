@@ -33,10 +33,15 @@ class Studio:
     def start(self):
         self.started = True
         self.hotkey.configure(self.service.config.hotkey)
-        for channel in self.store.all("channel"):
-            self.connect(channel)
+        if self.service.setup_ready():
+            for channel in self.store.all("channel"):
+                self.connect(channel)
 
     def configure(self, value: AppConfig):
+        if self.service.setup_busy:
+            from .domain import BusyError
+
+            raise BusyError("Dependency setup is running. Wait or cancel it first.")
         self.service.configure(value)
         self.hotkey.configure(value.hotkey)
         return {**value.model_dump(), "hotkey_status": self.hotkey.status}
@@ -51,6 +56,8 @@ class Studio:
         return config
 
     def connect(self, config):
+        if not self.service.setup_ready():
+            return
         if config.get("kind") == "general":
             return
         name = config["name"]

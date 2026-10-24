@@ -41,6 +41,8 @@ class GenerationService:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._closed = False
+        self.setup_busy = False
+        self.setup_ready = lambda: True
         self.active_id = None
         self.active_start = None
         self.cancel_event = threading.Event()
@@ -91,6 +93,10 @@ class GenerationService:
         original_filename=None,
     ):
         with self._lock:
+            if self.setup_busy:
+                raise BusyError("Dependency setup is running. Wait or cancel it first.")
+            if not self.setup_ready():
+                raise UserError("Complete first-run setup before generating or preparing voices.")
             if self._closed:
                 raise UserError("O aplicativo está encerrando.")
             pending = self.pending()

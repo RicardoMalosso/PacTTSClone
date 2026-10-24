@@ -54,3 +54,16 @@ R20: Optional browser-persisted local autoqueue checkbox, separate from autoplay
 Snapshot per submitted upload/preset job; backend queues successful local speech
 once to playbackMain, even after browser closure. Honor filters/delay/pause, report
 queue rejection, and exclude failed/cancelled jobs and Twitch-channel duplicates.
+
+
+## RC4 mandatory browser setup
+
+Current design supersedes earlier installer dependency/model-on-first-use notes:
+native setup contains no CUDA/PyTorch. Initial Setup is the first required web tab;
+it installs CPU/NVIDIA inference packages and verified OmniVoice/Whisper files,
+shows download/cache/resume activity and unlocks generation only on success.
+Worker uses local offline model directories afterward. Package activity has no
+fabricated byte total. Owner-only API supports cancel/retry/logs. See
+[web setup design](web-setup-design.md) and [installer design](installer-design.md).
+Validation pending RC4 Windows workflow; backend/browser results recorded below
+when completed. An automatic updater is not implemented.

@@ -133,3 +133,35 @@ item ID to prevent duplicate callback delivery. No browser completion request is
 needed. Existing moderation/countdown/paused-state rules apply; rejection is saved
 as playback_error and shown separately from browser autoplay feedback. Channel jobs
 retain their original destination and are not duplicated to the general bus.
+
+## RC4 contained-root layout and failure navigation
+
+The selected destination is now a container: private app/runtime/launcher/config
+files live in root/app, default recordings/models/caches live in root/data, and
+launch/uninstall shortcuts live at root. The bootstrap still enforces non-overlap
+between the private app directory and data. Existing custom data paths are retained;
+no silent relocation/deletion of old data or legacy installation files.
+
+Removed the unsafe global Next button reset from CurPageChanged. Only the intro
+countdown may control its button. Preparation failure explicitly clears NeedsRestart,
+blocks advancing the error page, offers Open setup log and saves a fallback log
+for errors before PowerShell transcript initialization. Inno restart requests are
+disabled and the finish-page restart choice is set to No/disabled. Failure tests use
+/NORESTART as additional test-runner protection; no real reboot is attempted.
+
+Windows tests cover the new contained data path, explicit failure before downloads,
+disabled Next/Finish and log availability, plus real installation, root shortcut
+startup and uninstall preserving data. Validation is pending the RC4 workflow.
+
+
+## RC4 mandatory browser setup
+
+Current design supersedes earlier installer dependency/model-on-first-use notes:
+native setup contains no CUDA/PyTorch. Initial Setup is the first required web tab;
+it installs CPU/NVIDIA inference packages and verified OmniVoice/Whisper files,
+shows download/cache/resume activity and unlocks generation only on success.
+Worker uses local offline model directories afterward. Package activity has no
+fabricated byte total. Owner-only API supports cancel/retry/logs. See
+[web setup design](web-setup-design.md) and [installer design](installer-design.md).
+Validation pending RC4 Windows workflow; backend/browser results recorded below
+when completed. An automatic updater is not implemented.

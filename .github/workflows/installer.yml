@@ -27,6 +27,20 @@ jobs:
             if ($errors) { throw ($errors | Out-String) }
           }
           & ./installer/test-common.ps1
+      - uses: actions/checkout@v4
+        with:
+          repository: FFmpeg/FFmpeg
+          ref: 8ae0b34901ba60a802f183ee75a250a9fc3e09a5
+          path: build-sources/ffmpeg
+          persist-credentials: false
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: make nasm diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-lame
+      - name: Build FFmpeg from pinned official source
+        shell: msys2 {0}
+        run: bash installer/build-ffmpeg.sh
       - name: Build application wheel
         run: python -m pip wheel --no-deps . -w dist
       - name: Compile small unsigned setup
@@ -46,21 +60,24 @@ jobs:
         if: failure()
         shell: powershell
         run: |
-          Get-ChildItem "$env:RUNNER_TEMP/PacTTSClone installation test" -Filter setup.log -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 160 }
+          Get-ChildItem "$env:RUNNER_TEMP/PacTTSClone installation test" -Filter *.log -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Get-Content $_.FullName -Tail 160 }
       - name: Retain diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: installer-diagnostics
           path: |
-            ${{ runner.temp }}/PacTTSClone installation test/PacTTS/PacTTSClone-data/logs/setup.log
+            ${{ runner.temp }}/PacTTSClone installation test/PacTTSClone/data/logs/*.log
             ${{ runner.temp }}/PacTTSClone installation test-setup.log
             ${{ runner.temp }}/pactts-wizard-*.png
           if-no-files-found: ignore
+      - name: Package FFmpeg source/provenance
+        shell: pwsh
+        run: Compress-Archive -Path installer/ffmpeg/* -DestinationPath dist/FFmpeg-source-build.zip
       - name: Checksums
         shell: pwsh
         run: |
-          Get-ChildItem dist/*.exe,dist/*.whl | ForEach-Object {
+          Get-ChildItem dist/*.exe,dist/*.whl,dist/*.zip | ForEach-Object {
             '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
           } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
       - uses: actions/upload-artifact@v4
@@ -70,12 +87,13 @@ jobs:
             dist/*.exe
             dist/*.whl
             dist/SHA256SUMS.txt
+            dist/FFmpeg-source-build.zip
       - name: Prepare draft prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $tag = 'v0.3.0-rc.3'
+          $tag = 'v0.3.0-rc.4'
           $existing = @(gh release list --json tagName,isDraft --limit 100 | ConvertFrom-Json) | Where-Object tagName -eq $tag
           if ($LASTEXITCODE -ne 0) { throw 'Could not inspect releases.' }
           if ($existing) {
@@ -83,5 +101,5 @@ jobs:
             gh release delete $tag --yes
             if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft.' }
           }
-          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.3 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.3.md dist/*.exe dist/*.whl dist/SHA256SUMS.txt
+          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.4 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.4.md dist/*.exe dist/*.whl dist/FFmpeg-source-build.zip dist/SHA256SUMS.txt
           if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }

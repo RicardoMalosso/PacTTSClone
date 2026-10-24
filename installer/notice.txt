@@ -1,17 +1,19 @@
 PacTTSClone preview installer (unsigned)
 
 Requires Windows 10/11 x64 and an internet connection. The small installer contains
-application code only. It downloads an isolated Python runtime, FFmpeg and
-CPU/NVIDIA dependencies during setup. Total downloads and installed files can
+application code and project-built FFmpeg from official source. It downloads an
+isolated Python runtime and base web packages during setup. CPU/NVIDIA inference
+packages and models are installed later through the browser Initial Setup tab. Total downloads and installed files can
 occupy several GB. NVIDIA drivers are not installed or changed.
 
-Select application and data folders on a drive with sufficient space. Large
+Select one root folder on a drive with sufficient space. App files go in its app
+subfolder and data goes in data unless a separate data location is selected. Large
 caches and model downloads use the selected data folder. Windows may still use
 small temporary files and installer metadata on its system drive.
 
-Models download from Hugging Face on first use. Audio generation runs locally.
+Models download from Hugging Face during Initial Setup, before voice preparation. Audio generation runs locally.
 Twitch monitoring and Cloudflare sharing are optional user-controlled features.
-Uninstall preserves the separate data folder (including models and recordings).
+Uninstall preserves the data folder (including models and recordings).
 
 The setup executable is not code-signed. SHA-256 checksums detect file changes but
 are not a trusted publisher signature. Source and build instructions are in the

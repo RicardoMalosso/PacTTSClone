@@ -18,13 +18,7 @@ try {
     if ($wheel.Count -ne 1) { throw 'Setup payload must contain exactly one application wheel.' }
     $version = $wheel[0].Name.Split('-')[1]
     if ($version -notmatch '^[0-9A-Za-z.]+$') { throw 'Invalid application version.' }
-    if ($Device -eq 'auto') {
-        $Device = 'cpu'
-        if (Get-Command nvidia-smi -ErrorAction SilentlyContinue) {
-            & nvidia-smi --query-gpu=name --format=csv,noheader
-            if ($LASTEXITCODE -eq 0) { $Device = 'cuda' }
-        }
-    }
+    $Device = 'auto'
     Write-Host "[1/6] Preparing $Device installation; data: $DataRoot"
     $downloads = Join-Path $DataRoot 'cache\setup'
     $uvArchive = Join-Path $downloads 'uv-0.9.5.zip'
@@ -42,24 +36,19 @@ try {
     $envRoot = Join-Path $AppRoot "environments\$version-$Device"
     Invoke-Checked $uv @('venv','--allow-existing','--python',$managedPython,$envRoot)
     $python = Join-Path $envRoot 'Scripts\python.exe'
-    Write-Host '[3/6] Downloading FFmpeg'
-    $ffArchive = Join-Path $downloads 'ffmpeg-8.0.1.zip'
-    Get-VerifiedDownload $manifest.ffmpeg.url $manifest.ffmpeg.sha256 $ffArchive
-    $ffRoot = Join-Path $AppRoot 'runtime\ffmpeg'
-    Expand-Archive -LiteralPath $ffArchive -DestinationPath $ffRoot -Force
-    $ffmpeg = @(Get-ChildItem -LiteralPath $ffRoot -Filter ffmpeg.exe -Recurse)[0].FullName
-    $ffBin = Split-Path $ffmpeg -Parent
+    Write-Host '[3/6] Installing project-built FFmpeg from official upstream source'
+    $ffBin = Join-Path $AppRoot 'runtime\ffmpeg\bin'
+    New-Item -ItemType Directory -Force -Path $ffBin | Out-Null
+    foreach ($tool in @('ffmpeg.exe','ffprobe.exe')) {
+        Copy-Item -LiteralPath (Join-Path $PayloadDir $tool) -Destination (Join-Path $ffBin $tool) -Force
+    }
     $env:PATH = "$ffBin;$env:PATH"
-    Write-Host '[4/6] Downloading PyTorch and application dependencies (can be several GB)'
-    $variant = if ($Device -eq 'cuda') { 'cu128' } else { 'cpu' }
-    $index = "https://download.pytorch.org/whl/$variant"
-    Invoke-Checked $uv @('pip','install','--python',$python,'--index-url',$index,"torch==2.8.0+$variant","torchaudio==2.8.0+$variant")
-    Invoke-Checked $uv @('pip','install','--python',$python,'--index-url','https://pypi.org/simple','--index',$index,
-        '--index-strategy','unsafe-best-match',"$($wheel[0].FullName)[inference]","torch==2.8.0+$variant","torchaudio==2.8.0+$variant")
-    Write-Host '[5/6] Checking installed runtime, CUDA selection and audio tools'
-    Invoke-Checked $python @((Join-Path $PayloadDir 'verify-runtime.py'), '--device', $Device)
-    Write-Host '[6/6] Activating installation; model downloads happen on first use'
-    $settings = @{python=$python; data_dir=$DataRoot; ffmpeg_bin=$ffBin; device=$Device; version=$version}
+    Write-Host '[4/6] Installing only the web application (no CUDA/PyTorch/models)'
+    Invoke-Checked $uv @('pip','install','--python',$python,'--index-url','https://pypi.org/simple',$wheel[0].FullName)
+    Write-Host '[5/6] Checking web runtime and audio tools'
+    Invoke-Checked $python @((Join-Path $PayloadDir 'verify-runtime.py'), '--device', 'web')
+    Write-Host '[6/6] Activating installation; open Initial Setup in the browser to install inference and models'
+    $settings = @{python=$python; data_dir=$DataRoot; ffmpeg_bin=$ffBin; device=$Device; version=$version; uv=$uv}
     $temporaryConfig = Join-Path $AppRoot 'active.json.new'
     $settings | ConvertTo-Json | Set-Content -LiteralPath $temporaryConfig -Encoding UTF8
     Move-Item -LiteralPath $temporaryConfig -Destination (Join-Path $AppRoot 'active.json') -Force
