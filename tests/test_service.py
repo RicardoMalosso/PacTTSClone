@@ -73,7 +73,11 @@ def test_failure_releases_worker_and_removes_files(mp3, tmp_path, engine):
         service.close()
 
 
-@pytest.mark.parametrize("payload", [b"", b"x" * (MAX_UPLOAD_BYTES + 1)])
+@pytest.mark.parametrize(
+    "payload",
+    [b"", b"x" * (MAX_UPLOAD_BYTES + 1)],
+    ids=["empty", "over-20MiB"],
+)
 def test_reject_upload_and_recover(payload, tmp_path, engine):
     service = GenerationService(Settings(data_dir=tmp_path), engine)
     try:
