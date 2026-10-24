@@ -421,3 +421,30 @@ def test_bug_video_lazy_delay_cancel_and_locale(page, live_server):
     expect(frame).to_have_attribute("title", "Guia para relatar problemas")
     page.locator('[data-tab="studio"]').click()
     page.unroute_all(behavior="wait")
+
+
+def test_local_autoqueue_checkbox_persists_and_queues_without_autoplay(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    expect(page.locator("#autoqueue")).not_to_be_checked()
+    page.locator("#autoqueue").check()
+    page.reload()
+    expect(page.locator("#autoqueue")).to_be_checked()
+    expect(page.locator("#autoplay")).not_to_be_checked()
+    page.locator("#reference").set_input_files(mp3)
+    page.locator("#ref-text").fill("Reference transcript.")
+    page.locator("#text").fill("Automatically queue my local generation")
+    page.locator("#generate").click()
+    expect(page.locator("#autoqueue-note")).to_have_text("Queued on general player.", timeout=15000)
+    assert len(app.state.studio.playback.items("playbackMain")) == 1
+    assert page.locator("#player").evaluate("audio => audio.paused")
+    page.locator('[data-tab="general"]').click()
+    expect(page.locator("#channel-queue")).to_contain_text(
+        "Automatically queue my local generation"
+    )
+    page.locator('[data-tab="studio"]').click()
+    page.locator("#autoqueue").uncheck()
+    page.locator("#generate").click()
+    expect(page.locator("#status")).to_contain_text("MP3 ready", timeout=15000)
+    assert len(app.state.studio.playback.items("playbackMain")) == 1

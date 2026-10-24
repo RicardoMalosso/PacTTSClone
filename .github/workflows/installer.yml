@@ -2,7 +2,7 @@ name: Windows installer preview
 on:
   push:
     branches: [main]
-    paths: ['installer/**', '.github/workflows/installer.yml', 'pyproject.toml']
+    paths: ['src/**', 'installer/**', '.github/workflows/installer.yml', 'pyproject.toml']
   workflow_dispatch:
 permissions:
   contents: write

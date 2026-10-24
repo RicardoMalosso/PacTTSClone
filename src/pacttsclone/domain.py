@@ -20,6 +20,7 @@ class GenerationRequest(BaseModel):
     language: str = "pt"
     speed: float = Field(default=1.0, ge=0.5, le=1.5)
     steps: int = Field(default=32, ge=4, le=64)
+    autoqueue_general: bool = False
 
     @field_validator("text", "ref_text", mode="before")
     @classmethod

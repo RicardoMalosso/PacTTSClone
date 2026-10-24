@@ -122,3 +122,14 @@ Panic also unloads it. Repeated activation of an already-open tab does not creat
 duplicate players. Autoplay is delegated/requested, with manual play/direct-link
 fallback for browser policy. UI locale changes update labels without reloading
 an already-playing video. There is no report submission or background log upload.
+
+## Local autoqueue
+
+GenerationRequest carries an optional autoqueue_general boolean (default false),
+accepted for MP3 uploads and saved-voice generation. The UI persists its independent
+checkbox and snapshots it at submission. Studio's completion callback enqueues
+successful local speech to playbackMain, under the playback lock, and persists the
+item ID to prevent duplicate callback delivery. No browser completion request is
+needed. Existing moderation/countdown/paused-state rules apply; rejection is saved
+as playback_error and shown separately from browser autoplay feedback. Channel jobs
+retain their original destination and are not duplicated to the general bus.

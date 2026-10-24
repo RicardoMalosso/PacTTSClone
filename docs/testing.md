@@ -106,3 +106,9 @@ uses the browser clock to assert no initial embed/request, no frame before 3000m
 correct embed/autoplay delegation after the delay, cancellation before timeout,
 frame removal on exit and PT-BR labels. This validates embed lifecycle, not actual
 YouTube playback availability, embedding permissions or browser autoplay policy.
+
+Local autoqueue regression covers opt-in/default-off behavior, idempotent completion,
+filter rejection reporting, and excluding channel-job duplication. Browser coverage
+checks checkbox persistence, upload submission, automatic general queueing with
+browser autoplay off, and subsequent unchecked generation not adding another item.
+Saved-voice request propagation is covered through the server completion test.

@@ -49,3 +49,8 @@ edits/deletions across upgrades. Parent-folder shortcut starts installed app.
 R19: Report a bug tab embeds the supplied video only after explicit activation and
 a three-second delay, requests autoplay, cancels/unloads on exit, and provides a
 manual-play/direct-link fallback. No initial YouTube embed/network request.
+
+R20: Optional browser-persisted local autoqueue checkbox, separate from autoplay.
+Snapshot per submitted upload/preset job; backend queues successful local speech
+once to playbackMain, even after browser closure. Honor filters/delay/pause, report
+queue rejection, and exclude failed/cancelled jobs and Twitch-channel duplicates.

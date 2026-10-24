@@ -611,3 +611,34 @@ def test_spawn_worker_ignores_ctrl_c_and_exits_cleanly(tmp_path, mp3):
         assert runner.pid is None
     finally:
         service.close()
+
+
+def test_local_autoqueue_is_opt_in_idempotent_and_filtered(studio, mp3):
+    preset = voice(studio, mp3)
+    normal = studio.voices.generate(preset["id"], GenerationRequest(text="No automatic playback"))
+    wait_job(studio.service, normal["id"])
+    assert studio.playback.items("playbackMain") == []
+    job = studio.voices.generate(
+        preset["id"], GenerationRequest(text="Queue this audio", autoqueue_general=True)
+    )
+    wait_job(studio.service, job["id"])
+    wait_until(lambda: studio.store.get("job", job["id"]).get("general_playback_item_id"))
+    studio.completed(studio.service.get(job["id"]))
+    assert len(studio.playback.items("playbackMain")) == 1
+    studio.store.patch("channel", "playbackMain", custom_filters=["blocked phrase"])
+    blocked = studio.voices.generate(
+        preset["id"], GenerationRequest(text="A blocked phrase", autoqueue_general=True)
+    )
+    wait_job(studio.service, blocked["id"])
+    wait_until(lambda: studio.store.get("job", blocked["id"]).get("playback_error"))
+    assert len(studio.playback.items("playbackMain")) == 1
+    channel(studio, preset["id"])
+    chat = studio.voices.generate(
+        preset["id"],
+        GenerationRequest(text="Channel only", autoqueue_general=True),
+        "testchannel",
+        "viewer",
+    )
+    wait_job(studio.service, chat["id"])
+    wait_until(lambda: studio.playback.items("testchannel"))
+    assert len(studio.playback.items("playbackMain")) == 1

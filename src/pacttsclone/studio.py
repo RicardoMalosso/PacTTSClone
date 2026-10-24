@@ -141,6 +141,22 @@ class Studio:
             except UserError as exc:
                 self.store.patch("job", job["id"], playback_error=str(exc))
 
+        if (
+            not job.get("channel")
+            and job["kind"] == "speech"
+            and job["status"] == "succeeded"
+            and job["request"].get("autoqueue_general")
+        ):
+            try:
+                with self.playback.lock:
+                    current = self.store.get("job", job["id"])
+                    if current.get("general_playback_item_id"):
+                        return
+                    item = self.playback.enqueue(job, destination=GENERAL_PLAYER)
+                    self.store.patch("job", job["id"], general_playback_item_id=item["id"])
+            except UserError as exc:
+                self.store.patch("job", job["id"], playback_error=str(exc))
+
     def cancel_job(self, job_id):
         result = self.service.cancel(job_id)
         for item in self.store.all("playback", 100000):

@@ -1,6 +1,10 @@
 'use strict';
 (() => {
   const pt = {
+    'Queue automatically on general OBS player': 'Adicionar automaticamente à fila do player OBS geral',
+    'Automatic OBS queue failed: ': 'Falha ao adicionar automaticamente à fila OBS: ',
+    'Queuing on general OBS player…': 'Adicionando à fila do player OBS geral…',
+
     'Report a bug': 'Relatar um problema',
     'Watch the bug reporting guide.': 'Assista ao guia para relatar problemas.',
     'Bug reporting guide': 'Guia para relatar problemas',

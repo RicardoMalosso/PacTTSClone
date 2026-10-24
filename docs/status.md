@@ -195,3 +195,11 @@ is absent initially, starts after a three-second user-triggered delay, requests
 autoplay and unloads on tab exit/panic. Cancellation and manual-play/direct-link
 fallback are explicit. No automatic report/log submission. Browser lifecycle tests
 use a stubbed external frame; real YouTube playback is not asserted by those tests.
+
+## Local autoqueue — implementation checkpoint
+
+Added opt-in remembered checkbox beside autoplay. Upload and preset submissions
+persist autoqueue_general; backend completion queues successful local speech once
+to playbackMain and saves the item ID. Browser closure does not prevent queueing.
+Channel jobs are not copied; rejection is surfaced through saved playback_error
+and a separate queue-status label. Validation results recorded after test completion.

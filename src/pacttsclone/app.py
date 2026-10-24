@@ -171,6 +171,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         language: str = Form("pt"),
         speed: float = Form(1.0),
         steps: int = Form(32),
+        autoqueue_general: bool = Form(False),
         x_pactts_token: str = Header(""),
     ):
         try:
@@ -185,6 +186,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                     language=language,
                     speed=speed,
                     steps=steps,
+                    autoqueue_general=autoqueue_general,
                 )
             except ValidationError as exc:
                 raise HTTPException(422, "Verifique texto, idioma, velocidade e passos.") from exc

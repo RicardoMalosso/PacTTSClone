@@ -85,6 +85,11 @@ function tab(name) {
 document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => tab(b.dataset.tab)));
 try { $('autoplay').checked = localStorage.getItem('pactts-autoplay') === 'true'; } catch { /* optional */ }
 $('autoplay').addEventListener('change', () => { try { localStorage.setItem('pactts-autoplay', String($('autoplay').checked)); } catch { /* optional */ } });
+try { $('autoqueue').checked = localStorage.getItem('pactts-autoqueue') === 'true'; } catch { /* optional */ }
+$('autoqueue').addEventListener('change', () => { try { localStorage.setItem('pactts-autoqueue', String($('autoqueue').checked)); } catch { /* optional */ } });
+function autoqueueNote(job) {
+  $('autoqueue-note').textContent = !job?.request?.autoqueue_general ? '' : job.playback_error ? t('Automatic OBS queue failed: ') + t(job.playback_error) : job.general_playback_item_id ? t('Queued on general player.') : t('Queuing on general OBS player…');
+}
 // Speech language is independent from the interface locale.
 try { const saved = localStorage.getItem('pactts-speech-language'); if (['pt', 'en', 'auto'].includes(saved)) $('language').value = saved; } catch { /* optional */ }
 $('language').addEventListener('change', () => { try { localStorage.setItem('pactts-speech-language', $('language').value); } catch { /* optional */ } });
@@ -97,7 +102,7 @@ $('voice-select').addEventListener('change', () => {
   $('preset-note').textContent = voice ? `${voice.original_filename} · ${t('saved transcript')}: ${voice.transcript}` : '';
 });
 function clearResult() {
-  completedJob = null;
+  completedJob = null; $('autoqueue-note').textContent = '';
   $('player').pause(); $('player').removeAttribute('src'); $('player').load();
   $('player').hidden = true; $('actions').hidden = true; $('error').hidden = true;
   $('playback-note').textContent = '';
@@ -144,7 +149,7 @@ async function watch(id) {
         try { await $('player').play(); }
         catch { $('playback-note').textContent = t('The browser blocked autoplay. Press play to listen.'); }
       }
-      completedJob = job.id; currentJob = null; return;
+      completedJob = job.id; autoqueueNote(job); currentJob = null; return;
     }
     await sleep(500);
   }
@@ -155,12 +160,13 @@ $('generate-form').addEventListener('submit', action(async event => {
   try {
     const voice = $('voice-select').value;
     let job;
-    if (voice) job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value)}});
+    if (voice) job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked}});
     else {
       const file = $('reference').files[0];
       if (!file || !file.name.toLowerCase().endsWith('.mp3')) throw new Error('Choose an MP3 reference.');
       if (file.size > session.max_upload_bytes) throw new Error('MP3 exceeds 20 MiB.');
-      job = await api('/api/jobs', {method: 'POST', body: new FormData($('generate-form'))});
+      const body = new FormData($('generate-form')); body.set('autoqueue_general', String($('autoqueue').checked));
+      job = await api('/api/jobs', {method: 'POST', body});
     }
     currentJob = job.id; await watch(job.id);
   } finally { busy = false; $('generate').disabled = false; }
@@ -309,6 +315,7 @@ $('config-form').addEventListener('submit', action(async event => {
 }));
 async function refresh() {
   state = await api('/api/state');
+  if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
   renderVoices(); renderJobs(); renderHistory(); renderChannels();
@@ -344,6 +351,7 @@ async function init() {
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
 window.addEventListener('localechange', () => {
+  if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   const guide = $('bug-video').querySelector('iframe'); if (guide) guide.title = t('Bug reporting guide');
   document.querySelectorAll('.resources strong').forEach(node => { node.textContent = t(node.textContent); });
   $('hotkey-status').textContent = t(state.hotkey_status || '');

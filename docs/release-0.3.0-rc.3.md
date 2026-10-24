@@ -40,3 +40,7 @@ iframe is created only three seconds after explicitly opening the tab; leaving
 cancels the timer and removes the player. Autoplay is requested with a manual-play
 fallback if the browser blocks it. Labels support English/Portuguese. This is a
 video guide, not an automatic report submission or log upload.
+
+Adds an independent, remembered autoqueue checkbox on Generate. Opted-in local
+uploads and saved-voice generations are queued server-side to playbackMain once
+complete, using existing moderation/delay/pause rules. Browser autoplay is separate.

@@ -159,8 +159,13 @@ This reuses the MP3; it does not generate again or change the original channel.
 Configure delay (default 5 seconds), filters and custom blocked phrases in the
 general controls. Pause/resume, cancel, panic and playback mirrors work as with
 channel players. Sharing includes a separate `playbackMain` OBS-only link.
-Manual preview/autoplay on Generate remains independent; use the OBS player alone
-when you want a single playback destination.
+Enable **Queue automatically on general OBS player** beside autoplay on Generate
+to send each new local generation to this queue. The checkbox defaults off and is
+remembered in your browser. The choice is captured when submitting a job; the server
+queues the completed MP3 even if that browser closes. Delay, filters and pause state
+still apply; failed/cancelled jobs and Twitch jobs are not automatically copied.
+Manual preview/autoplay remains independent; leave browser autoplay off when you
+want to hear the audio only through OBS.
 
 ## Share with a friend
 
