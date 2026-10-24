@@ -2,9 +2,9 @@
 
 Run before building wheels/installers; runtime never depends on Tenor being online.
 """
+import time
 from pathlib import Path
 from urllib.request import Request, urlopen
-import time
 
 URL = "https://media1.tenor.com/m/SfZnf2pHgtIAAAAd/choopo-jingle.gif"
 TARGET = Path(__file__).resolve().parents[1] / "src/pacttsclone/static/choopo-jingle.gif"
