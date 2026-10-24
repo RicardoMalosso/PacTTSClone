@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.4.exe` when the preview is available. Draft releases are
+`PacTTSClone-Setup-0.3.0-rc.4.exe` in the [verified RC4 draft preview](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/untagged-6b421e5dab1ef8ce46d5). The unsigned setup is 4.33 MB. Draft releases are
 visible only to repository collaborators with the appropriate access; a private
 repository does not provide public downloads.
 

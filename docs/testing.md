@@ -244,3 +244,21 @@ LASTEXITCODE; the script now explicitly exits 0 only after all checked assertion
 pass. This does not skip any failed assertion. The next build packages that fix
 and the validated cross-browser result controls. No real-model synthesis/GPU
 performance is asserted by this installation/import/download test.
+
+## RC4 verified installer snapshot
+
+Snapshot: aa06a85720d459e07ae15f749c64e2e518a0ee54. Windows installer workflow
+40130667963 succeeded; test workflow 40130667999 succeeded (Windows/Linux,
+Python 3.11/3.12 plus Chromium). Local/application totals: 138 backend tests and
+25 browser tests. Actual Windows acceptance passed native wizard error/delay/path
+checks, minimal install without PyTorch, root shortcut HTTP launch, web CPU runtime
+installation and verified model download, repeat install and data-preserving
+uninstall. Real inference quality and physical CUDA remain separate checks.
+
+Draft preview: https://github.com/RicardoMalosso/PacTTSClone/releases/tag/untagged-6b421e5dab1ef8ce46d5
+Installer: PacTTSClone-Setup-0.3.0-rc.4.exe, 4,331,203 bytes, unsigned.
+SHA-256: 3a986c5ee329c221d6a90ade29e3eae4128bd0ed691c416868d6e0f009e9ed60.
+Downloaded the workflow ZIP and independently verified every SHA256SUMS entry;
+installer/wheel/FFmpeg archive hashes also match GitHub release asset digests.
+No unfinished feature or auto-updater was added to this snapshot. Future feature
+work must preserve these RC4 artifacts and use a new version for another installer.
