@@ -5,6 +5,7 @@ const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
+let completedJob = null;
 let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
 let voicesKey = '', historyKey = '', channelKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
 function stopAllAudio() { document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
@@ -39,12 +40,32 @@ async function api(url, options = {}) {
   return response.json();
 }
 function tab(name) {
-  document.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + name; });
+  window.Locale.apply();
+  const general = name === 'general';
+  if (general) selectedChannel = 'playbackMain';
+  else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
+  window.Locale.bind($('playback-heading'), general ? 'General playback' : 'Twitch & OBS');
+  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Read public Twitch chat. Commands queue local speech; this does not verify Bits or channel-point purchases.');
+  $('channel-form').hidden = general;
+  $('general-form').hidden = !general;
+  $('chat-events').parentElement.hidden = general;
+  if (general && state.general_playback) {
+    $('general-delay').value = state.general_playback.delay_seconds;
+    $('general-filter').value = state.general_playback.filter_level;
+    $('general-custom').value = state.general_playback.custom_filters.join('\n');
+  }
+  renderChannels();
+  if (session) renderChannelState().catch(e => error(e.message));
+  const pane = general ? 'channels' : name;
+  document.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + pane; });
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
 }
 document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => tab(b.dataset.tab)));
 try { $('autoplay').checked = localStorage.getItem('pactts-autoplay') === 'true'; } catch { /* optional */ }
 $('autoplay').addEventListener('change', () => { try { localStorage.setItem('pactts-autoplay', String($('autoplay').checked)); } catch { /* optional */ } });
+// Speech language is independent from the interface locale.
+try { const saved = localStorage.getItem('pactts-speech-language'); if (['pt', 'en', 'auto'].includes(saved)) $('language').value = saved; } catch { /* optional */ }
+$('language').addEventListener('change', () => { try { localStorage.setItem('pactts-speech-language', $('language').value); } catch { /* optional */ } });
 $('text').addEventListener('input', () => { $('count').textContent = `${$('text').value.length} / 2000`; });
 $('stop').addEventListener('click', () => { $('player').pause(); $('player').currentTime = 0; });
 $('voice-select').addEventListener('change', () => {
@@ -54,6 +75,7 @@ $('voice-select').addEventListener('change', () => {
   $('preset-note').textContent = voice ? `${voice.original_filename} · ${t('saved transcript')}: ${voice.transcript}` : '';
 });
 function clearResult() {
+  completedJob = null;
   $('player').pause(); $('player').removeAttribute('src'); $('player').load();
   $('player').hidden = true; $('actions').hidden = true; $('error').hidden = true;
   $('playback-note').textContent = '';
@@ -100,7 +122,7 @@ async function watch(id) {
         try { await $('player').play(); }
         catch { $('playback-note').textContent = t('The browser blocked autoplay. Press play to listen.'); }
       }
-      currentJob = null; return;
+      completedJob = job.id; currentJob = null; return;
     }
     await sleep(500);
   }
@@ -172,6 +194,7 @@ function renderHistory() {
     const actions = el('div', {class: 'row-actions'});
     if (j.output_url) {
       actions.append(button('Preview here', () => { preview.hidden = !preview.hidden; if (!preview.hidden) preview.src = j.output_url; else preview.pause(); }), link('Download MP3', j.output_url, true));
+      actions.append(button('Queue on general player', () => queueGeneral(j.id)));
       if (j.channel) actions.append(button('Replay on OBS', async () => { await api(`/api/channels/${j.channel}/replay/${j.id}`, {method: 'POST'}); }));
     }
     actions.append(link('Timing report', `/api/jobs/${j.id}/report`, true));
@@ -179,6 +202,19 @@ function renderHistory() {
       el('p', {}, j.request.text), el('p', {class: 'muted'}, `${j.username || t('Local')} · ${new Date(j.created_at * 1000).toLocaleString(window.Locale.language === 'pt' ? 'pt-BR' : 'en-CA')} · ${j.elapsed_seconds} s ${t('elapsed')} · ${j.metrics?.worker_cpu_seconds ?? t('N/A')} ${t('worker CPU s')} · ${j.device || 'device N/A'}`),
       j.error ? el('p', {class: 'error'}, j.error) : null, j.playback_error ? el('p', {class: 'error'}, j.playback_error) : null, actions, preview,
       el('details', {}, el('summary', {}, t('Per-stage hardware accounting')), el('pre', {}, JSON.stringify(j.metrics, null, 2)))));
+  }
+}
+function refreshCommandVoices() {
+  for (const select of document.querySelectorAll('.command-row select')) {
+    const selected = select.value;
+    const ready = state.voices.filter(v => v.status === 'ready');
+    const key = JSON.stringify([window.Locale.language, ready.map(v => [v.id, v.title])]);
+    if (select.dataset.voicesKey === key) continue;
+    select.dataset.voicesKey = key;
+    select.replaceChildren(el('option', {value: ''}, t('Choose voice')));
+    for (const voice of ready) select.append(el('option', {value: voice.id}, voice.title));
+    select.value = ready.some(v => v.id === selected) ? selected : '';
+    select.setAttribute('aria-label', t('Command voice'));
   }
 }
 function commandRow(keyword = '', voiceId = '') {
@@ -211,20 +247,21 @@ $('channel-form').addEventListener('submit', action(async event => {
 }));
 $('pause-channel').addEventListener('click', action(async () => { if (selectedChannel) { await api(`/api/channels/${selectedChannel}/pause`, {method: 'POST', body: {paused: !latestChannelState?.paused}}); await refresh(); } }));
 function renderChannels() {
+  refreshCommandVoices();
   const key = JSON.stringify(state.channels.map(c => ({name: c.name})));
   if (key !== channelKey) {
     channelKey = key; $('channel-select').replaceChildren(el('option', {value: ''}, t('Create a channel')));
     for (const c of state.channels) $('channel-select').append(el('option', {value: c.name}, c.name));
     $('channel-select').value = selectedChannel;
   }
-  const c = state.channels.find(c => c.name === selectedChannel);
+  const c = selectedChannel === 'playbackMain' ? {name: 'playbackMain', connection: t('General playback')} : state.channels.find(c => c.name === selectedChannel);
   $('channel-connection').textContent = c ? `${c.name}: ${t(c.connection)}${c.connection_error ? ' · ' + c.connection_error : ''}` : t('Choose a saved channel.');
   $('channel-links').replaceChildren();
   if (c) $('channel-links').append(el('p', {}, link('Open OBS player', `/${c.name}`)), el('input', {readonly: '', value: `${location.origin}/${c.name}`, 'aria-label': 'OBS source URL'}),
     el('p', {}, link('Open separate control page', `/${c.name}/control`)));
 }
 async function renderChannelState() {
-  if (!selectedChannel || !state.channels.some(c => c.name === selectedChannel)) return;
+  if (!selectedChannel || (selectedChannel !== 'playbackMain' && !state.channels.some(c => c.name === selectedChannel))) return;
   const snap = await api(`/api/channels/${selectedChannel}/state`); latestChannelState = snap;
   $('channel-player-status').textContent = `${snap.paused ? t('Playback paused') : t('Playback enabled')} · ${snap.player_connected ? t('OBS player connected') : t('No active OBS player')}`;
   const pending = snap.items.filter(i => ['queued', 'countdown', 'ready', 'playing'].includes(i.status));
@@ -268,7 +305,7 @@ async function init() {
     $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
-    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { fillChannel(selectedChannel); tab('channels'); } else commandRow();
+    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else commandRow();
     $('generate').disabled = false;
     const loop = async () => { try { await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
     const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
@@ -306,3 +343,14 @@ async function tunnelStatus() {
 }
 $('tunnel-start').addEventListener('click', action(async () => { await api('/api/tunnel/start', {method: 'POST'}); await tunnelStatus(); }));
 $('tunnel-stop').addEventListener('click', action(async () => { await api('/api/tunnel/stop', {method: 'POST'}); await tunnelStatus(); }));
+
+async function queueGeneral(id) {
+  await api(`/api/channels/playbackMain/replay/${id}`, {method: 'POST'});
+  $('playback-note').textContent = t('Queued on general player.');
+}
+$('send-general').addEventListener('click', action(async () => { if (completedJob) await queueGeneral(completedJob); }));
+$('general-form').addEventListener('submit', action(async event => {
+  event.preventDefault();
+  await api('/api/general-playback', {method: 'PUT', body: {name: 'general', delay_seconds: Number($('general-delay').value), filter_level: $('general-filter').value, custom_filters: $('general-custom').value.split('\n').map(s => s.trim()).filter(Boolean), paused: latestChannelState?.paused || false}});
+  await refresh();
+}));

@@ -17,6 +17,7 @@ Current scope supersedes v1 exclusions. Detailed rationale: v2-design.md.
 | R11 | Persistent history, MP3 download, local preview and replay without regeneration; replay rechecks current moderation and countdown. |
 | R12 | Homepage start/stop sharing button, opt-in Cloudflare Quick Tunnel, independently keyed admin and per-channel OBS links. Remote player cannot inspect/change administration or other channels. |
 | R13 | Browser/system language detection, English and Brazilian Portuguese, persisted override with Canadian/Brazilian flag buttons at bottom. Preserve user content verbatim. |
+| R15 | Always-available /playbackMain OBS player and /playbackMain/control dashboard; explicitly queue completed Generate/History audio from any origin without changing its channel metadata. Independent delay/filter/pause policy, cancellation, panic, replay and scoped tunnel link. No Twitch connection required. |
 | R14 | Deterministic unit/API/process/browser tests and Linux/Windows CI. Real model, real external network and real GPU/physical hotkey validation reported separately. |
 
 Bind the server to 127.0.0.1. Public requests must enter through the opt-in tunnel

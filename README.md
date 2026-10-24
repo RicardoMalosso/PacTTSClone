@@ -121,6 +121,19 @@ The basic PT/EN word filter cannot enforce every Twitch policy or detect all
 obfuscation/context. Custom blocked phrases are checked before generation. Each
 channel has its own settings; the mandatory basic slur list cannot be disabled.
 
+## General OBS player / testing
+
+Use **http://127.0.0.1:7860/playbackMain** as an OBS Browser Source without Twitch.
+Its dashboard is **http://127.0.0.1:7860/playbackMain/control**, also available in
+**General playback**. Generate an MP3, then click **Queue on general player**, or
+use the same button in History for any completed local or channel generation.
+This reuses the MP3; it does not generate again or change the original channel.
+Configure delay (default 5 seconds), filters and custom blocked phrases in the
+general controls. Pause/resume, cancel, panic and playback mirrors work as with
+channel players. Sharing includes a separate `playbackMain` OBS-only link.
+Manual preview/autoplay on Generate remains independent; use the OBS player alone
+when you want a single playback destination.
+
 ## Share with a friend
 
 Click **Start secure tunnel** on the homepage. No Cloudflare account is required.

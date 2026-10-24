@@ -5,6 +5,8 @@ import uuid
 from .domain import UserError
 from .moderation import blocked_reason
 
+GENERAL_PLAYER = "playbackMain"
+
 PENDING = {"queued", "countdown", "ready", "playing"}
 
 
@@ -23,8 +25,8 @@ class Playback:
             self.store.channel_records("playback", channel), key=lambda item: item["created_at"]
         )
 
-    def enqueue(self, job, replay=False):
-        channel = self.store.get("channel", job.get("channel", ""))
+    def enqueue(self, job, replay=False, destination=None):
+        channel = self.store.get("channel", destination or job.get("channel", ""))
         if not channel:
             raise UserError("Channel not found.")
         if job["status"] != "succeeded" or not self.service.output_path(job["id"]).is_file():

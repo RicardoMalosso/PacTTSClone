@@ -1,6 +1,13 @@
 'use strict';
 (() => {
   const pt = {
+    'General playback': 'Reprodução geral',
+    'Queue on general player': 'Adicionar ao player geral',
+    'Queued on general player.': 'Adicionado à fila do player geral.',
+    'Queue any generated MP3 here without connecting to Twitch.': 'Reproduza qualquer MP3 gerado aqui sem conectar à Twitch.',
+    'Save playback settings': 'Salvar ajustes de reprodução',
+    'Open general control page': 'Abrir painel de controle geral',
+    'Open general OBS player': 'Abrir player OBS geral',
     'Active': 'Ativo', 'Disabled': 'Desativado',
     'Unavailable on this platform; buttons and focused-browser shortcut work.': 'Indisponível nesta plataforma; use os botões ou o atalho com o navegador em foco.',
     'Unavailable: shortcut is in use.': 'Indisponível: o atalho já está em uso.',
@@ -176,7 +183,7 @@
     lang = value; try { localStorage.setItem('pactts-locale', value); } catch { /* optional */ }
     apply(); window.dispatchEvent(new Event('localechange'));
   }
-  window.Locale = {t, bind, set, get language() { return lang; }};
+  window.Locale = {t, bind, apply, set, get language() { return lang; }};
   capture(); apply();
   document.querySelectorAll('[data-locale]').forEach(node => node.addEventListener('click', () => set(node.dataset.locale)));
 })();

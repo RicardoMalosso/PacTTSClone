@@ -21,7 +21,8 @@ This proves process lifecycle/cancellation, not real voice quality or GPU behavi
 Browser tests use actual Chromium with explicit fake inference engines: original
 upload/player/download flow; saved voices, transcription and settings; timer and
 cancel controls; channel configuration/moderation/countdown/replay; locale detection
-and override; sharing controls; remote admin/OBS cookie bootstrap; backend panic
+and override across tabs/reloads; speech-language persistence; existing channel
+command dropdown refresh after voice preparation without losing drafts; sharing controls; remote admin/OBS cookie bootstrap; backend panic
 stopping browser audio. Public-origin tests emulate cloudflared forwarding in the
 browser and enforce actual server capability checks; they do not claim an external
 internet tunnel was established. Keep in-flight browser routes drained during

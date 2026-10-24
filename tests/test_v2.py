@@ -499,3 +499,81 @@ def test_restart_marks_preparing_voice_retryable(tmp_path, engine):
         assert studio.store.get("voice", "saved")["status"] == "cancelled"
     finally:
         studio.close()
+
+
+def test_general_player_reuses_local_and_channel_audio(studio, mp3):
+    preset = voice(studio, mp3)
+    local = studio.voices.generate(preset["id"], GenerationRequest(text="General player test"))
+    local = wait_job(studio.service, local["id"])
+    assert not local.get("channel")
+    assert studio.channels() == []
+    assert "playbackMain" not in studio.clients
+    item = studio.playback.enqueue(local, destination="playbackMain")
+    assert item["channel"] == "playbackMain"
+    assert studio.service.get(local["id"]).get("channel") is None
+    tick = studio.playback.tick("playbackMain", "OBS")
+    assert tick["item"]["status"] == "countdown"
+    studio.playback.cancel(item["id"])
+    assert studio.playback.items("playbackMain")[0]["status"] == "cancelled"
+    channel(studio, preset["id"])
+    chat_job = studio.receive("testchannel", "viewer", "!lula Good morning")
+    chat_job = wait_job(studio.service, chat_job["id"])
+    copied = studio.playback.enqueue(chat_job, destination="playbackMain")
+    assert copied["channel"] == "playbackMain"
+    assert studio.service.get(chat_job["id"])["channel"] == "testchannel"
+    studio.playback.panic()
+    assert studio.playback.snapshot("playbackMain")["paused"]
+
+
+def test_general_player_api_and_shared_audio_acl(tmp_path, engine, mp3):
+    app = create_app(Settings(data_dir=tmp_path / "general"), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        headers = {"X-PacTTS-Token": client.get("/api/session").json()["token"]}
+        assert client.get("/playbackMain").status_code == 200
+        assert client.get("/playbackMain/control").status_code == 200
+        response = client.put(
+            "/api/general-playback", json={"name": "general", "delay_seconds": 0}, headers=headers
+        )
+        assert response.status_code == 200
+        studio = app.state.studio
+        preset = voice(studio, mp3)
+        job = wait_job(
+            studio.service,
+            studio.voices.generate(preset["id"], GenerationRequest(text="Hello there"))["id"],
+        )
+        other = wait_job(
+            studio.service,
+            studio.voices.generate(preset["id"], GenerationRequest(text="Private audio"))["id"],
+        )
+        cap = ("player", "playbackMain")
+        assert not app.state.tunnel.permitted(cap, job["output_url"], "GET")
+        queued = client.post(f"/api/channels/playbackMain/replay/{job['id']}", headers=headers)
+        assert queued.status_code == 201
+        assert app.state.tunnel.permitted(cap, job["output_url"], "GET")
+        assert not app.state.tunnel.permitted(cap, other["output_url"], "GET")
+        assert not app.state.tunnel.permitted(("player", "otherchannel"), job["output_url"], "GET")
+        tick = studio.playback.tick("playbackMain", "test")
+        assert tick["item"]["status"] == "countdown"
+        tick = studio.playback.tick("playbackMain", "test")
+        assert tick["item"]["status"] == "ready"
+        studio.playback.acknowledge("playbackMain", "test", queued.json()["id"], "playing")
+        studio.playback.acknowledge("playbackMain", "test", queued.json()["id"], "played")
+        assert (
+            client.put(
+                "/api/general-playback",
+                json={"name": "general", "delay_seconds": -1},
+                headers=headers,
+            ).status_code
+            == 422
+        )
+        client.put(
+            "/api/general-playback",
+            json={"name": "general", "custom_filters": ["hello"]},
+            headers=headers,
+        )
+        assert (
+            client.post(
+                f"/api/channels/playbackMain/replay/{job['id']}", headers=headers
+            ).status_code
+            == 422
+        )

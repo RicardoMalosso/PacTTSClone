@@ -88,3 +88,22 @@ Windows shortcut delivery, real OBS CEF behavior, external Cloudflare and live
 Twitch connection on the user's PC. No GPU allocation/timing or network success
 has been fabricated when unavailable. Basic lexical filters do not guarantee all
 Twitch policy compliance or detect every evasion.
+
+## Studio and general playback follow-up — 2026-10-24
+
+- Gruvbox Dark studio with responsive recording-desk styling; transparent OBS
+  styling remains separate. Desktop/mobile screenshots inspected, no horizontal
+  overflow at 390px.
+- Reapply interface locale across tabs; persist speech-language selection
+  independently across reloads. Existing command voice dropdowns update when
+  voice preparation completes, preserving command text and valid selections.
+- `/playbackMain` and `/playbackMain/control` provide a general OBS queue without
+  Twitch. Generate/History manually queue any successful generated MP3. Original
+  channel metadata remains unchanged. Independent delay/filter/pause settings,
+  cancellation, panic and general-player tunnel capability reuse existing logic.
+- Validation: 116 backend/API/process tests and 15 Chromium tests passed. New
+  coverage includes local/channel audio reuse, general FIFO countdown/acks/cancel,
+  filter validation, player audio ACL, Generate-to-OBS browser playback and
+  separate control routing; language persistence and live dropdown refresh.
+- No new real-model/GPU/network performance claim is made by these fake-engine
+  regression tests. Prior real CPU evidence remains above.

@@ -63,3 +63,24 @@ Generate, Voices, Twitch & OBS, History and Configuration tabs share polling sta
 Locale module detects preferred browser language, supports en-CA/pt-BR and persists
 manual override. Static UI and explicit dynamic labels translate; user content and
 machine-readable diagnostic keys do not. Canadian/Brazilian flags are inline SVG.
+
+### Studio preferences and command drafts
+
+Reapply the selected interface locale when activating a tab. Persist generation
+speech language separately in `pactts-speech-language`; interface translation must
+not change the requested speech language. Refresh existing command voice dropdowns
+when ready voice IDs/titles or locale change, preserving valid selections and
+command text. Pending voices become selectable only after preparation succeeds.
+The studio uses a Gruvbox Dark palette with responsive recording-desk panels.
+
+### General playback destination
+
+A persisted internal playback configuration named `playbackMain` shares the FIFO,
+lease, countdown, filtering, cancellation and panic implementation. It is excluded
+from Twitch channel listings/connections. Queueing a completed job explicitly to
+this destination does not alter its original channel, regenerate it, or duplicate
+its MP3. Generate and History expose manual queue actions; no implicit double
+playback is enabled. `/playbackMain/control` selects general controls; the player
+is `/playbackMain`. Optional tunnel sharing includes this destination. Its player
+capability can retrieve only successful audio explicitly assigned to that FIFO,
+not every completed job in the studio.

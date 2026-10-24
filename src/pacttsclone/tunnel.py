@@ -85,7 +85,13 @@ class Tunnel:
         match = re.fullmatch(r"/api/jobs/([a-f0-9]{32})/audio", path)
         if method in {"GET", "HEAD"} and match:
             job = self.service.get(match[1])
-            return bool(job and job.get("channel") == channel and job["status"] == "succeeded")
+            assigned = job and job.get("channel") == channel
+            if channel == "playbackMain":
+                assigned = any(
+                    item["job_id"] == match[1]
+                    for item in self.service.store.channel_records("playback", channel)
+                )
+            return bool(job and assigned and job["status"] == "succeeded")
         return False
 
     def snapshot(self):

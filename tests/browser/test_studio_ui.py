@@ -259,3 +259,82 @@ def test_backend_panic_stops_browser_audio_without_key_focus(page, live_server, 
     app.state.studio.playback.panic()
     page.wait_for_function("document.getElementById('player').paused")
     assert page.locator("#player").evaluate("audio => audio.currentTime === 0")
+
+
+def test_languages_persist_across_tabs_and_reload(page, live_server):
+    url, _ = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.get_by_text("Generation settings", exact=True).click()
+    page.locator("#language").select_option("auto")
+    page.locator('[data-locale="pt"]').click()
+    for tab in ["voices", "channels", "history", "config", "studio"]:
+        page.locator(f'[data-tab="{tab}"]').click()
+        expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
+    expect(page.locator("#language")).to_have_value("auto")
+    page.reload()
+    expect(page.locator("#generate")).to_be_enabled()
+    expect(page.locator("html")).to_have_attribute("lang", "pt-BR")
+    expect(page.locator("#language")).to_have_value("auto")
+    page.locator('[data-locale="en"]').click()
+    for tab in ["voices", "channels", "studio"]:
+        page.locator(f'[data-tab="{tab}"]').click()
+        expect(page.locator("html")).to_have_attribute("lang", "en-CA")
+    expect(page.locator("#generate")).to_have_text("Generate MP3 ↗")
+
+
+def test_command_voices_refresh_without_losing_drafts(page, live_server, mp3):
+    url, _ = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    open_tab(page, "Twitch & OBS")
+    page.locator(".command-row input").fill("!test")
+    expect(page.locator(".command-row select option")).to_have_count(1)
+    open_tab(page, "Voices")
+    page.locator("#voice-title").fill("New voice")
+    page.locator("#voice-reference").set_input_files(mp3)
+    page.get_by_role("button", name="Save voice", exact=True).click()
+    expect(page.locator(".voice-card .pill")).to_have_text("ready", timeout=15000)
+    open_tab(page, "Twitch & OBS")
+    select = page.locator(".command-row select")
+    expect(select.locator("option")).to_have_count(2)
+    select.select_option(label="New voice")
+    selected = select.input_value()
+    page.locator('[data-locale="pt"]').click()
+    expect(select).to_have_value(selected)
+    expect(page.locator(".command-row input")).to_have_value("!test")
+    expect(select.locator("option").first).to_have_text("Selecione a voz")
+
+
+def test_general_player_generate_queue_and_controls(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator("#reference").set_input_files(mp3)
+    page.locator("#ref-text").fill("Reference transcript.")
+    page.locator("#text").fill("General player browser test")
+    page.locator("#generate").click()
+    expect(page.locator("#send-general")).to_be_visible(timeout=15000)
+    page.locator("#send-general").click()
+    expect(page.locator("#playback-note")).to_have_text("Queued on general player.")
+    open_tab(page, "General playback")
+    expect(page.locator("#channel-queue")).to_contain_text("General player browser test")
+    expect(page.locator("#channel-form")).to_be_hidden()
+    page.locator("#general-delay").fill("0")
+    page.get_by_role("button", name="Save playback settings", exact=True).click()
+    wait_until(lambda: app.state.service.store.get("channel", "playbackMain")["delay_seconds"] == 0)
+    obs = page.context.new_page()
+    try:
+        obs.goto(url + "/playbackMain")
+        wait_until(
+            lambda: (
+                app.state.studio.playback.items("playbackMain")[0]["status"]
+                in {"playing", "played"}
+            )
+        )
+    finally:
+        obs.close()
+    page.goto(url + "/playbackMain/control")
+    expect(page.locator("#general-form")).to_be_visible()
+    expect(page.locator("#channel-form")).to_be_hidden()
+    expect(page.get_by_label("OBS source URL")).to_have_value(url + "/playbackMain")

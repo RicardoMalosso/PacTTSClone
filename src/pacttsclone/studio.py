@@ -6,7 +6,7 @@ from .domain import GenerationRequest, UserError
 from .hotkey import GlobalHotkey
 from .models import AppConfig, ChannelConfig
 from .moderation import blocked_reason
-from .playback import Playback
+from .playback import GENERAL_PLAYER, Playback
 from .twitch import TwitchClient
 from .voices import Voices
 
@@ -15,6 +15,11 @@ class Studio:
     def __init__(self, service, twitch_factory=TwitchClient):
         self.service, self.store = service, service.store
         self.voices = Voices(service)
+        if not self.store.get("channel", GENERAL_PLAYER):
+            general = ChannelConfig(name="general").model_dump()
+            self.store.put(
+                "channel", GENERAL_PLAYER, {**general, "name": GENERAL_PLAYER, "kind": "general"}
+            )
         self.playback = Playback(service)
         self.twitch_factory = twitch_factory
         self.clients = {}
@@ -45,6 +50,8 @@ class Studio:
         return config
 
     def connect(self, config):
+        if config.get("kind") == "general":
+            return
         name = config["name"]
         old = self.clients.get(name)
         if not config["enabled"]:
@@ -60,6 +67,8 @@ class Studio:
     def channels(self):
         result = []
         for config in self.store.all("channel"):
+            if config.get("kind") == "general":
+                continue
             client = self.clients.get(config["name"])
             result.append(
                 {

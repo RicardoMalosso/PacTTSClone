@@ -96,3 +96,20 @@ Reviewed current requirements, architecture, tests, UI and upgrade instructions 
 consistency. Replaced v1 scope statements in current docs; historical v1 evidence is
 preserved separately in v1-validation.md. Exact GPU timing, physical global-hotkey
 operation and external routing remain separate from deterministic fake-engine tests.
+
+## Studio follow-up — 2026-10-24
+
+Use Gruvbox Dark for the studio, retaining transparent OBS backgrounds. UI locale
+and generation language are independent browser preferences. Tab activation
+reapplies locale; speech language survives reloads. Existing command rows refresh
+ready voice options on polling instead of requiring users to recreate the row or
+reload the page. Preserve command drafts and valid selected voice IDs.
+Automatic device selection is only CUDA availability selection, not an additional
+model. Blank reference transcripts trigger CPU Whisper; saved transcripts avoid
+repeating ASR. Automatic speech language passes `language=None` to OmniVoice and
+does not explicitly load another language-detection model in our adapter.
+
+General playback uses an internal persisted destination rather than a fake Twitch
+connection. Reuse the proven playback state machine; allow explicit destination
+override only on the admin queue endpoint, retaining original job provenance.
+The general player capability authorizes only jobs actually queued to that bus.

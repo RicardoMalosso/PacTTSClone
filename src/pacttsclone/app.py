@@ -13,6 +13,7 @@ from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, Engine, GenerationRequest, UserError
 from .engine import dependencies_available
 from .models import AppConfig, ChannelConfig
+from .playback import GENERAL_PLAYER
 from .service import GenerationService
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
@@ -277,6 +278,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             "jobs": [service.get(j["id"]) for j in service.history(100)],
             "voices": service.store.all("voice"),
             "channels": studio.channels(),
+            "general_playback": service.store.get("channel", GENERAL_PLAYER),
             "hotkey_status": studio.hotkey.status,
             "panic_revision": studio.playback.panic_revision,
         }
@@ -373,6 +375,16 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(404, "Asset not found.")
         return FileResponse(path, media_type="image/jpeg" if asset == "thumbnail" else "audio/mpeg")
 
+    @app.put("/api/general-playback")
+    def configure_general(value: ChannelConfig):
+        # Reuse validated playback policy, never enable IRC for the general bus.
+        config = service.store.get("channel", GENERAL_PLAYER)
+        for key in ("paused", "delay_seconds", "filter_level", "custom_filters"):
+            config[key] = getattr(value, key)
+        service.store.put("channel", GENERAL_PLAYER, config)
+        studio.playback.pause(GENERAL_PLAYER, config["paused"])
+        return config
+
     @app.get("/api/channels")
     def channels():
         return studio.channels()
@@ -410,9 +422,9 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.post("/api/channels/{channel}/replay/{job_id}", status_code=201)
     def replay(channel: str, job_id: str):
         value = service.get(job_id)
-        if not value or value.get("channel") != channel:
+        if not value or (channel != GENERAL_PLAYER and value.get("channel") != channel):
             raise HTTPException(404, "Channel audio not found.")
-        return studio.playback.enqueue(value, replay=True)
+        return studio.playback.enqueue(value, replay=True, destination=channel)
 
     @app.post("/api/channels/{channel}/player/tick")
     def player_tick(channel: str, value: dict):
