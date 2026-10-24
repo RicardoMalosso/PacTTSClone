@@ -207,6 +207,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
+    @app.post("/api/setup/countermeasures/offer")
+    def setup_countermeasures_offer():
+        return runtime_setup.offer_countermeasures()
+
     @app.get("/api/setup/log")
     def setup_log():
         if not runtime_setup.log_path.is_file():
