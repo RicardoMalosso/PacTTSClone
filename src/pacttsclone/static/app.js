@@ -98,7 +98,8 @@ function tab(name) {
   document.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + pane; });
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
 }
-document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => tab(b.dataset.tab)));
+let userSelectedTab = false;
+document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => { userSelectedTab = true; tab(b.dataset.tab); }));
 try { $('autoplay').checked = localStorage.getItem('pactts-autoplay') === 'true'; } catch { /* optional */ }
 $('autoplay').addEventListener('change', () => { try { localStorage.setItem('pactts-autoplay', String($('autoplay').checked)); } catch { /* optional */ } });
 try { $('autoqueue').checked = localStorage.getItem('pactts-autoqueue') === 'true'; } catch { /* optional */ }
@@ -395,7 +396,7 @@ async function init() {
       };
       setupEvents.onerror = () => { setupEventsConnected = false; };
     }
-    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
+    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); if (!userSelectedTab) tab(runtimeSetup.ready ? 'studio' : 'setup'); }
     $('generate').disabled = !runtimeSetup.ready;
     const loop = async () => { try { if (!setupEventsConnected) await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
     const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
