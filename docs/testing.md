@@ -283,3 +283,23 @@ those files and installing local metadata the above backend run passed.
 Windows compiled-binary smoke awaits GitHub Actions. No real Whisper/OmniVoice
 weights or physical GPU inference were executed locally; these results do not
 establish speech quality or end-to-end model inference.
+
+## GitHub Actions execution policy
+
+- `Tests` starts on pull requests, pushes to `main`, or manual dispatch.
+  Only `main` pushes trigger push-based jobs, avoiding duplicate push/PR
+  executions for feature branches.
+- The `fast` job checks Ruff, Python compilation and YAML syntax before expensive
+  Windows FFmpeg setup or browser/core tests. Chromium runs after this gate;
+  Windows/Linux Python 3.11/3.12 tests also wait for the Windows FFmpeg artifact.
+  The matrix uses `fail-fast: false` to retain cross-platform diagnostics.
+- Superseded test runs are cancelled within their workflow/ref concurrency group.
+  GitHub retains their run history; the intermediate FFmpeg artifact expires in
+  7 days.
+- `Windows installer preview` is explicitly dispatched from GitHub Actions.
+  It reruns the reusable full test suite and only builds/acceptance-tests the
+  installer if every check succeeds. Manual builds are not cancelled.
+- Installers are attached to GitHub Actions for 14 days, diagnostics for 7.
+  Publication requires the explicit `publish_draft` checkbox and execution from
+  `main`. Existing draft or published releases are never deleted or overwritten.
+  The verified installer/test procedure is otherwise unchanged.
