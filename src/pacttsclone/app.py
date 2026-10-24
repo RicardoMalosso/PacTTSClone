@@ -198,7 +198,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                 payload = json.dumps(snapshot, ensure_ascii=False)
                 if payload != previous:
                     previous = payload
-                    yield f"data: {payload}\\n\\n"
+                    yield f"data: {payload}\n\n"
                 await asyncio.sleep(0.25)
 
         return StreamingResponse(
