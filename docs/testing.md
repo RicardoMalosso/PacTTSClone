@@ -20,6 +20,9 @@ Linux. Never silently skip required FFmpeg tests. Browser suite is opt-in locall
 and is explicitly selected in its CI job.
 Every deterministic test has a 60-second timeout (pytest-timeout); CI jobs also
 have overall limits and verbose test names for diagnosing platform-specific hangs.
+CI core uses a stricter 15-second per-test bound and a three-minute step bound.
+Use short explicit parameter IDs for large binary inputs: a 20 MiB upload fixture
+must never become a 20 MiB test name/log line.
 
 ## Real model smoke (separate, opt-in)
 

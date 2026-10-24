@@ -7,7 +7,7 @@ Python oficial. A inferência acontece no seu computador; não chama a API do Sp
 
 ## Requisitos
 
-- Python **3.12** recomendado (CPython 64 bits); testes de aplicação também previstos em 3.11.
+- Python **3.12** recomendado (CPython 64 bits); testes de aplicação passaram em 3.11 e 3.12, no Windows e Linux.
 - FFmpeg, incluindo `ffmpeg` e `ffprobe`, no PATH, com encoder `libmp3lame`.
 - Espaço para dependências e modelos (reserve vários GB; não é um instalador pequeno).
 - NVIDIA com PyTorch CUDA compatível, ou CPU (mais lenta). Não há promessa de tempo
