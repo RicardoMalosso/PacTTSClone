@@ -27,5 +27,5 @@ body{padding-top:calc(var(--status-bar-height,130px) + 16px)}.live-generation{po
 .setup-question strong{margin-right:auto}
 .countermeasure-backdrop{position:fixed;inset:0;z-index:200;background:#000b;display:flex;align-items:center;justify-content:center;padding:18px}
 .countermeasure-window{position:relative;max-width:min(720px,95vw);width:100%;min-height:160px;background:var(--panel);border:2px solid var(--accent);padding:36px 20px 20px;text-align:center;box-shadow:0 10px 40px #000b}
-.countermeasure-window img{max-width:100%;max-height:75vh;object-fit:contain}
+.countermeasure-window video{display:block;width:100%;max-height:75vh;object-fit:contain}
 .countermeasure-close{position:absolute;top:6px;right:6px}
