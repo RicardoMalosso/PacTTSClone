@@ -107,7 +107,7 @@ class Voices:
                 thumbnail_url=f"/api/voices/{voice_id}/thumbnail?v={uuid.uuid4().hex}",
             )
 
-    def create(self, stream, title, filename, transcript="", thumbnail=None):
+    def create(self, stream, title, filename, transcript="", thumbnail=None, identity=None):
         title, transcript = title.strip(), transcript.strip()
         if not title or len(title) > 100 or len(transcript) > 4000:
             raise UserError(
@@ -150,14 +150,14 @@ class Voices:
             }
             self.store.put("voice", voice_id, voice)
             if not transcript:
-                self.prepare(voice_id)
+                self.prepare(voice_id, identity=identity)
             return self.store.get("voice", voice_id)
         except Exception:
             self.store.delete("voice", voice_id)
             shutil.rmtree(folder, ignore_errors=True)
             raise
 
-    def prepare(self, voice_id):
+    def prepare(self, voice_id, identity=None):
         voice = self.store.get("voice", voice_id)
         if not voice:
             raise UserError("Voice not found.")
@@ -179,6 +179,7 @@ class Voices:
                     allow_queue=True,
                     voice_id=voice_id,
                     kind="transcribe",
+                    identity=identity,
                 )
             return self.store.patch(
                 "voice", voice_id, preparation_job_id=job["id"], status="pending", error=None
@@ -200,7 +201,7 @@ class Voices:
                     error=job.get("error"),
                 )
 
-    def generate(self, voice_id, request, channel=None, username=None):
+    def generate(self, voice_id, request, channel=None, username=None, identity=None):
         voice = self.store.get("voice", voice_id)
         if not voice or voice["status"] != "ready":
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
@@ -215,6 +216,7 @@ class Voices:
                     channel=channel,
                     username=username,
                     original_filename=voice["original_filename"],
+                    identity=identity,
                 )
             self.store.patch("job", result["id"], voice_title=voice["title"])
             return self.service.get(result["id"])

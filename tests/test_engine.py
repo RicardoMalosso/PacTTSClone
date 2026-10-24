@@ -131,3 +131,19 @@ def test_offline_sets_flags_before_loading(monkeypatch):
     # Restore environment to avoid influencing other tests in this process.
     monkeypatch.delenv("HF_HUB_OFFLINE")
     monkeypatch.delenv("TRANSFORMERS_OFFLINE")
+
+
+def test_residency_is_shared_across_voice_changes_and_cleared_on_oom(modules):
+    _, model, factory = modules
+    engine = OmniVoiceEngine(Settings())
+    events = []
+    engine.residency_observer = lambda loaded, device: events.append((loaded, device))
+    request = GenerationRequest(text="Test", ref_text="Known reference")
+    engine.synthesize("voice-a.wav", request)
+    engine.synthesize("voice-b.wav", request)
+    assert factory.call_count == 1
+    assert events == [(True, "cuda")]
+    model.generate.side_effect = RuntimeError("out of memory")
+    with pytest.raises(UserError, match="Memória"):
+        engine.synthesize("voice-a.wav", request)
+    assert events[-1] == (False, "cuda")

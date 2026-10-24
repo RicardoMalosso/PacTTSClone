@@ -27,6 +27,10 @@ class GenerationService:
         self.settings = settings
         self.engine = engine
         self.store = Store(settings.data_dir)
+        identity = self.store.get("identity", "installation")
+        if not identity:
+            identity = self.store.put("identity", "installation", {"id": uuid.uuid4().hex})
+        self.installation_id = identity["id"]
         self.outputs = settings.data_dir / "outputs"
         self.temporary = settings.data_dir / "temporary"
         self.logs = settings.data_dir / "logs"
@@ -72,6 +76,50 @@ class GenerationService:
     def pending(self):
         return self.store.pending_jobs()
 
+    def identity(self, origin="local", name="", requester_id="", source="host"):
+        namespace = uuid.UUID(self.installation_id)
+        try:
+            requester_id = uuid.UUID(requester_id).hex
+        except (ValueError, TypeError, AttributeError):
+            requester_id = uuid.uuid5(namespace, f"{origin}:{name or 'legacy'}").hex
+        return {
+            "origin": origin,
+            "origin_id": uuid.uuid5(namespace, f"{origin}:{source}").hex,
+            "requester_name": (name.strip() or "Unnamed requester")[:80],
+            "requester_id": requester_id,
+        }
+
+    def _audit(self, event, job):
+        record = {k: v for k, v in job.items() if k not in {"workspace", "resources", "metrics"}}
+        self.store.put("request", job["id"], record)
+        with (self.logs / "requests.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"event": event, **record}, ensure_ascii=False) + "\n")
+
+    def reject_request(self, text, reason, *, channel, username, voice_id=None):
+        with self._lock:
+            record = {
+                "id": uuid.uuid4().hex,
+                "kind": "speech",
+                "status": "blocked",
+                "created_at": time.time(),
+                "finished_at": time.time(),
+                "elapsed_seconds": 0,
+                "request": {"text": text[:2000]},
+                "error": reason,
+                "channel": channel,
+                "voice_id": voice_id,
+                "username": username,
+                "output_url": None,
+                **self.identity("twitch", username, source=channel),
+            }
+            self._audit("blocked", record)
+
+    def request_history(self, limit=100):
+        records = {j["id"]: self.get(j["id"]) for j in self.history(limit)}
+        for value in self.store.all("request", limit):
+            records.setdefault(value["id"], value)
+        return sorted(records.values(), key=lambda j: j["created_at"], reverse=True)[:limit]
+
     def configure(self, config):
         with self._lock:
             if self.pending():
@@ -91,6 +139,7 @@ class GenerationService:
         username=None,
         kind="speech",
         original_filename=None,
+        identity=None,
     ):
         with self._lock:
             if self.setup_busy:
@@ -117,6 +166,15 @@ class GenerationService:
                     raise UserError("Selecione um MP3 não vazio.")
                 job_id = uuid.uuid4().hex
                 job = {
+                    **(
+                        identity
+                        or self.identity(
+                            "twitch" if channel else "local",
+                            username or request.requester_name,
+                            request.requester_id,
+                            source=channel or "host",
+                        )
+                    ),
                     "id": job_id,
                     "kind": kind,
                     "status": "queued",
@@ -141,6 +199,7 @@ class GenerationService:
                     "stages": [],
                 }
                 self.store.put("job", job_id, job)
+                self._audit("submitted", job)
                 self._wake.set()
                 return self.get(job_id)
             except Exception:
@@ -311,6 +370,7 @@ class GenerationService:
         record = {k: v for k, v in job.items() if k not in {"workspace", "resources"}}
         with self._lock, (self.logs / "generation.jsonl").open("a", encoding="utf-8") as log:
             log.write(json.dumps(record, ensure_ascii=False) + "\n")
+            self._audit("finished", job)
 
     def close(self):
         with self._lock:

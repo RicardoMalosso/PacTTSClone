@@ -59,6 +59,7 @@ def add_ready_voice(page, mp3, title="Browser voice"):
     ).to_be_visible()
     page.locator('[data-tab="studio"]').click()
     page.locator("#voice-select").select_option(label=title)
+    page.locator("#requester-name").fill("Browser tester")
 
 
 def prepare(page, live_app, mp3):
@@ -109,6 +110,7 @@ def test_error_message_and_retry(page, live_app, mp3, tmp_path):
     expect(page.locator(".voice-card")).to_have_count(1)
     page.locator('[data-tab="studio"]').click()
     page.locator("#voice-select").select_option(label="Retry voice")
+    page.locator("#requester-name").fill("Retry tester")
     page.locator("#text").fill("Retry successful")
     page.locator("#generate").click()
     expect(page.locator("#player")).to_be_visible(timeout=15000)

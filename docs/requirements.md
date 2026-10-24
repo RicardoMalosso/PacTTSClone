@@ -92,3 +92,35 @@ voices accept bounded thumbnail replacement with atomic JPEG writes. Default
 user-provided thumbnails are downsampled to <=128 px, integrity-checked, and seeded
 to existing presets only when no custom thumbnail is present; tombstones remain.
 No transcription, title or custom image is replaced by thumbnail migration.
+
+## RC4 remote access and observability
+
+Remote admins unlock voices/history using host readiness from session/state,
+without polling owner-only setup/tunnel endpoints. Shared OBS links include a
+channel capability and work in a separate browser context. A lost cookie gets one
+bootstrap retry; revoked/unauthorized links stop polling and ask for a fresh link.
+Successful high-frequency HTTP polls are omitted from the CLI access log; errors
+remain visible and TTS request lifecycle records remain in requests.jsonl.
+
+Generate requires a browser-persisted requester name and random UUID. Server-derived
+local/cloudflare/Twitch origin and installation-scoped origin IDs are recorded on
+jobs; labels are for debugging, not proof of identity. History includes pending,
+completed, failed/cancelled generation, sample preparation and moderation-rejected
+TTS commands. Existing records have explicit legacy fallbacks. No IP addresses or
+capability keys are added to the request log. All voices share one worker-reported
+base-model resident state; changing voice repeats reference conditioning rather
+than training a new model. OOM/reset/death clears residency. Fixed top status spans
+all tabs, and language flags are beside the application title. Detailed contract:
+[remote observability design](remote-observability-design.md).
+
+Local validation: 138 backend tests, 25 Chromium tests and ruff passed. Remote tests
+use a local tunnel simulation with independent browser contexts, not a live public
+Cloudflare tunnel. Physical GPU behavior remains untested here.
+
+Windows RC4 build compiled project-built FFmpeg and Inno; the actual wizard's
+five-second delay/default folders/failure page passed, including disabled Next/
+Finish, log availability and no requested restart. Minimal app install and root
+shortcut HTTP launch passed. Web CPU setup exposed uv's constraint-path handling
+with spaces (upstream issue astral-sh/uv#12639); commands now use a relative
+constraint filename in an explicit setup working directory. Full CPU/model setup,
+repeat installation and uninstall await the next Windows acceptance run.

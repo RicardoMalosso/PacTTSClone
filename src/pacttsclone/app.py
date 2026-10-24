@@ -2,7 +2,7 @@ import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
@@ -148,14 +148,30 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             {"detail": str(exc)}, status_code=409 if isinstance(exc, BusyError) else 422
         )
 
+    def request_identity(request, value=None):
+        return service.identity(
+            "cloudflare" if request.state.remote_access else "local",
+            (value.requester_name if value else "")
+            or unquote(request.headers.get("x-pactts-requester-name", "")),
+            (value.requester_id if value else "")
+            or request.headers.get("x-pactts-requester-id", ""),
+            source=tunnel.public_host() if request.state.remote_access else "host",
+        )
+
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html")
 
     @app.get("/api/session")
-    def session():
+    def session(request: Request):
         return JSONResponse(
-            {"token": token, "max_upload_bytes": MAX_UPLOAD_BYTES, "max_text": 2000},
+            {
+                "token": token,
+                "max_upload_bytes": MAX_UPLOAD_BYTES,
+                "max_text": 2000,
+                "remote_access": request.state.remote_access,
+                "setup_ready": service.setup_ready(),
+            },
             headers={"Cache-Control": "no-store"},
         )
 
@@ -190,6 +206,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.post("/api/jobs", status_code=202)
     def generate(
+        http_request: Request,
         reference: Annotated[UploadFile, File()],
         text: str = Form(...),
         ref_text: str = Form(""),
@@ -219,6 +236,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                 return service.submit(
                     reference.file,
                     request,
+                    identity=request_identity(http_request),
                     original_filename=reference.filename.replace("\\", "/").rsplit("/", 1)[-1][
                         :255
                     ],
@@ -306,7 +324,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             jobs = [service.get(j["id"]) for j in service.history(100)]
         return {
             "active_job": active,
+            "setup_ready": service.setup_ready(),
+            "player_links": tunnel.snapshot()["players"],
             "jobs": jobs,
+            "request_history": service.request_history(),
+            "model_residency": {
+                **getattr(service.runner, "model_state", {}),
+                "loaded": bool(
+                    service.runner.pid and getattr(service.runner, "model_state", {}).get("loaded")
+                ),
+                "model": runtime_setup.model_ids[0],
+                "worker_pid": service.runner.pid,
+            },
             "voices": service.store.all("voice"),
             "channels": studio.channels(),
             "general_playback": service.store.get("channel", GENERAL_PLAYER),
@@ -349,12 +378,20 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(404, "No generation logs yet.")
         return FileResponse(path, media_type="application/x-ndjson", filename="generation.jsonl")
 
+    @app.get("/api/request-logs")
+    def request_logs():
+        path = service.logs / "requests.jsonl"
+        if not path.is_file():
+            raise HTTPException(404, "No request log yet.")
+        return FileResponse(path, media_type="application/x-ndjson", filename="requests.jsonl")
+
     @app.get("/api/voices")
     def voices():
         return service.store.all("voice")
 
     @app.post("/api/voices", status_code=201)
     def add_voice(
+        http_request: Request,
         reference: Annotated[UploadFile, File()],
         title: str = Form(...),
         transcript: str = Form(""),
@@ -363,7 +400,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         try:
             thumb = thumbnail.file.read(2 * 1024 * 1024 + 1) if thumbnail else None
             return studio.voices.create(
-                reference.file, title, reference.filename or "", transcript, thumb
+                reference.file,
+                title,
+                reference.filename or "",
+                transcript,
+                thumb,
+                identity=request_identity(http_request),
             )
         finally:
             reference.file.close()
@@ -387,8 +429,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         return {"ok": True}
 
     @app.post("/api/voices/{voice_id}/prepare")
-    def prepare_voice(voice_id: str):
-        return studio.voices.prepare(voice_id)
+    def prepare_voice(voice_id: str, request: Request):
+        return studio.voices.prepare(voice_id, identity=request_identity(request))
 
     @app.post("/api/voices/{voice_id}/thumbnail")
     def update_thumbnail(voice_id: str, thumbnail: Annotated[UploadFile, File()]):
@@ -398,8 +440,8 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             thumbnail.file.close()
 
     @app.post("/api/voices/{voice_id}/generate", status_code=202)
-    def generate_voice(voice_id: str, value: GenerationRequest):
-        return studio.voices.generate(voice_id, value)
+    def generate_voice(voice_id: str, value: GenerationRequest, request: Request):
+        return studio.voices.generate(voice_id, value, identity=request_identity(request, value))
 
     @app.get("/api/voices/{voice_id}/{asset}")
     def voice_asset(voice_id: str, asset: str):

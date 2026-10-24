@@ -28,6 +28,7 @@ class OmniVoiceEngine:
         self.asr_loaded = False
         self.observer = lambda *args: None
         self.last_gpu_seconds = None
+        self.residency_observer = lambda loaded, device: None
         if settings.offline:
             os.environ["HF_HUB_OFFLINE"] = "1"
             os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -56,6 +57,7 @@ class OmniVoiceEngine:
             asr_device="cpu",
         )
         self.model.eval()
+        self.residency_observer(True, self.device)
 
     def transcribe(self, reference: str) -> str:
         self._load()
@@ -105,6 +107,7 @@ class OmniVoiceEngine:
             if "out of memory" in message or isinstance(exc, MemoryError):
                 # Drop caches/model after OOM so a retry doesn't retain broken state.
                 self.model = None
+                self.residency_observer(False, self.device)
                 self.asr_loaded = False
                 gc.collect()
                 try:

@@ -129,6 +129,10 @@ def execute_task(engine, settings, task, emit):
     if hasattr(engine, "last_gpu_seconds"):
         engine.last_gpu_seconds = None
     report = Reporter(emit, engine)
+    if hasattr(engine, "residency_observer"):
+        engine.residency_observer = lambda loaded, device: emit(
+            {"type": "model_state", "loaded": loaded, "device": device}
+        )
     if hasattr(engine, "observer"):
         engine.observer = report.stage
     try:
@@ -213,6 +217,7 @@ class ProcessRunner:
         self.commands = None
         self.events = None
         self.fingerprint = None
+        self.model_state = {"loaded": False, "device": None}
         self.lock = threading.RLock()
 
     @property
@@ -250,6 +255,8 @@ class ProcessRunner:
                 continue
             if event["type"] == "result":
                 return event
+            if event["type"] == "model_state":
+                self.model_state = event
             on_event(event)
 
     def reset(self, hard=False):
@@ -279,6 +286,7 @@ class ProcessRunner:
                     value.cancel_join_thread()
                     value.close()
             self.fingerprint = None
+            self.model_state = {"loaded": False, "device": None}
 
 
 class InlineRunner:

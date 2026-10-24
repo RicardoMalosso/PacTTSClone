@@ -12,6 +12,9 @@ let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
 let voicesKey = '', historyKey = '', channelKey = '', channelLinksKey = '', channelDashboardKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
 function stopAllAudio() { stopBugVideo(); document.querySelectorAll('audio').forEach(a => { try { a.pause(); if (a.readyState) a.currentTime = 0; } catch { /* keep panic responsive for broken media */ } }); suppressAutoplay = true; }
 
+let requesterId;
+try { requesterId = localStorage.getItem('pactts-requester-id'); if (!requesterId) { requesterId = crypto.randomUUID(); localStorage.setItem('pactts-requester-id', requesterId); } $('requester-name').value = localStorage.getItem('pactts-requester-name') || ''; } catch { requesterId = crypto.randomUUID(); }
+$('requester-name').addEventListener('input', () => { try { localStorage.setItem('pactts-requester-name', $('requester-name').value); } catch { /* optional persistence */ } });
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attrs)) {
@@ -31,7 +34,7 @@ function bytes(value) { return value == null ? t('N/A') : `${(value / 1073741824
 function duration(value) { const n = Math.max(0, value || 0); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${(n % 60).toFixed(1).padStart(4, '0')}`; }
 async function api(url, options = {}) {
   const opts = {cache: 'no-store', ...options};
-  opts.headers = {...options.headers};
+  opts.headers = {'X-PacTTS-Requester-ID': requesterId, 'X-PacTTS-Requester-Name': encodeURIComponent($('requester-name').value), ...options.headers};
   if ((opts.method || 'GET') !== 'GET') opts.headers['X-PacTTS-Token'] = session.token;
   if (opts.body && !(opts.body instanceof FormData)) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(opts.body); }
   const response = await fetch(url, opts);
@@ -112,13 +115,14 @@ function clearResult() {
 function renderMonitor(job) {
   lastMonitor = job; lastMonitorAt = performance.now();
   const voice = state.voices.find(v => v.id === job.voice_id);
-  const source = [job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
+  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
   $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
-  $('live-generation').hidden = !runtimeSetup.ready;
+  $('live-generation').hidden = false;
   $('status').textContent = job.error || (job.status === 'succeeded' ? (job.kind === 'transcribe' ? t('Voice preparation ready') : t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds})) : `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`);
   $('live-generation-status').textContent = $('status').textContent;
   $('live-generation-cancel').hidden = !['queued', 'running'].includes(job.status);
   $('overall-progress').value = job.progress || 0;
+  if (job.status === 'running') $('live-generation-progress').removeAttribute('value'); else $('live-generation-progress').value = job.progress || 0;
   $('cancel-job').hidden = !['queued', 'running'].includes(job.status);
   $('stage-list').replaceChildren();
   const completed = job.metrics?.stages?.length ? job.metrics.stages : job.stages || [];
@@ -143,7 +147,8 @@ setInterval(() => {
   if (!lastMonitor) return;
   const delta = lastMonitor.status === 'running' ? (performance.now() - lastMonitorAt) / 1000 : 0;
   $('timer').textContent = duration((lastMonitor.elapsed_seconds || 0) + delta);
-  $('live-generation-timer').textContent = $('timer').textContent;
+  if (runtimeSetup.status === 'running' && runtimeSetup.started_at) $('live-generation-timer').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
+  else if (lastMonitor.status === 'running') $('live-generation-timer').textContent = $('timer').textContent;
   $('stage-timer').textContent = `${((lastMonitor.stage_elapsed_seconds || 0) + delta).toFixed(1)} s`;
 }, 100);
 async function watch(id) {
@@ -169,8 +174,9 @@ $('generate-form').addEventListener('submit', action(async event => {
   busy = true; $('generate').disabled = true; clearResult(); currentJob = null; suppressAutoplay = false;
   try {
     const voice = $('voice-select').value;
+    if (!$('requester-name').value.trim()) { $('requester-name').focus(); throw new Error(t('Enter a requester name.')); }
     if (!voice) throw new Error(t('Choose a saved voice in Voices first.'));
-    const job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked}});
+    const job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked, requester_name: $('requester-name').value.trim(), requester_id: requesterId}});
     currentJob = job.id; await watch(job.id);
   } finally { busy = false; $('generate').disabled = !runtimeSetup.ready; }
 }));
@@ -233,7 +239,7 @@ function renderJobs() {
   if (!pending.length) $('generation-queue').textContent = t('No pending generations.');
 }
 function renderHistory() {
-  const jobs = state.jobs.filter(j => j.kind === 'speech' && ['succeeded', 'failed', 'cancelled'].includes(j.status));
+  const jobs = state.request_history || state.jobs;
   const key = JSON.stringify(jobs); if (key === historyKey) return; historyKey = key;
   $('history-list').replaceChildren();
   for (const j of jobs) {
@@ -244,9 +250,9 @@ function renderHistory() {
       actions.append(button('Queue on local OBS source', () => queueGeneral(j.id)));
       if (j.channel) actions.append(button('Replay on OBS', async () => { await api(`/api/channels/${j.channel}/replay/${j.id}`, {method: 'POST'}); }));
     }
-    actions.append(link('Timing report', `/api/jobs/${j.id}/report`, true));
+    if (j.status !== 'blocked') actions.append(link('Timing report', `/api/jobs/${j.id}/report`, true));
     $('history-list').append(el('section', {class: 'card'}, el('strong', {}, `${j.voice_title || j.original_filename || t('Voice')} · ${t(j.status)}${j.channel ? ' · #' + j.channel : ''}`),
-      el('p', {}, j.request.text), el('p', {class: 'muted'}, `${j.username || t('Local')} · ${new Date(j.created_at * 1000).toLocaleString(window.Locale.language === 'pt' ? 'pt-BR' : 'en-CA')} · ${j.elapsed_seconds} s ${t('elapsed')} · ${j.metrics?.worker_cpu_seconds ?? t('N/A')} ${t('worker CPU s')} · ${j.device || 'device N/A'}`),
+      el('p', {}, j.request.text), el('p', {class: 'muted'}, `${t('Requester ID')}: ${j.requester_id || t('Legacy request')} · ${t('Origin ID')}: ${j.origin_id || t('Legacy request')} · ${t(j.kind || 'speech')}`), el('p', {class: 'muted'}, `${j.requester_name || j.username || t('Local')} · ${t(j.origin || (j.channel ? 'twitch' : 'local'))} · ${new Date(j.created_at * 1000).toLocaleString(window.Locale.language === 'pt' ? 'pt-BR' : 'en-CA')} · ${j.elapsed_seconds} s ${t('elapsed')} · ${j.metrics?.worker_cpu_seconds ?? t('N/A')} ${t('worker CPU s')} · ${j.device || 'device N/A'}`),
       j.error ? el('p', {class: 'error'}, j.error) : null, j.playback_error ? el('p', {class: 'error'}, j.playback_error) : null, actions, preview,
       el('details', {}, el('summary', {}, t('Per-stage hardware accounting')), el('pre', {}, JSON.stringify(j.metrics, null, 2)))));
   }
@@ -304,11 +310,13 @@ function renderChannels() {
   }
   const c = selectedChannel === 'playbackMain' ? {name: 'playbackMain', connection: t('Local OBS Sources')} : state.channels.find(c => c.name === selectedChannel);
   $('channel-connection').textContent = c ? `${c.name}: ${t(c.connection)}${c.connection_error ? ' · ' + c.connection_error : ''}` : t('Choose a saved channel.');
-  const linksKey = c?.name || '';
+  const playerUrl = c ? (session?.remote_access ? state.player_links?.[c.name] || `/${c.name}` : `/${c.name}`) : '';
+  const linksKey = JSON.stringify([c?.name || '', playerUrl]);
+  $('local-obs-player-link').href = session?.remote_access ? state.player_links?.playbackMain || '/playbackMain' : '/playbackMain';
   if (linksKey === channelLinksKey) return;
   channelLinksKey = linksKey;
   $('channel-links').replaceChildren();
-  if (c) $('channel-links').append(el('p', {}, link('Open OBS player', `/${c.name}`)), el('input', {readonly: '', value: `${location.origin}/${c.name}`, 'aria-label': 'OBS source URL'}),
+  if (c) $('channel-links').append(el('p', {}, link('Open OBS player', playerUrl)), el('input', {readonly: '', value: new URL(playerUrl, location.origin).href, 'aria-label': 'OBS source URL'}),
     el('p', {}, link('Open separate control page', `/${c.name}/control`)));
 }
 async function renderChannelState() {
@@ -328,8 +336,10 @@ $('config-form').addEventListener('submit', action(async event => {
 }));
 async function refresh() {
   state = await api('/api/state');
+  if (session?.remote_access) await runtimeStatus();
   const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.filter(j => j.status === 'queued').sort((a, b) => a.created_at - b.created_at)[0] || [...state.jobs].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
   if (monitored) renderMonitor(monitored);
+  renderResidency(); renderGlobalStatus();
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
@@ -373,14 +383,14 @@ window.addEventListener('localechange', () => {
   const drafts = [...document.querySelectorAll('.voice-card')].map(card => ({id: card.dataset.voiceId, title: card.querySelector('input[data-field="title"]')?.value, transcript: card.querySelector('textarea')?.value}));
   voicesKey = historyKey = ''; renderVoices(); renderHistory(); renderJobs(); renderChannels();
   for (const d of drafts) { const card = [...document.querySelectorAll('.voice-card')].find(c => c.dataset.voiceId === d.id); if (card) { card.querySelector('input[data-field="title"]').value = d.title; card.querySelector('textarea').value = d.transcript; } }
-  if (lastMonitor) renderMonitor(lastMonitor);
+  if (lastMonitor) renderMonitor(lastMonitor); renderResidency(); renderGlobalStatus();
   if (initialHealth) $('health').textContent = [initialHealth.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), initialHealth.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
   if (session) { renderChannelState().catch(() => {}); tunnelStatus().catch(() => {}); }
 });
 init();
 
 async function tunnelStatus() {
-  if (!runtimeSetup.ready) { $('tunnel-card').hidden = true; return; }
+  if (session?.remote_access || !runtimeSetup.ready) { $('tunnel-card').hidden = true; return; }
   try {
     const data = await api('/api/tunnel');
     $('tunnel-start').hidden = ['starting', 'downloading', 'running'].includes(data.status);
@@ -419,7 +429,7 @@ function renderSetup(data) {
   runtimeSetup = data;
   document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
   $('generate').disabled = busy || !data.ready;
-  $('live-generation').hidden = !data.ready || !lastMonitor;
+  renderGlobalStatus();
   $('tunnel-card').hidden = !data.ready;
   $('setup-start').disabled = data.status === 'running';
   $('setup-cancel').hidden = data.status !== 'running';
@@ -437,6 +447,7 @@ function renderSetup(data) {
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
 async function runtimeStatus() {
+  if (session?.remote_access) { renderSetup({ready: state.setup_ready ?? session.setup_ready, status: 'host', stage: 'Waiting for host setup'}); document.querySelector('[data-tab="setup"]').hidden = runtimeSetup.ready; $('setup-start').hidden = true; $('setup-cancel').hidden = true; $('setup-device').disabled = true; $('tunnel-card').hidden = true; return; }
   try { renderSetup(await api('/api/setup')); }
   catch (e) {
     // Shared administrators cannot install host software; generation remains
@@ -453,6 +464,28 @@ $('setup-start').addEventListener('click', setupAction(async () => {
 }));
 $('setup-cancel').addEventListener('click', setupAction(async () => { renderSetup(await api('/api/setup/cancel', {method: 'POST'})); }));
 window.addEventListener('localechange', () => { if (setupAvailable) renderSetup(runtimeSetup); });
+
+function renderResidency() {
+  const model = state.model_residency || {};
+  const warm = Boolean(model.loaded);
+  $('model-residency').textContent = `${model.model || 'k2-fsa/OmniVoice'} · ${t(warm ? 'Warm · loaded in memory' : 'Cold · not loaded')} · ${model.device || t('N/A')}`;
+  $('voice-residency-list').replaceChildren(...state.voices.map(voice => el('p', {}, `${voice.title} · ${t(voice.status === 'ready' ? (warm ? 'Warm' : 'Cold') : 'Needs preparation')}`)));
+}
+function renderGlobalStatus() {
+  $('live-generation').hidden = false;
+  const running = state.active_job || state.jobs.find(job => job.status === 'running');
+  if (runtimeSetup.status === 'running') {
+    $('live-generation-source').textContent = t('Initial Setup');
+    $('live-generation-status').textContent = t(runtimeSetup.stage === 'models' ? 'Downloading / verifying models' : 'Installing dependencies') + ' · ' + t(runtimeSetup.stage || '');
+    const d = runtimeSetup.download;
+    if (d?.total_bytes) { $('live-generation-progress').value = d.completed_bytes / d.total_bytes; } else $('live-generation-progress').removeAttribute('value');
+    $('live-generation-cancel').hidden = true; return;
+  }
+  if (running) { renderMonitor(running); return; }
+  $('live-generation-source').textContent = t('Idle');
+  $('live-generation-status').textContent = state.jobs.some(job => job.status === 'queued') ? t('Waiting for queued work') : t('Ready for the next request');
+  $('live-generation-progress').value = 0; $('live-generation-timer').textContent = '00:00.0'; $('live-generation-cancel').hidden = true;
+}
 
 function renderChannelDashboard() {
   const key = JSON.stringify([window.Locale.language, state.channels]);

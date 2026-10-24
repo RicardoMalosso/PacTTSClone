@@ -564,7 +564,7 @@ def test_voice_only_generation_and_channel_dashboard(page, live_server):
     second = page.locator('[data-channel="channeltwo"]')
     expect(first).to_contain_text("disconnected")
     first.get_by_role("button", name="Connect", exact=True).click()
-    expect(first).to_contain_text("connected")
+    expect(first.get_by_role("button", name="Disconnect", exact=True)).to_be_visible()
     assert app.state.studio.clients["channelone"].status == "connected"
     expect(second.get_by_role("button", name="Connect", exact=True)).to_be_visible()
     first.get_by_role("button", name="Disconnect", exact=True).click()
@@ -612,3 +612,108 @@ def test_long_voice_crop_notice_and_existing_thumbnail_upload(
     page.locator('[data-locale="pt"]').click()
     expect(page.locator(".voice-card .notice")).to_contain_text("cortado para 30 segundos")
     expect(page.locator(".voice-card img")).to_be_visible()
+
+
+def test_shared_admin_voices_history_scoped_obs_and_revocation(browser, live_server, mp3):
+    from pacttsclone.tunnel import TUNNEL_HOST
+    from tests.conftest import wait_job
+
+    url, app = live_server
+    studio = app.state.studio
+    with mp3.open("rb") as stream:
+        voice = studio.voices.create(stream, "Remote voice", "remote.mp3", "Known text")
+    job = studio.voices.generate(
+        voice["id"],
+        __import__("pacttsclone.domain", fromlist=["GenerationRequest"]).GenerationRequest(
+            text="Visible remote history"
+        ),
+    )
+    wait_job(studio.service, job["id"])
+    tunnel = app.state.tunnel
+    tunnel.url, tunnel.status, tunnel.admin_key = (
+        "https://remote-test.trycloudflare.com",
+        "running",
+        "admin-test-key",
+    )
+    contexts = [browser.new_context(), browser.new_context()]
+    requests = []
+
+    def forward(route):
+        request = route.request
+        requests.append(request.url)
+        response = route.fetch(
+            url=url + request.url.split(".com", 1)[1],
+            headers={**request.all_headers(), "host": TUNNEL_HOST},
+        )
+        route.fulfill(response=response)
+
+    for context in contexts:
+        context.route("https://remote-test.trycloudflare.com/**", forward)
+    try:
+        page = contexts[0].new_page()
+        page.goto(tunnel.url + "/#admin=" + tunnel.admin_key)
+        expect(page.locator('[data-tab="voices"]')).to_be_enabled()
+        open_tab(page, "Voices")
+        expect(page.locator(".voice-card")).to_contain_text("Remote voice")
+        open_tab(page, "History")
+        expect(page.locator("#history-list")).to_contain_text("Visible remote history")
+        assert (
+            page.get_by_role("link", name="Download MP3", exact=True).evaluate(
+                "async a => (await fetch(a.href)).status"
+            )
+            == 200
+        )
+        open_tab(page, "Local OBS Sources")
+        link = page.locator("#local-obs-player-link").get_attribute("href")
+        assert "#play=" in link
+        obs = contexts[1].new_page()
+        obs.goto(link)
+        obs.wait_for_function("!location.hash")
+        assert obs.evaluate('async () => (await fetch("/api/session")).status') == 200
+        # Cookie loss is recoverable while the original capability is still valid.
+        contexts[1].clear_cookies()
+        page.wait_for_timeout(1000)
+        assert obs.evaluate('async () => (await fetch("/api/session")).status') == 200
+        tunnel.player_keys["playbackMain"] = "replacement-key"
+        expect(obs.locator("#message")).to_contain_text("Shared link expired", timeout=10000)
+        before = len(requests)
+        page.wait_for_timeout(1200)
+        assert not any("/player/tick" in u for u in requests[before:])
+        assert not any("/api/setup" in u or "/api/tunnel" in u for u in requests)
+    finally:
+        for context in contexts:
+            context.unroute_all(behavior="ignoreErrors")
+            context.close()
+
+
+def test_requester_name_persists_identity_and_fixed_status(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    add_ready_voice(page, mp3)
+    page.locator("#requester-name").fill("")
+    page.locator("#text").fill("Identity test")
+    page.locator("#generate").click()
+    assert app.state.service.history() == []
+    page.locator("#requester-name").fill("Named tester")
+    identity = page.evaluate('localStorage.getItem("pactts-requester-id")')
+    page.reload()
+    expect(page.locator("#requester-name")).to_have_value("Named tester")
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator("#voice-select").select_option(label="Browser voice")
+    page.locator("#text").fill("Identity test")
+    page.locator("#generate").click()
+    expect(page.locator("#player")).to_be_visible(timeout=15000)
+    done = app.state.service.history()[0]
+    assert done["requester_name"] == "Named tester"
+    assert done["requester_id"] == identity.replace("-", "")
+    open_tab(page, "History")
+    expect(page.locator("#history-list")).to_contain_text("Named tester")
+    expect(page.locator("#history-list")).to_contain_text(done["origin_id"])
+    assert (
+        page.locator("#live-generation").evaluate("node => getComputedStyle(node).position")
+        == "fixed"
+    )
+    assert page.locator('header [data-locale="en"]').count() == 1
+    page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    assert page.locator("#live-generation").bounding_box()["y"] == 0

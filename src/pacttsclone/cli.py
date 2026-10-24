@@ -9,6 +9,23 @@ from threading import Timer
 from .config import Settings
 
 
+class PollingAccessFilter(logging.Filter):
+    def filter(self, record):
+        args = record.args
+        if isinstance(args, tuple) and len(args) == 5:
+            path, status = str(args[2]).split("?", 1)[0], str(args[4])
+            poll = path in {
+                "/api/state",
+                "/api/resources",
+                "/api/tunnel",
+                "/api/setup",
+                "/api/session",
+            } or path.endswith("/player/tick")
+            if status == "200" and poll:
+                return False
+        return True
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="PacTTSClone — geração local com OmniVoice")
     result.add_argument("--data-dir", type=Path, default=Path.home() / ".pacttsclone")
@@ -49,6 +66,7 @@ def main():
     from .app import create_app
 
     logging.basicConfig(level=logging.INFO)
+    logging.getLogger("uvicorn.access").addFilter(PollingAccessFilter())
     if not args.no_browser:
         timer = Timer(1.5, webbrowser.open, args=[f"http://127.0.0.1:{args.port}"])
         timer.daemon = True

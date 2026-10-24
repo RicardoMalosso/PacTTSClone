@@ -235,3 +235,17 @@ def test_model_setup_reuses_existing_hf_snapshot_and_reports_real_bytes(tmp_path
         model_setup, "make_plan", lambda repo: pytest.fail("Revision resolved again")
     )
     assert model_setup.download_models(root, ["owner/voice"], cache)["reused_files"] == 1
+
+
+def test_dependency_constraints_use_relative_path_in_directory_with_spaces(
+    tmp_path, engine, monkeypatch
+):
+    app = create_app(Settings(data_dir=tmp_path / "folder with spaces"), engine)
+    setup = app.state.runtime_setup
+    try:
+        commands = setup._commands("cpu")
+        for _stage, command in commands[:2]:
+            assert command[command.index("--constraint") + 1] == "base-constraints.txt"
+        assert (setup.root / "base-constraints.txt").is_file()
+    finally:
+        app.state.studio.close()

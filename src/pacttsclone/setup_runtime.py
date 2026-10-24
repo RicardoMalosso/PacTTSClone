@@ -126,6 +126,7 @@ class RuntimeSetup:
                 completed_steps=0,
                 total_steps=5,
                 download=None,
+                started_at=time.time(),
             )
             self.thread = threading.Thread(
                 target=self._run, args=(device,), daemon=True, name="runtime-setup"
@@ -182,7 +183,7 @@ class RuntimeSetup:
                 prefix
                 + [
                     "--constraint",
-                    str(constraints),
+                    constraints.name,
                     "--index-url",
                     f"https://download.pytorch.org/whl/{variant}",
                 ]
@@ -191,7 +192,7 @@ class RuntimeSetup:
             (
                 "inference",
                 prefix
-                + ["--constraint", str(constraints), "--index-url", "https://pypi.org/simple"]
+                + ["--constraint", constraints.name, "--index-url", "https://pypi.org/simple"]
                 + extra
                 + torch
                 + ["omnivoice==0.2.1", "transformers==5.20.2"],
@@ -250,8 +251,11 @@ class RuntimeSetup:
         with self.lock:
             if self.cancelled.is_set():
                 raise InterruptedError("Setup cancelled.")
+            log.write("Running: " + json.dumps(command) + "\n")
+            log.flush()
             self.process = subprocess.Popen(
                 command,
+                cwd=self.root,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

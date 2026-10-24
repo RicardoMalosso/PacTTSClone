@@ -187,3 +187,48 @@ def test_invalid_remote_keys_return_forbidden_not_server_error(shared_app, key):
             headers={"Origin": shared_app.state.tunnel.url},
         )
         assert response.status_code == 403
+
+
+def test_remote_identity_history_and_shared_media_are_available(shared_app, mp3):
+    import uuid
+
+    from .conftest import wait_job
+
+    with mp3.open("rb") as stream:
+        voice = shared_app.state.studio.voices.create(
+            stream, "Shared voice", "voice.mp3", "Known text"
+        )
+    with TestClient(shared_app, base_url="https://local-test.trycloudflare.com") as client:
+        origin = {"Origin": "https://local-test.trycloudflare.com"}
+        client.post(
+            "/api/remote/session", json={"key": shared_app.state.tunnel.admin_key}, headers=origin
+        ).raise_for_status()
+        session = client.get("/api/session").json()
+        assert session["remote_access"] and session["setup_ready"]
+        headers = {**origin, "X-PacTTS-Token": session["token"]}
+        requester = uuid.uuid4().hex
+        response = client.post(
+            f"/api/voices/{voice['id']}/generate",
+            json={"text": "Shared speech", "requester_name": "Friend", "requester_id": requester},
+            headers=headers,
+        )
+        assert response.status_code == 202
+        done = wait_job(shared_app.state.service, response.json()["id"])
+        assert done["origin"] == "cloudflare"
+        assert done["requester_name"] == "Friend"
+        assert done["requester_id"] == requester
+        assert len(done["origin_id"]) == 32
+        state = client.get("/api/state").json()
+        assert any(v["id"] == voice["id"] for v in state["voices"])
+        assert any(
+            j["id"] == done["id"] and j["origin"] == "cloudflare" for j in state["request_history"]
+        )
+        assert client.get(done["output_url"]).status_code == 200
+        assert client.get("/api/request-logs").status_code == 200
+        assert "#play=" in state["player_links"]["playbackMain"]
+        records = [
+            json.loads(line)
+            for line in (shared_app.state.service.logs / "requests.jsonl").read_text().splitlines()
+        ]
+        assert [r["event"] for r in records if r["id"] == done["id"]] == ["submitted", "finished"]
+        assert all("key" not in r and "workspace" not in r for r in records)

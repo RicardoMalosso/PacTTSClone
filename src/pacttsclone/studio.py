@@ -147,6 +147,14 @@ class Studio:
                     self.cooldowns[key] = now
                 except (UserError, OSError) as exc:
                     reason = str(exc)
+            if reason:
+                self.service.reject_request(
+                    text,
+                    reason,
+                    channel=channel,
+                    username=username,
+                    voice_id=config["commands"][parts[0].casefold()],
+                )
             event_id = uuid.uuid4().hex
             self.store.put(
                 "chat",

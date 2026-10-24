@@ -40,3 +40,10 @@ controls, and General playback is named Local OBS Sources (same URLs). Long MP3
 references are automatically cropped to 30 seconds with a persistent notice.
 Existing voice thumbnails can be replaced; the four defaults include the supplied
 small thumbnails and preserve user customizations on upgrade.
+
+Remote admin tabs/history/media are accessible after host readiness verification;
+remote clients avoid owner-only APIs. Scoped OBS links, bounded cookie recovery and
+revoked-link polling stop address cross-machine playback failures. Generate now
+records a saved requester name, browser UUID and server-derived origin ID. Request
+history includes preparation and blocked Twitch commands. Added a fixed status bar,
+shared-model warm/cold availability, and title-adjacent language controls.

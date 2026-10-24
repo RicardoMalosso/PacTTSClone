@@ -349,3 +349,22 @@ channel generation/playback, retaining generated audio/history. Each channel has
 independent controls. **Local OBS Sources** keeps the existing `/playbackMain` and
 `/playbackMain/control` URLs. Player/control links open in new tabs. Tunnel controls
 are in **Configuration**.
+
+## Shared access, requester identity and model status
+
+Shared administrators can browse saved voices, all TTS request history and audio.
+Copy the complete scoped OBS URL, including its `#play=...` fragment, when adding
+an OBS source on a different computer. A bare player path grants no authorization.
+An expired link stops retrying; obtain the current link from Configuration.
+
+Generate requires a requester name (anything recognizable), saved in that browser.
+A separate random browser ID and server-derived origin ID distinguish requests;
+they are debugging labels, not verified accounts. History includes generation,
+voice preparation and blocked Twitch commands, with origin/name/IDs/status. The
+request lifecycle log is downloadable separately from final hardware reports.
+
+The fixed top bar shows the current operation and progress across tabs. Language
+flags are next to Local Voice Studio. Generate also displays base-model residency
+and voice availability: every ready voice shares the same warm/cold OmniVoice
+model. Switching voice repeats reference conditioning, without training or loading
+a separate per-person model. Preparation/transcription is tracked separately.

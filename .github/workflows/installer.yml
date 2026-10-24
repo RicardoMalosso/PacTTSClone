@@ -68,6 +68,7 @@ jobs:
           name: installer-diagnostics
           path: |
             ${{ runner.temp }}/PacTTSClone installation test/PacTTSClone/data/logs/*.log
+            ${{ runner.temp }}/PacTTSClone installation test/PacTTSClone/data/setup/base-constraints.txt
             ${{ runner.temp }}/PacTTSClone installation test-setup.log
             ${{ runner.temp }}/pactts-wizard-*.png
           if-no-files-found: ignore
