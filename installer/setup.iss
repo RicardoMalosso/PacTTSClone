@@ -36,7 +36,7 @@ Source: "common.ps1"; Flags: dontcopy
 
 [Icons]
 Name: "{group}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; WorkingDir: "{app}"
-Name: "{code:ParentLauncher}"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; WorkingDir: "{app}"
+Name: "{code:ParentFolder}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; WorkingDir: "{app}"
 Name: "{autodesktop}\PacTTSClone"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\launcher\launch.ps1"""; Tasks: desktopicon; WorkingDir: "{app}"
 Name: "{group}\Uninstall PacTTSClone"; Filename: "{uninstallexe}"
 Name: "{app}\Uninstall PacTTSClone"; Filename: "{uninstallexe}"
@@ -67,9 +67,9 @@ function SetTimer(Wnd, ID, Interval, Callback: LongWord): LongWord;
 function KillTimer(Wnd, ID: LongWord): Boolean;
   external 'KillTimer@user32.dll stdcall';
 
-function ParentLauncher(Param: String): String;
+function ParentFolder(Param: String): String;
 begin
-  Result := AddBackslash(ExtractFileDir(RemoveBackslashUnlessRoot(ExpandConstant('{app}')))) + 'PacTTSClone';
+  Result := ExtractFileDir(RemoveBackslashUnlessRoot(ExpandConstant('{app}')));
 end;
 
 function SiblingDataPath: String;
