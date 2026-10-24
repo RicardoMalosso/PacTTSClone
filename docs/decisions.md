@@ -52,3 +52,15 @@ no Twitch hooks, no pause tags, no saved voice prompts. Automatic ASR is optiona
 and lazy; Windows scripts must install compatible torch explicitly. Resource
 estimates remain unverified; tests using fake engines cannot establish inference
 quality, latency or hardware compatibility. No conflicting design decisions remain.
+
+## Post-implementation consistency review
+
+Re-read requirements against the implemented API, engine, UI, launchers and tests.
+Updated output sample rate to 48 kHz for the tested 192 kbps MP3 contract; retained
+24 kHz reference PCM. Standardized the Windows installer on tested Python 3.12 and
+pinned inference/browser versions. Confirmed venv (no container), one generation,
+Portuguese default, automatic ASR on CPU, no pause syntax and no Twitch code.
+Verified real CPU generation separately from fake-engine application tests, then
+verified cached offline and blank-transcript/Whisper generation. Hardware claims
+remain limited to the measured CPU runs in status.md; GTX 1660 SUPER is untested.
+The earlier Gradio proposal is superseded; no remaining design conflict found.

@@ -28,6 +28,8 @@ empty. Source API and package version verified through the GitHub connector.
 | `python -m pip wheel --no-deps . -w dist` | Built; HTML/CSS/JS assets verified inside wheel |
 | `pip check` in isolated inference environment | No broken requirements |
 | Real OmniVoice CPU smoke, manual reference transcript | Passed: actual weights downloaded, model loaded, generated MP3 probed with FFprobe |
+| Real OmniVoice offline CPU smoke | Passed: new process with `--offline`, cached weights, manual transcript, MP3 generated |
+| Real OmniVoice CPU smoke with blank transcript | Passed: Whisper-small loaded/transcribed locally on CPU and MP3 generated |
 
 Real smoke used torch/torchaudio 2.8.0+cpu, omnivoice 0.2.1,
 transformers 5.20.2, NumPy 2.5.4, librosa 1.0.0; OMP/MKL threads=2.
@@ -40,9 +42,26 @@ This is an execution smoke test, not a perceptual quality benchmark or a claim
 about generation speed on the user's PC. Browser tests use a fake model and are
 reported separately from this actual model invocation.
 
+Offline smoke used target “Olá.” and the same 4.932 s reference: 79.01 s including
+loading in a fresh process. Peak child RSS measured by `resource.getrusage` was
+3,251,668 KiB (about 3.10 GiB). This single short, no-ASR CPU run does not establish
+an upper bound for RAM or any GPU's VRAM requirements. Persistent server reuses
+loaded models; these CLI results are not warm-server benchmarks.
+
+Blank-transcript smoke used target “Olá, mundo.” and downloaded Whisper-small
+revision `973afd24965f72e36ca33b3055d56a652f456b4d`; total 151.98 s including its
+initial download. Result: 1.200 s, 48 kHz / 192 kbps MP3, 29,421 bytes. The default
+upstream ASR loader snapshots the model repository, including other framework
+formats, so the first ASR download can use substantially more disk than the single
+PyTorch weight file. Manual reference transcripts bypass that download entirely.
+
+GitHub Actions run for implementation commit `e578d34`:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40061589697
+Linux Python 3.11/3.12 and Chromium jobs passed. Windows jobs are still running at
+this checkpoint; their final results will be recorded before closing validation.
+
 ## Remaining validation / next work
 
-Offline cached smoke and blank-transcript ASR smoke are being checked separately.
 Windows/GPU benchmark remains hardware-dependent. Current UI intentionally does
 not provide a voice library, pause tags, cancellation or Twitch integration.
 
