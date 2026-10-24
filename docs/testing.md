@@ -79,3 +79,10 @@ repeats setup and uninstalls while retaining a user-data marker. Logs/artifacts
 are retained. This smoke does not download model weights, simulate CUDA hardware
 or establish cloning quality. Only a passing installer job may create a draft
 prerelease; no published release or signing claim is generated automatically.
+
+Validated installer preview run:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40110383432
+The generated executable is 2,171,921 bytes. Its SHA-256 and wheel checksum were
+independently verified from the downloaded Actions artifact; the PE certificate
+entry is empty (unsigned). This is a hosted Windows runner install, not a clean-VM
+or physical GPU acceptance result.

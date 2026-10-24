@@ -125,5 +125,27 @@ Version 0.3.0rc1: Inno Setup source, isolated uv-managed Python, verified uv/FFm
 archives, CPU/CUDA dependencies downloaded at setup time, selectable separate data
 folder, shortcuts, reusable caches and data-preserving uninstall. README now uses
 general installation paths and documents source/installer distinctions. No signing
-or repository visibility change. Windows build/install evidence is pending the
-new installer workflow; local Linux checks do not establish Windows install success.
+or repository visibility change. Windows installer workflow passed on commit
+`0d83cf513b732ae8f64f72fefd63933532c12cd5`:
+https://github.com/RicardoMalosso/PacTTSClone/actions/runs/40110383432
+
+- Inno Setup 6.7.1 compiled a 2,171,921-byte unsigned setup executable.
+- Windows PowerShell 5.1 download/path/cache helper tests passed.
+- Actual CPU installation downloaded managed Python 3.12.12, FFmpeg and real
+  inference dependencies into paths containing spaces.
+- Runtime imports, audio tools and installed-launcher HTTP health check passed.
+- Repeated setup and uninstall retained the separate user-data marker.
+- Draft prerelease v0.3.0-rc.1 contains setup, application wheel and SHA256SUMS.txt.
+- Downloaded the CI artifact independently; both file hashes matched SHA256SUMS,
+  and the executable's empty certificate directory confirmed it is unsigned.
+- Local backend suite: 117 passed; Ruff and formatting passed. Core application
+  CI passed Windows/Linux Python 3.11/3.12; browser CI is tracked separately.
+
+The first setup smoke exposed default payload path initialization; the next exposed
+managed-runtime path discovery. Explicit payload and pinned private Python paths
+resolved these. The final complete install smoke passed, not only compilation.
+
+Remaining acceptance: interactive wizard on a physical Windows PC, GPU dependency
+installation and generation on that installed build. CI uses a Windows runner,
+not a pristine consumer Windows VM. No model inference or CUDA performance claim
+is inferred from the CPU installation/import/HTTP smoke.
