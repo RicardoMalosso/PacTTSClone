@@ -1,6 +1,15 @@
 'use strict';
 (() => {
   const pt = {
+    'unprepared': 'não preparada',
+    'Prepare for first use': 'Preparar para o primeiro uso',
+    'Retry preparation': 'Tentar preparação novamente',
+    'Cancel preparation': 'Cancelar preparação',
+    'Preparing for first use…': 'Preparando para o primeiro uso…',
+    'Not prepared for first use. Click Prepare to download required models and save the reference transcript locally.': 'Não preparada para o primeiro uso. Clique em Preparar para baixar os modelos necessários e salvar a transcrição localmente.',
+    'The first preparation may download models. You can cancel and retry.': 'A primeira preparação pode baixar modelos. Você pode cancelar e tentar novamente.',
+    'Some voices need preparation · open Voices': 'Algumas vozes precisam de preparação · abrir Vozes',
+
     'General playback': 'Reprodução geral',
     'Queue on general player': 'Adicionar ao player geral',
     'Queued on general player.': 'Adicionado à fila do player geral.',

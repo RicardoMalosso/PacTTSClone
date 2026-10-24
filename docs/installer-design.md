@@ -65,3 +65,15 @@ The existing native Inno uninstaller now has explicit Start Menu/app-folder link
 Deletion rules still preserve the sibling or custom data directory. RC2 requires
 interactive wizard timing/path-toggle tests plus a real default-sibling install,
 repeat setup and uninstall preserving user data. No certificate/signing added.
+
+The default parent folder is PacTTS. Its PacTTSClone.lnk launches the installed
+application; child directories PacTTSClone and PacTTSClone-data hold app/data.
+This is a native Windows shortcut, not a fabricated executable. Start Menu and
+optional desktop shortcuts remain. The parent shortcut is registered with Inno so
+uninstall removes it while preserving the data directory. The installed Windows
+smoke must launch this shortcut and verify the HTTP app starts.
+
+RC2 also includes the four user-supplied default reference MP3s in the application
+wheel (about 1.5 MB together); these are samples, not model weights. This keeps the
+setup below the 10 MiB bootstrap gate. Default voices are seeded without model
+loads or ASR; preparation is an explicit first-use action in Voices.

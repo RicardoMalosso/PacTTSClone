@@ -30,7 +30,7 @@ pacttsclone-smoke = "pacttsclone.cli:smoke"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pacttsclone = ["static/*"]
+pacttsclone = ["static/*", "assets/voices/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -37,7 +37,9 @@ repository does not provide public downloads.
 4. Follow download progress in the setup console. The executable is small; runtime
    downloads and installed files can occupy several GB. Closing the console cancels
    setup; rerun it to retry using cached downloads. Errors: `data-folder/logs/setup.log`.
-5. Start **PacTTSClone** from the Start Menu or optional desktop shortcut. Models
+5. Double-click **PacTTSClone.lnk** in the parent **PacTTS** folder, or use the
+   Start Menu/optional desktop shortcut. Application and data live in its
+   `PacTTSClone` and `PacTTSClone-data` subfolders. Models
    download on first generation; a blank reference transcript also downloads ASR.
 
 The first red **STEP 1** page explains downloads, including about 3.3 GB for the
@@ -103,6 +105,20 @@ pacttsclone --data-dir ./local-data
 ```
 
 For compatible NVIDIA drivers, replace `cpu` in the wheel URL with `cu128`.
+
+## Included voices and first-use preparation
+
+The app includes **Akuma Lady**, **Dilma**, **Chrétien**, and **lula** as unprepared
+presets. Open **Voices** and click **Prepare for first use** for each voice you want.
+The card shows preparation/download status and cancellation; when ready, its saved
+transcript is reused and the voice appears in Generate and Twitch command lists.
+No models are loaded merely by opening the app. You can edit a transcript manually
+instead, or delete unwanted defaults; upgrades do not recreate deleted presets.
+
+Samples were supplied by the project owner. Akuma Lady's source was 30.59 seconds;
+the bundled reference is a 29.9-second copy to meet the 30-second limit. Other
+samples are unchanged. Original uploaded files are not modified. Sample quality
+(including the supplied Dilma recording) is not improved or guaranteed by packaging.
 
 ## Studio workflow
 

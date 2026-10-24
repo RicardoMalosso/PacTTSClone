@@ -15,6 +15,7 @@ class Studio:
     def __init__(self, service, twitch_factory=TwitchClient):
         self.service, self.store = service, service.store
         self.voices = Voices(service)
+        self.voices.seed_defaults()
         if not self.store.get("channel", GENERAL_PLAYER):
             general = ChannelConfig(name="general").model_dump()
             self.store.put(

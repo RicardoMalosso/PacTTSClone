@@ -40,3 +40,8 @@ custom data storage. Path pickers show small red bold capacity estimates at thei
 right. First interactive page uses large red storage/download/unsigned wording and
 a five-second Next delay. Uninstaller is discoverable in Start Menu and app folder
 and preserves data by default.
+
+R18: Seed user-provided Akuma Lady, Dilma, Chrétien and lula references once, without
+inference on startup. Explicit first-use preparation with progress/cancel/retry and
+persisted transcript; only ready voices selectable for generation/chat. Preserve
+edits/deletions across upgrades. Parent-folder shortcut starts installed app.

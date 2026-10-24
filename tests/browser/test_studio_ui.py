@@ -338,3 +338,45 @@ def test_general_player_generate_queue_and_controls(page, live_server, mp3):
     expect(page.locator("#general-form")).to_be_visible()
     expect(page.locator("#channel-form")).to_be_hidden()
     expect(page.get_by_label("OBS source URL")).to_have_value(url + "/playbackMain")
+
+
+def test_default_voice_first_use_preparation(page, live_server, monkeypatch):
+    from pathlib import Path
+
+    url, app = live_server
+    catalog = Path(__file__).parents[2] / "src/pacttsclone/assets/voices/catalog.json"
+    monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", catalog)
+    app.state.studio.voices.seed_defaults()
+    entered, release = threading.Event(), threading.Event()
+
+    def transcribe(reference):
+        entered.set()
+        release.wait(10)
+        return "Saved first-use reference transcript."
+
+    app.state.service.engine.transcribe = transcribe
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator("#prepare-voices").click()
+    card = page.locator(".voice-card").filter(
+        has=page.get_by_role("heading", name="Akuma Lady", exact=True)
+    )
+    expect(card).to_contain_text("Not prepared for first use.")
+    assert app.state.service.history() == []
+    card.get_by_role("button", name="Prepare for first use", exact=True).click()
+    try:
+        wait_until(entered.is_set)
+        expect(card).to_contain_text("Preparing for first use…")
+        expect(card.get_by_role("button", name="Cancel preparation")).to_be_visible()
+        expect(card.locator("progress")).to_be_visible()
+    finally:
+        release.set()
+    expect(card.locator(".pill")).to_have_text("ready", timeout=15000)
+    expect(card.get_by_label("Saved transcript")).to_have_value(
+        "Saved first-use reference transcript."
+    )
+    page.locator('[data-tab="studio"]').click()
+    expect(page.locator("#voice-select option").filter(has_text="Akuma Lady")).to_have_count(1)
+    page.reload()
+    expect(page.locator("#generate")).to_be_enabled()
+    assert len(app.state.service.history()) == 1

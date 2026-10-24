@@ -1,4 +1,6 @@
+import hashlib
 import io
+import json
 import shutil
 import tempfile
 import uuid
@@ -8,6 +10,8 @@ from PIL import Image, UnidentifiedImageError
 
 from .config import MAX_UPLOAD_BYTES
 from .domain import GenerationRequest, UserError
+
+BUILTIN_CATALOG = Path(__file__).parent / "assets" / "voices" / "catalog.json"
 
 
 class Voices:
@@ -26,6 +30,39 @@ class Voices:
                         status="cancelled",
                         error="Reference preparation was interrupted. Retry transcription.",
                     )
+
+    def seed_defaults(self):
+        if BUILTIN_CATALOG is None:
+            return  # Explicit test isolation; production always uses the packaged catalog.
+        catalog = json.loads(BUILTIN_CATALOG.read_text(encoding="utf-8"))
+        for entry in catalog:
+            key = entry["key"]
+            if self.store.get("builtin_voice", key):
+                continue
+            voice_id = uuid.uuid5(uuid.NAMESPACE_URL, "pacttsclone-default:" + key).hex
+            if not self.store.get("voice", voice_id):
+                source = BUILTIN_CATALOG.parent / entry["filename"]
+                if hashlib.sha256(source.read_bytes()).hexdigest() != entry["sha256"]:
+                    raise UserError("A bundled voice reference failed its integrity check.")
+                folder = self.root / voice_id
+                folder.mkdir(exist_ok=True)
+                shutil.copyfile(source, folder / "reference.mp3")
+                self.store.put(
+                    "voice",
+                    voice_id,
+                    {
+                        "id": voice_id,
+                        "title": entry["title"],
+                        "original_filename": entry["original_filename"],
+                        "transcript": "",
+                        "status": "unprepared",
+                        "thumbnail_url": None,
+                        "error": None,
+                        "builtin_key": key,
+                    },
+                )
+            # Keep this marker after deletion so upgrades never resurrect user-deleted presets.
+            self.store.put("builtin_voice", key, {"initialized": True, "voice_id": voice_id})
 
     def create(self, stream, title, filename, transcript="", thumbnail=None):
         title, transcript = title.strip(), transcript.strip()
@@ -85,6 +122,16 @@ class Voices:
         if not voice:
             raise UserError("Voice not found.")
         with self.service._lock:
+            voice = self.store.get("voice", voice_id)
+            if voice["status"] == "ready" and voice.get("transcript"):
+                return voice
+            if voice["status"] == "pending":
+                current = self.store.get("job", voice.get("preparation_job_id", ""))
+                if current and current["status"] in {"queued", "running"}:
+                    return voice
+                if current and current["status"] == "succeeded":
+                    self.completed(current)
+                    return self.store.get("voice", voice_id)
             with (self.root / voice_id / "reference.mp3").open("rb") as ref:
                 job = self.service.submit(
                     ref,
@@ -99,7 +146,12 @@ class Voices:
 
     def completed(self, job):
         if job.get("voice_id") and job["kind"] == "transcribe":
-            if self.store.get("voice", job["voice_id"]):
+            voice = self.store.get("voice", job["voice_id"])
+            if (
+                voice
+                and voice["status"] == "pending"
+                and voice.get("preparation_job_id") == job["id"]
+            ):
                 self.store.patch(
                     "voice",
                     job["voice_id"],

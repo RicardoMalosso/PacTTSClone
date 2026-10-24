@@ -158,24 +158,34 @@ $('voice-form').addEventListener('submit', action(async event => {
   finally { submit.disabled = false; }
 }));
 function renderVoices() {
-  const key = JSON.stringify(state.voices); if (key === voicesKey) return; voicesKey = key;
+  const key = JSON.stringify([state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
   const selected = $('voice-select').value;
   $('voice-select').replaceChildren(el('option', {value: ''}, t('Upload an MP3 instead')));
   for (const v of state.voices.filter(v => v.status === 'ready')) $('voice-select').append(el('option', {value: v.id}, v.title));
   $('voice-select').value = selected; $('voice-select').dispatchEvent(new Event('change'));
+  const drafts = new Map([...document.querySelectorAll('.voice-card')].filter(card => card.dataset.dirty === 'true').map(card => [card.dataset.voiceId, {title: card.querySelector('input').value, transcript: card.querySelector('textarea').value}]));
   $('voices-list').replaceChildren();
   for (const v of state.voices) {
-    const title = el('input', {value: v.title, maxlength: '100', 'aria-label': t('Voice title')});
-    const transcript = el('textarea', {rows: '3', maxlength: '4000', 'aria-label': t('Saved transcript')}); transcript.value = v.transcript || '';
+    const preparing = v.status === 'pending';
+    const prep = state.jobs.find(j => j.id === v.preparation_job_id);
+    const title = el('input', {...(preparing ? {disabled: ''} : {}), value: v.title, maxlength: '100', 'aria-label': t('Voice title')});
+    const transcript = el('textarea', {...(preparing ? {disabled: ''} : {}), rows: '3', maxlength: '4000', 'aria-label': t('Saved transcript')}); transcript.value = v.transcript || '';
     const card = el('section', {class: 'card voice-card', 'data-voice-id': v.id}, v.thumbnail_url ? el('img', {src: v.thumbnail_url, alt: v.title}) : null,
       el('h2', {}, v.title), el('p', {class: 'muted'}, v.original_filename), el('span', {class: 'pill'}, t(v.status)),
+      v.status === 'unprepared' ? el('p', {class: 'preparation-note'}, t('Not prepared for first use. Click Prepare to download required models and save the reference transcript locally.')) : null,
+      preparing ? el('div', {class: 'preparation-note', role: 'status'}, el('strong', {}, t('Preparing for first use…')), el('progress', {max: '1'}), el('p', {}, `${t(prep?.stage || 'queued')} · ${t('The first preparation may download models. You can cancel and retry.')} `), button('Cancel preparation', async () => { await api(`/api/jobs/${v.preparation_job_id}/cancel`, {method: 'POST'}); await refresh(); }, 'danger small-button')) : null,
       v.error ? el('p', {class: 'error'}, v.error) : null, el('label', {}, t('Title'), title), el('label', {}, t('Saved reference transcript'), transcript),
       el('audio', {controls: '', src: `/api/voices/${v.id}/reference`, preload: 'none'}),
-      el('div', {class: 'row-actions'}, button('Save edits', async () => { await api(`/api/voices/${v.id}`, {method: 'PUT', body: {title: title.value, transcript: transcript.value}}); await refresh(); }),
-        v.status !== 'ready' && v.status !== 'pending' ? button('Retry transcription', async () => { await api(`/api/voices/${v.id}/prepare`, {method: 'POST'}); await refresh(); }) : null,
+      el('div', {class: 'row-actions'}, button('Save edits', async () => { await api(`/api/voices/${v.id}`, {method: 'PUT', body: {title: title.value, transcript: transcript.value}}); card.dataset.dirty = 'false'; await refresh(); }),
+        v.status !== 'ready' && v.status !== 'pending' ? button(v.status === 'unprepared' ? 'Prepare for first use' : 'Retry preparation', async () => { await api(`/api/voices/${v.id}/prepare`, {method: 'POST'}); await refresh(); }) : null,
         button('Delete voice', async () => { if (confirm(t('Delete saved voice {name}?', {name: v.title}))) { await api(`/api/voices/${v.id}`, {method: 'DELETE'}); await refresh(); } }, 'danger small-button')));
+    const draft = drafts.get(v.id);
+    if (draft && !preparing) { title.value = draft.title; transcript.value = draft.transcript; card.dataset.dirty = 'true'; }
+    for (const field of [title, transcript]) field.addEventListener('input', () => { card.dataset.dirty = 'true'; });
+    card.querySelector('.row-actions button').disabled = preparing;
     $('voices-list').append(card);
   }
+  $('prepare-voices').hidden = !state.voices.some(v => v.status !== 'ready');
   if (!state.voices.length) $('voices-list').append(el('p', {class: 'muted'}, t('No saved voices yet.')));
 }
 function renderJobs() {
@@ -354,3 +364,5 @@ $('general-form').addEventListener('submit', action(async event => {
   await api('/api/general-playback', {method: 'PUT', body: {name: 'general', delay_seconds: Number($('general-delay').value), filter_level: $('general-filter').value, custom_filters: $('general-custom').value.split('\n').map(s => s.trim()).filter(Boolean), paused: latestChannelState?.paused || false}});
   await refresh();
 }));
+
+$('prepare-voices').addEventListener('click', () => tab('voices'));

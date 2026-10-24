@@ -158,3 +158,13 @@ checkbox unlocks a custom data path. Small red bold estimates sit beside both
 pickers. Existing native uninstaller gains explicit Start Menu/app-folder links.
 Windows CI now checks the interactive wizard and performs actual default-sibling
 CPU install/reinstall/uninstall with retained data. Validation pending new run.
+
+## Default voices and parent launcher — implementation checkpoint
+
+Bundled the four explicitly authorized user references in the wheel with hashes;
+Akuma Lady is a 29.9-second copy of the 30.59-second original, other samples byte
+unchanged. Defaults seed once without jobs/model downloads, require Prepare, and
+retain edits/deletions across restarts. Preparation is idempotent with stored ASR
+text, UI progress/cancel/retry and readiness gating. Added parent launcher shortcut.
+All samples passed real FFmpeg reference decoding. New lifecycle/browser tests and
+updated Windows installer validation are running; no real ASR accuracy claim yet.

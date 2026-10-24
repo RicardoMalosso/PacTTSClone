@@ -56,3 +56,9 @@ def wait_job(service, job_id, timeout=10):
             return job
         time.sleep(0.01)
     raise AssertionError("Job failed to reach terminal state")
+
+
+@pytest.fixture(autouse=True)
+def isolate_default_voice_catalog(monkeypatch):
+    # Existing tests start with an empty studio; default assets have dedicated coverage.
+    monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", None)

@@ -1,0 +1,30 @@
+[
+  {
+    "key": "akuma-lady",
+    "title": "Akuma Lady",
+    "filename": "akuma-lady.mp3",
+    "original_filename": "Karen is Coming for Jasper County.mp3",
+    "sha256": "e8d38980a888b9ccc19fab46afea09fa409bc238a88262332ebc1556fb3fb870"
+  },
+  {
+    "key": "dilma",
+    "title": "Dilma",
+    "filename": "dilma.mp3",
+    "original_filename": "dilma-sample-short-bad.mp3",
+    "sha256": "c19d03f13602f30076406c547c66209892469296e523f42251199d5be57b7265"
+  },
+  {
+    "key": "chretien",
+    "title": "Chrétien",
+    "filename": "chretien.mp3",
+    "original_filename": "chretien-sample-short.mp3",
+    "sha256": "7fbfd768b228aa48c91a5118319b488da5ff3f316b2c3c5af123dda91289ea2b"
+  },
+  {
+    "key": "lula",
+    "title": "lula",
+    "filename": "lula.mp3",
+    "original_filename": "lula-sample-curto-podpah.mp3",
+    "sha256": "1f84c697b51266282df89dd6ffe753c88e4598d6f9c9ded26771de044d45f7d7"
+  }
+]

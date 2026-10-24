@@ -100,3 +100,15 @@ manages private CPython and version/device venvs. Bootstrap validates imports/to
 before changing active.json. Installed launcher sets process-local caches and
 PATH. Application data is separate and never part of uninstaller deletion rules.
 Source scripts remain available; no git checkout is required by installed builds.
+
+## Bundled reference presets
+
+The four user-authorized samples live in assets/voices with a hash manifest. Studio
+copies each once into the selected data directory with status unprepared. No FFmpeg
+or inference/model download runs during seeding. Stable IDs and initialization
+markers prevent duplicate presets, overwriting edited transcripts/titles, or
+resurrecting deleted defaults after restart/upgrade. Explicit Prepare submits the
+existing isolated transcription job; pending actions are idempotent, completion
+saves the transcript, and only ready voices can generate/be assigned to commands.
+UI distinguishes not prepared, preparing, ready and retryable failure/cancellation,
+with per-card progress/cancel and a Generate-to-Voices preparation link.

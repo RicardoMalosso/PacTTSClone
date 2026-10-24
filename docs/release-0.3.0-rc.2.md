@@ -28,3 +28,9 @@ lock; default app/data sibling folders with a checkbox for separate data storage
 small red bold space estimates beside both path pickers; explicit uninstaller
 shortcuts in the Start Menu and application directory. User data remains retained.
 Size figures are planning estimates; recordings/caches can grow without a fixed cap.
+
+A parent-folder PacTTSClone.lnk launches the app directly. Defaults live under
+PacTTS/PacTTSClone and PacTTS/PacTTSClone-data. Includes user-supplied Akuma Lady,
+Dilma, Chrétien and lula references, initially unprepared; explicit preparation
+saves transcripts once and exposes progress/cancel/retry. Akuma Lady is shortened
+to 29.9 seconds to fit the reference limit; other samples remain unchanged.
