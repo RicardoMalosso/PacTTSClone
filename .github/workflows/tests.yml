@@ -14,22 +14,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - uses: actions/checkout@v4
-        with:
-          repository: FFmpeg/FFmpeg
-          ref: 8ae0b34901ba60a802f183ee75a250a9fc3e09a5
-          path: build-sources/ffmpeg
-          persist-credentials: false
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: git python make nasm diffutils mingw-w64-x86_64-gcc mingw-w64-x86_64-pkgconf mingw-w64-x86_64-lame
-      - shell: msys2 {0}
-        run: bash installer/build-ffmpeg.sh
+      - name: Verify gyan.dev FFmpeg and ASR PCM output
+        run: python scripts/fetch-gyan-ffmpeg.py
       - uses: actions/upload-artifact@v4
         with:
-          name: source-built-windows-ffmpeg
+          name: verified-gyan-windows-ffmpeg
           path: installer/ffmpeg/bin/*.exe
   core:
     needs: windows-tools
@@ -50,9 +39,9 @@ jobs:
       - uses: actions/download-artifact@v4
         if: runner.os == 'Windows'
         with:
-          name: source-built-windows-ffmpeg
+          name: verified-gyan-windows-ffmpeg
           path: ffmpeg-tools
-      - name: FFmpeg path (Windows, built from official source)
+      - name: FFmpeg path (Windows, verified gyan.dev Essentials)
         if: runner.os == 'Windows'
         shell: pwsh
         run: Add-Content $env:GITHUB_PATH (Join-Path $env:GITHUB_WORKSPACE 'ffmpeg-tools')
