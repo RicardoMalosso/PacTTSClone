@@ -71,7 +71,7 @@ keypress test.
 ## Windows installer preview
 
 `.github/workflows/installer.yml` compiles `installer/setup.iss` on Windows and
-asserts the unsigned bootstrap is below 10 MiB. PowerShell 5.1 helpers are executed
+asserts the unsigned bootstrap is below 150 MiB. PowerShell 5.1 helpers are executed
 with controlled download responses to verify retries, corrupt-cache rejection,
 partial cleanup and non-overlapping app/data paths. A separate real network smoke
 installs the actual CPU dependency stack, starts the installed HTTP launcher,
@@ -303,3 +303,25 @@ establish speech quality or end-to-end model inference.
   Publication requires the explicit `publish_draft` checkbox and execution from
   `main`. Existing draft or published releases are never deleted or overwritten.
   The verified installer/test procedure is otherwise unchanged.
+
+
+## RC5 original clip and release acceptance
+
+The bundled `static/jingling-keys.webm` is the unchanged user-uploaded 640x360
+VP9/Opus WebM (136,654 bytes), SHA-256
+`01f5003f1ad001452249af8939afdecd6cb7470d29772af7d18d038c41d3c894`.
+The media regression verifies that digest and decodes both streams with FFmpeg.
+Chromium observes two actual end-to-start loops, decoded audio, unmuted/nonzero
+volume, original dimensions, and pause/reset on dismissal. This checks browser
+decoding and playback state, not physical speakers. Windows installer acceptance
+fetches the installed clip over HTTP, verifies the same hash and decodes both
+streams with the installed FFmpeg. No remote GIF, downloader, or Tenor dependency
+remains in the current repository tree.
+
+Installer acceptance can also be requested for a PR by applying the
+`installer-acceptance` label after its ordinary tests pass. Only that label event
+starts a build; unrelated labels, edits and intermediate commits do not. Remove
+and reapply it to request another acceptance run after changes. The workflow
+retains its full reusable test gate, actual Windows install/model-download/wizard/
+reinstall/uninstall checks, and uploads the distributable only after acceptance.
+Draft release creation remains manual and main-only.

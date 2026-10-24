@@ -218,15 +218,28 @@ def test_initial_setup_countermeasures_prompt_once(page, live_server):
         'document.querySelector("#countermeasure-video")?.videoWidth > 0',
         timeout=10000,
     )
-    page.locator("#countermeasure-close").click()
-    expect(page.locator("#countermeasure-modal")).to_be_hidden()
     video = page.locator("#countermeasure-video")
     expect(video).to_have_attribute("loop", "")
     page.wait_for_function(
         'document.querySelector("#countermeasure-video")?.currentTime > 0',
         timeout=10000,
     )
+    assert video.evaluate("(v) => !v.muted && v.volume > 0 && !v.paused")
+    # Observe two real end-to-start wraps, rather than merely checking loop=true.
+    video.evaluate("""(v) => {
+        window.clipWraps = 0;
+        let previous = v.currentTime;
+        v.addEventListener('timeupdate', () => {
+            if (previous > v.duration - 1 && v.currentTime < 1) window.clipWraps++;
+            previous = v.currentTime;
+        });
+    }""")
+    page.wait_for_function("window.clipWraps >= 2", timeout=15000)
+    assert video.evaluate("(v) => v.webkitAudioDecodedByteCount > 0")
+    assert video.evaluate("(v) => v.videoWidth === 640 && v.videoHeight === 360")
+    assert video.evaluate("(v) => !v.paused && !v.ended && !v.muted && v.volume > 0")
     page.locator("#countermeasure-close").click()
-    assert video.evaluate("(v) => v.paused")
+    expect(page.locator("#countermeasure-modal")).to_be_hidden()
+    assert video.evaluate("(v) => v.paused && v.currentTime === 0")
     page.reload()
     expect(page.locator("#setup-too-long")).to_be_hidden()

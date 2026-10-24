@@ -56,3 +56,12 @@ and server restart can restore the tail of this log.
 The once-only countermeasures offer is claimed server-side by an authenticated
 request before displaying the prompt; declined, closed and accepted offers are
 all consumed. An independent local WebM video overlay does not pause or cancel setup.
+
+
+RC5 packaging supersedes the RC4 FFmpeg source-build paragraph above: CI fetches
+the Gyan Essentials archive and same-origin checksum, verifies SHA-256 and the
+ASR float32 pipe protocol, and bundles the executables and distribution licenses.
+This downstream Windows build must not be described as an official upstream
+FFmpeg binary. No Tenor downloader or external countermeasures media is used.
+The original WebM is packaged unchanged; browser controls remain available if
+sound autoplay is blocked by browser policy.

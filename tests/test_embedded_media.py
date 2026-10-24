@@ -1,4 +1,5 @@
 """Verify that the bundled jingling-keys clip is decodable with video AND audio."""
+import hashlib
 import json
 import subprocess
 
@@ -8,7 +9,10 @@ from pacttsclone.app import STATIC
 def test_jingling_keys_webm_has_video_and_audio():
     media = STATIC / "jingling-keys.webm"
     assert media.is_file(), "User-supplied jingling keys clip must be bundled locally"
-    assert media.stat().st_size > 1000
+    # Original user upload, unmodified: guards against a placeholder/transcode.
+    assert hashlib.sha256(media.read_bytes()).hexdigest() == (
+        "01f5003f1ad001452249af8939afdecd6cb7470d29772af7d18d038c41d3c894"
+    )
 
     inspection = subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries",

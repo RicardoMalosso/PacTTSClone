@@ -8,7 +8,7 @@ This release candidate updates the initial setup interface and dependency instal
 - Model download progress preserved; model verification cannot reverse the global download indicator.
 - One-time 30-second **Setup taking too long?** prompt with Yes / No / close. Yes triggers 2 seconds of **Deploying countermeasures** followed by the bundled looping jingling-keys WebM video with sound. The prompt is claimed persistently before display, so refresh, cancellation, or other browser sessions cannot show it again.
 - Keep downloaded logs and status continuity after restart; retain Download setup log.
-- Bundle the supplied local jingling-keys WebM in the wheel; no external media download. The video loops, preserves audio, and stops when the modal closes.
+- Bundle the exact original 640×360 user-supplied jingling-keys WebM in the wheel; no external media download. The video loops, preserves audio, and stops when the modal closes.
 
 ## Validation and limitations
 
