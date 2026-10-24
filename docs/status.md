@@ -364,3 +364,14 @@ Downloaded the workflow ZIP and independently verified every SHA256SUMS entry;
 installer/wheel/FFmpeg archive hashes also match GitHub release asset digests.
 No unfinished feature or auto-updater was added to this snapshot. Future feature
 work must preserve these RC4 artifacts and use a new version for another installer.
+
+## RC5 setup feedback branch (verification pending)
+
+The branch `fix/setup-progress-and-countermeasures` introduces a streaming setup console,
+per-line timestamped logs, an elapsed wall clock, real pip raw download-byte percentages,
+and monotonic model download progress. A server-persisted one-shot 30-second
+countermeasures prompt can display the bundled Choopo GIF after a two-second bar.
+The GIF is downloaded at build/test time, not from the user's browser.
+Backend and Chromium test cases were added; CI results are not yet asserted here.
+Original signed/unsigned RC4 artifacts and checksums are preserved; RC5 uses
+new wheel/installer/release version numbers.
