@@ -55,4 +55,4 @@ its most recent 500 lines in an always-open scrollable panel. Browser refresh
 and server restart can restore the tail of this log.
 The once-only countermeasures offer is claimed server-side by an authenticated
 request before displaying the prompt; declined, closed and accepted offers are
-all consumed. An independent GIF overlay does not pause or cancel setup.
+all consumed. An independent local WebM video overlay does not pause or cancel setup.
