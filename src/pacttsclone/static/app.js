@@ -33,6 +33,13 @@ function action(fn) { return async event => { try { await fn(event); } catch (e)
 function button(text, fn, cls = 'secondary small-button') { return window.Locale.bind(el('button', {type: 'button', class: cls, onclick: action(fn)}), text); }
 function link(text, href, download = false) { return window.Locale.bind(el('a', {href, ...(download ? {download: ''} : {target: '_blank', rel: 'noopener noreferrer'})}), text); }
 function bytes(value) { return value == null ? t('N/A') : `${(value / 1073741824).toFixed(2)} GiB`; }
+function formatTransferBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return 'N/A';
+  if (value < 1024) return Math.round(value) + ' B';
+  if (value < 1048576) return (value / 1024).toFixed(1) + ' KiB';
+  if (value < 1073741824) return (value / 1048576).toFixed(1) + ' MiB';
+  return (value / 1073741824).toFixed(2) + ' GiB';
+}
 function duration(value) { const n = Math.max(0, value || 0); return `${String(Math.floor(n / 60)).padStart(2, '0')}:${(n % 60).toFixed(1).padStart(4, '0')}`; }
 async function api(url, options = {}) {
   const opts = {cache: 'no-store', ...options};
@@ -515,8 +522,28 @@ function renderSetup(data) {
   const d = data.download;
   $('setup-file-progress').hidden = !d;
   if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.phase?.startsWith('verifying') ? (d.file_total || 1) : (d.file_bytes || 0); }
-  $('setup-package-status').textContent = data.stage === 'pytorch' || data.stage === 'inference' ? (data.dependency_progress?.message || 'Downloading / installing dependencies — package totals may be unavailable') : '';
-  $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : t('Package installation has no reliable byte total; technical details show actual activity.');
+  const isDependency = data.stage === 'pytorch' || data.stage === 'inference';
+  const p = isDependency ? data.dependency_progress : null;
+  $('setup-package-status').textContent = isDependency ?
+    (p?.message || 'Preparing dependency downloads — resolving package information') : '';
+  $('setup-dependency-progress').hidden = !isDependency;
+  if (isDependency) {
+    const bar = $('setup-dependency-progress');
+    if (p?.total_bytes > 0 && p.downloaded_bytes != null) {
+      bar.max = p.total_bytes;
+      bar.value = Math.min(p.downloaded_bytes, p.total_bytes);
+      $('setup-dependency-metrics').textContent =
+        `${p.percent?.toFixed(1) ?? '0.0'}% · ${formatTransferBytes(p.downloaded_bytes)} / ${formatTransferBytes(p.total_bytes)}` +
+        (p.speed_bytes_per_second ? ` · ${formatTransferBytes(p.speed_bytes_per_second)}/s` : '') +
+        (p.eta_seconds != null ? ` · ~${Math.round(p.eta_seconds)} s remaining` : '');
+    } else {
+      bar.removeAttribute('value');
+      $('setup-dependency-metrics').textContent = p?.phase === 'installing' ?
+        'Installing downloaded packages (time remaining unknown)' :
+        'Waiting for measurable download bytes (time remaining unknown)';
+    }
+  } else $('setup-dependency-metrics').textContent = '';
+  $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
   if (!data.ready && !setupAvailable) return;
   if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
