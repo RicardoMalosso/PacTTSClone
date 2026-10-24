@@ -2,6 +2,7 @@
 const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
+let modelDownloaded = 0, modelSession = null, setupEventsConnected = false;
 const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -378,9 +379,18 @@ async function init() {
     $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
-    await runtimeStatus(); await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
+    await runtimeStatus();
+    if (!session?.remote_access && 'EventSource' in window) {
+      const setupEvents = new EventSource('/api/setup/stream');
+      setupEvents.onopen = () => { setupEventsConnected = true; };
+      setupEvents.onmessage = event => {
+        try { renderSetup(JSON.parse(event.data)); } catch (e) { console.warn('Setup stream:', e); }
+      };
+      setupEvents.onerror = () => { setupEventsConnected = false; };
+    }
+    await refresh(); await resources(); await tunnelStatus(); if (selectedChannel) { if (selectedChannel === 'playbackMain') tab('general'); else { fillChannel(selectedChannel); tab('channels'); } } else { commandRow(); tab(runtimeSetup.ready ? 'studio' : 'setup'); }
     $('generate').disabled = !runtimeSetup.ready;
-    const loop = async () => { try { await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
+    const loop = async () => { try { if (!setupEventsConnected) await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
     const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
@@ -470,6 +480,10 @@ $('countermeasure-close').addEventListener('click', closeCountermeasures);
 function renderSetup(data) {
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
+  if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
+  if (data.stage === 'models' && data.download?.total_bytes) {
+    modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
+  }
   document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
   $('generate').disabled = busy || !data.ready;
   renderGlobalStatus();
@@ -489,7 +503,7 @@ function renderSetup(data) {
   refreshCountermeasurePrompt();
   const d = data.download;
   $('setup-file-progress').hidden = !d;
-  if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.file_bytes || 0; }
+  if (d) { $('setup-file-progress').max = d.file_total || 1; $('setup-file-progress').value = d.phase?.startsWith('verifying') ? (d.file_total || 1) : (d.file_bytes || 0); }
   $('setup-package-status').textContent = data.stage === 'pytorch' || data.stage === 'inference' ? (data.dependency_progress?.message || 'Downloading / installing dependencies — package totals may be unavailable') : '';
   $('setup-download-status').textContent = d ? `${d.repo} · ${d.file} · ${t(d.phase || d.cache_status || 'checking cache')} · ${bytes(d.file_bytes)} / ${bytes(d.file_total)} · ${d.reused_files || 0} ${t('verified cached files reused')}` : t('Package installation has no reliable byte total; technical details show actual activity.');
   if (!data.ready && !setupAvailable) return;
@@ -537,7 +551,7 @@ function renderGlobalStatus() {
     $('live-generation-source').textContent = t('Initial Setup');
     $('live-generation-status').textContent = t(runtimeSetup.stage === 'models' ? 'Downloading / verifying models' : 'Installing dependencies') + ' · ' + t(runtimeSetup.stage || '');
     const d = runtimeSetup.download;
-    if (d?.total_bytes) { $('live-generation-progress').value = d.completed_bytes / d.total_bytes; } else $('live-generation-progress').removeAttribute('value');
+    if (d?.total_bytes) { $('live-generation-progress').value = Math.min(1, modelDownloaded / d.total_bytes); } else $('live-generation-progress').removeAttribute('value');
     $('live-generation-cancel').hidden = true; return;
   }
   if (running) { renderMonitor(running); return; }
