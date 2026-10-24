@@ -113,3 +113,15 @@ General playback uses an internal persisted destination rather than a fake Twitc
 connection. Reuse the proven playback state machine; allow explicit destination
 override only on the admin queue endpoint, retaining original job provenance.
 The general player capability authorizes only jobs actually queued to that bus.
+
+## Unsigned installer preview — 2026-10-24
+
+User explicitly chose setup-time dependency downloads and unsigned distribution.
+Use Inno Setup plus pinned uv managed Python, not unsupported pip modification of
+Python's embeddable distribution. Bundle the tiny app wheel to avoid authenticated
+GitHub asset downloads during installation of a private repository. Python, FFmpeg,
+PyTorch and other dependencies are downloaded, and models remain first-use assets.
+Version 0.3.0rc1 / release v0.3.0-rc.1 is a draft preview, not a stable declaration.
+Official uv 0.9.5 and Gyan FFmpeg 8.0.1 SHA-256 values were retrieved from their
+GitHub release metadata. No certificate enrollment, signing claim or public access
+change. No blanket project license is invented for the repository or model weights.

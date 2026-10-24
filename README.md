@@ -20,65 +20,70 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
   admin and per-channel OBS-only links. Stop sharing revokes those links.
 - English / Português, browser-language detection and bottom 🇨🇦 / 🇧🇷 controls.
 
-## Requirements
+## Windows installer (preview)
 
-Python **3.12, 64-bit** recommended (application CI also tests Python 3.11).
-FFmpeg and ffprobe must be on PATH. Use matching torch/torchaudio 2.8.0 wheels.
-NVIDIA CUDA is supported; CPU is supported but slower. AMD/Intel/Apple GPU
-acceleration is not implemented. GTX 1660 SUPER 6 GB still needs its own benchmark.
-Reserve several GB for packages/models; automatic ASR can download additional
-model formats through the upstream loader. No claim of real-time generation.
+Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
+`PacTTSClone-Setup-0.3.0-rc.1.exe` when the preview is available. Draft releases are
+visible only to repository collaborators with the appropriate access; a private
+repository does not provide public downloads.
 
-## Update an existing Windows installation on G:
+1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
+2. Choose separate application and data folders. Either can be on another drive.
+   Data includes voices, MP3s, settings, model/download caches and setup logs.
+3. Choose Automatic, CPU or NVIDIA CUDA. Automatic detects NVIDIA; a compatible
+   NVIDIA driver is still required. AMD/Intel/Apple GPU acceleration is unsupported.
+4. Follow download progress in the setup console. The executable is small; runtime
+   downloads and installed files can occupy several GB. Closing the console cancels
+   setup; rerun it to retry using cached downloads. Errors: `data-folder/logs/setup.log`.
+5. Start **PacTTSClone** from the Start Menu or optional desktop shortcut. Models
+   download on first generation; a blank reference transcript also downloads ASR.
 
-Stop the running app first (Ctrl+C in its terminal), then in PowerShell:
+The preview installer is **unsigned**. `SHA256SUMS.txt` detects file changes but is
+not a trusted publisher signature. Build/validation details: [installer design](docs/installer-design.md).
+No signing certificate is purchased or installed.
+
+Upgrade: stop the app with Ctrl+C, run the newer installer and keep the same data
+folder. Existing voices, audio and settings are preserved. Uninstall removes the
+application/runtime and leaves the separate data folder intact; delete that folder
+manually only if you also want to remove your recordings and models.
+
+Large caches use the chosen data drive; the setup executable and Windows may still
+create small temporary files or installer metadata on the system drive. Setup does
+not change global Python, system PATH, NVIDIA drivers or enable network sharing.
+CPU mode uses smaller dependencies and slower generation. There is no real-time
+generation guarantee. Keep several GB free for models and installation caches.
+
+## Run or update from source
+
+For existing source installations, stop the app, open PowerShell **in your project
+folder**, then run:
 
 ```powershell
-Set-Location G:\projects\chatgpt\PacTTSClone
 git pull --ff-only
 .\.venv\Scripts\python.exe -m pip install -e ".[inference]"
-powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir G:\projects\chatgpt\PacTTSClone-data
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir "YOUR_DATA_FOLDER"
 ```
 
-Existing model caches are reused. If you already created
-`G:\utils\Start-PacTTSClone.cmd`, that launcher continues to work after updating.
-V1 MP3 files remain in outputs, but v1 did not retain metadata for history import.
+Replace `YOUR_DATA_FOLDER` with the same data directory you already use. Keep your
+existing cache environment variables and launcher if configured. No particular
+drive, parent directory or external launcher is required. Installer installations
+and source checkouts are independent; stop one before starting the other on port 7860.
 
-## Fresh installation
-
-You can install prerequisites outside C:
-
-```powershell
-winget install --id Python.Python.3.12 -e --scope user --architecture x64 --location "G:\utils\Python312"
-winget install --id Gyan.FFmpeg -e --scope user --location "G:\utils\FFmpeg"
-```
-
-Open a fresh terminal after installation. Clone into your projects directory:
+Fresh source installation requires Python 3.12 x64, FFmpeg/ffprobe on PATH and Git.
+Clone this repository into any chosen directory, then run:
 
 ```powershell
-New-Item -ItemType Directory -Force G:\projects\chatgpt | Out-Null
-Set-Location G:\projects\chatgpt
-git clone https://github.com/RicardoMalosso/PacTTSClone.git
-Set-Location PacTTSClone
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Device cuda
-powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir G:\projects\chatgpt\PacTTSClone-data
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1 --data-dir "YOUR_DATA_FOLDER"
 ```
 
-Use `-Device cpu` to install CPU wheels instead. The isolated `.venv` stays inside
-this project. The first generation downloads models; install scripts do not train
-anything. To keep model/pip caches off C:, set these user environment variables
-before installing or generating (the earlier full setup block already does this):
+Use `-Device cpu` for CPU wheels. The venv is stored in the project. Set `HF_HOME`,
+`HF_HUB_CACHE`, `PIP_CACHE_DIR` and session `TEMP`/`TMP` to your chosen storage
+locations **before** installing/generating if space on the system drive is limited.
+The source scripts reuse existing Python/FFmpeg; use the installer for automatic
+prerequisite installation. V1 MP3s remain but have no metadata for history import.
 
-```powershell
-[Environment]::SetEnvironmentVariable('HF_HOME', 'G:\utils\cache\huggingface', 'User')
-[Environment]::SetEnvironmentVariable('HF_HUB_CACHE', 'G:\utils\cache\huggingface\hub', 'User')
-[Environment]::SetEnvironmentVariable('PIP_CACHE_DIR', 'G:\utils\cache\pip', 'User')
-```
-
-Open a new terminal to pick them up. TEMP/TMP can also be set to a G: directory
-for the installer session. Windows may retain small installer metadata on C:.
-
-Linux/manual setup:
+Linux/manual setup (install FFmpeg through your package manager):
 
 ```bash
 python3.12 -m venv .venv
@@ -89,8 +94,7 @@ python -m pip install -e '.[inference]'
 pacttsclone --data-dir ./local-data
 ```
 
-Install FFmpeg through your system package manager. For NVIDIA replace `cpu` in
-PyTorch's wheel URL with `cu128`, subject to driver compatibility.
+For compatible NVIDIA drivers, replace `cpu` in the wheel URL with `cu128`.
 
 ## Studio workflow
 
@@ -157,7 +161,7 @@ cloudflared manually and add it to PATH; the UI displays startup/download failur
 
 ## Logs, storage and measurement
 
-Data directory (default `~/.pacttsclone`, or the G: path above):
+Data directory (chosen in setup, passed with `--data-dir`, or source default `~/.pacttsclone`):
 
 | Path | Contents |
 |---|---|

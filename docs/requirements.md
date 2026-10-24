@@ -28,3 +28,9 @@ control requests through Cloudflare; generation/model assets remain on the host.
 Data directory is configurable; keep outputs, SQLite, voices and logs there.
 Models use HF_HOME/HF_HUB_CACHE. Venv/project/caches can all reside on G:. V1 MP3s
 are retained but v1 had no persistent job metadata to import into the new history.
+
+R16: A small unsigned Windows x64 bootstrap installer downloads isolated Python,
+FFmpeg and selected CPU/CUDA dependencies during setup, accepts separate app/data
+locations, creates shortcuts, preserves user data on upgrade/uninstall, and produces
+logs/checksums. No signing enrollment or repository visibility change. See
+installer-design.md for acceptance and release gates.

@@ -67,3 +67,15 @@ on POSIX also delivers SIGINT while it waits for the next command. A second job
 must reuse that PID, then sentinel shutdown must exit with code zero. Existing
 hard cancellation/recovery tests still run. This is not a physical Windows console
 keypress test.
+
+## Windows installer preview
+
+`.github/workflows/installer.yml` compiles `installer/setup.iss` on Windows and
+asserts the unsigned bootstrap is below 10 MiB. PowerShell 5.1 helpers are executed
+with controlled download responses to verify retries, corrupt-cache rejection,
+partial cleanup and non-overlapping app/data paths. A separate real network smoke
+installs the actual CPU dependency stack, starts the installed HTTP launcher,
+repeats setup and uninstalls while retaining a user-data marker. Logs/artifacts
+are retained. This smoke does not download model weights, simulate CUDA hardware
+or establish cloning quality. Only a passing installer job may create a draft
+prerelease; no published release or signing claim is generated automatically.

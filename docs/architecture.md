@@ -92,3 +92,11 @@ Windows console Ctrl+C reaches both server and child; only the server owns the
 shutdown lifecycle. Idle workers exit via the existing command sentinel, while
 active jobs are cancelled through bounded process-tree termination. This avoids
 an idle `commands.get()` KeyboardInterrupt traceback without changing cancellation.
+
+## Installer distribution
+
+See installer-design.md. Inno Setup embeds only app wheel/scripts/manifest. uv
+manages private CPython and version/device venvs. Bootstrap validates imports/tools
+before changing active.json. Installed launcher sets process-local caches and
+PATH. Application data is separate and never part of uninstaller deletion rules.
+Source scripts remain available; no git checkout is required by installed builds.

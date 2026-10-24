@@ -1,0 +1,78 @@
+name: Windows installer preview
+on:
+  push:
+    branches: [main]
+    paths: ['installer/**', '.github/workflows/installer.yml', 'pyproject.toml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: installer-preview
+  cancel-in-progress: false
+jobs:
+  windows-setup:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate scripts and download/cache helpers
+        shell: powershell
+        run: |
+          Get-ChildItem installer/*.ps1 | ForEach-Object {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errors) | Out-Null
+            if ($errors) { throw ($errors | Out-String) }
+          }
+          & ./installer/test-common.ps1
+      - name: Build application wheel
+        run: python -m pip wheel --no-deps . -w dist
+      - name: Compile small unsigned setup
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer/setup.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
+          $setup = Get-Item dist/PacTTSClone-Setup-*.exe
+          if ($setup.Length -gt 10MB) { throw 'Bootstrap installer exceeds 10 MiB.' }
+      - name: Actual CPU install, HTTP launch, repeat setup and uninstall
+        shell: powershell
+        run: ./installer/test-install.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
+      - name: Retain diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-diagnostics
+          path: |
+            ${{ runner.temp }}/PacTTSClone installation test/Data with spaces/logs/setup.log
+            ${{ runner.temp }}/PacTTSClone installation test-setup.log
+          if-no-files-found: ignore
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/*.exe,dist/*.whl | ForEach-Object {
+            '{0}  {1}' -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          } | Set-Content dist/SHA256SUMS.txt -Encoding ascii
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PacTTSClone-Windows-setup
+          path: |
+            dist/*.exe
+            dist/*.whl
+            dist/SHA256SUMS.txt
+      - name: Prepare draft prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = 'v0.3.0-rc.1'
+          $existing = @(gh release list --json tagName,isDraft --limit 100 | ConvertFrom-Json) | Where-Object tagName -eq $tag
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect releases.' }
+          if ($existing) {
+            if (-not $existing.isDraft) { throw 'Refusing to replace a published release.' }
+            gh release delete $tag --yes
+            if ($LASTEXITCODE -ne 0) { throw 'Could not refresh draft.' }
+          }
+          gh release create $tag --draft --prerelease --target $env:GITHUB_SHA --title 'PacTTSClone 0.3.0-rc.1 — Windows bootstrap installer' --notes-file docs/release-0.3.0-rc.1.md dist/*.exe dist/*.whl dist/SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }

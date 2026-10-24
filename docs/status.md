@@ -118,3 +118,12 @@ handling, same-PID subsequent generation and exit code zero on graceful reset.
 All 117 backend tests, Ruff checks/formatting and diff checks passed locally.
 Physical Windows Ctrl+C delivery remains a Windows acceptance check; the regression
 checks the installed signal handler inside a real child on both CI platforms.
+
+## Windows bootstrap preview — implementation checkpoint
+
+Version 0.3.0rc1: Inno Setup source, isolated uv-managed Python, verified uv/FFmpeg
+archives, CPU/CUDA dependencies downloaded at setup time, selectable separate data
+folder, shortcuts, reusable caches and data-preserving uninstall. README now uses
+general installation paths and documents source/installer distinctions. No signing
+or repository visibility change. Windows build/install evidence is pending the
+new installer workflow; local Linux checks do not establish Windows install success.
