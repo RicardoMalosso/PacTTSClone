@@ -1,7 +1,6 @@
 """Explicit local-owner dependency installation; no inference imports in the web process."""
 
 import contextlib
-import re
 from datetime import datetime, timezone
 import importlib
 import importlib.metadata
@@ -40,7 +39,10 @@ class RuntimeSetup:
             self.state.update(
                 status="cancelled", stage="interrupted", error="Setup was interrupted. Retry setup."
             )
-        self.lines = []
+        try:
+            self.lines = self.log_path.read_text(encoding="utf-8").splitlines()[-500:]
+        except OSError:
+            self.lines = []
         self.on_ready = lambda: None
         self._apply_models()
         service.setup_ready = lambda: self.snapshot()["ready"]
@@ -78,7 +80,7 @@ class RuntimeSetup:
                     )
                 )
             )
-            return {**self.state, "ready": ready, "lines": self.lines[-100:]}
+            return {**self.state, "ready": ready, "lines": self.lines[-500:]}
 
     def update(self, **values):
         with self.lock:
@@ -255,7 +257,7 @@ class RuntimeSetup:
         with self.lock:
             if self.cancelled.is_set():
                 raise InterruptedError("Setup cancelled.")
-            log.write("Running: " + json.dumps(command) + "\n")
+            log.write(f"[{datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds')}] Running: " + json.dumps(command) + "\n")
             log.flush()
             self.process = subprocess.Popen(
                 command,
@@ -282,7 +284,7 @@ class RuntimeSetup:
                 self.update(dependency_progress={"message": line, "timestamp": time.time()})
             with self.lock:
                 self.lines.append(f"[{timestamp}] {line}")
-                self.lines = self.lines[-100:]
+                self.lines = self.lines[-500:]
             if self.cancelled.is_set():
                 self._kill()
         code = process.wait()
