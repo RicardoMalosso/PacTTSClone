@@ -135,6 +135,68 @@ class EventSubClient:
             raise ConnectionError("Missing EventSub welcome")
         return message["payload"]["session"]
 
+    def _handoff(self, old, connector, url):
+        # Opening a replacement can block; continue consuming the old socket so
+        # notifications sent before the new welcome cannot disappear in its buffer.
+        done, abandoned = threading.Event(), threading.Event()
+        result = {}
+
+        def open_replacement():
+            replacement = None
+            try:
+                replacement = self._open(connector, url)
+                session = self._welcome(replacement)
+                if abandoned.is_set() or self.stop.is_set():
+                    replacement.close()
+                    return
+                result.update(socket=replacement, session=session)
+            except Exception as exc:
+                if replacement:
+                    with contextlib.suppress(Exception):
+                        replacement.close()
+                result["error"] = exc
+            finally:
+                done.set()
+
+        worker = threading.Thread(target=open_replacement, daemon=True, name="eventsub-handoff")
+        worker.start()
+        deadline = time.monotonic() + 25
+        accepted = False
+        try:
+            while not self.stop.is_set() and time.monotonic() < deadline:
+                try:
+                    message = json.loads(old.recv(timeout=0.1))
+                except TimeoutError:
+                    if done.is_set():
+                        break
+                    continue
+                except Exception:
+                    if done.is_set() and "socket" in result:
+                        break
+                    raise
+                # Twitch can repeat the reconnect instruction on the old socket.
+                # Other notifications/revocations must still be delivered.
+                if message.get("metadata", {}).get("message_type") != "session_reconnect":
+                    self.handle(message)
+            if self.stop.is_set():
+                raise ConnectionError("EventSub stopped during handoff")
+            if not done.is_set():
+                raise ConnectionError("EventSub reconnect timed out")
+            if "error" in result:
+                raise result["error"]
+            if "socket" not in result:
+                raise ConnectionError("EventSub replacement unavailable")
+            old.close()
+            accepted = True
+            return result["socket"], result["session"]
+        finally:
+            if not accepted:
+                abandoned.set()
+                worker.join(0.2)
+                if "socket" in result:
+                    with contextlib.suppress(Exception):
+                        result["socket"].close()
+
     def _run(self):
         delay = 1
         while not self.stop.is_set():
@@ -169,15 +231,7 @@ class EventSubClient:
                     last = time.monotonic()
                     reconnect = self.handle(message)
                     if reconnect:
-                        # Keep the old socket open until the replacement welcomes us.
-                        replacement = self._open(connector, reconnect)
-                        try:
-                            session = self._welcome(replacement)
-                        except Exception:
-                            replacement.close()
-                            raise
-                        ws.close()
-                        ws = replacement
+                        ws, session = self._handoff(ws, connector, reconnect)
                         self.socket = ws
                         silence = session.get("keepalive_timeout_seconds") or silence
                         last = time.monotonic()
