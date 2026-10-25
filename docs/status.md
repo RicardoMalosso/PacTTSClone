@@ -483,3 +483,27 @@ replacement opens/waits for its welcome, rather than leaving them unread in the
 old socket's buffer. Its regression delivers a notification during a deliberately
 blocked new welcome and verifies delivery before old-socket closure. The focused
 26 Twitch core tests pass, and all 30 Chromium tests pass locally after the UI fix.
+
+## RC6 published and independently verified
+
+RC6 was published as a prerelease after run 40163520519 passed the full reusable
+suite, actual Windows installer acceptance and target-checked publication. Final
+source 5293b9ab7b6c242b2d6dd4611479eadcaa900172 has the tested tree. Final local
+counts: 178 core and 30 Chromium tests passed; final PR and post-merge CI passed
+Windows/Linux Python 3.11/3.12 and Chromium. Real Windows CPU setup imported the
+runtime and verified 4,238,811,339 model bytes; launcher/reinstall/data-preserving
+uninstall passed. A separate 64 MiB fixture exercised the production import threshold.
+
+Downloaded accepted artifact 12587508059; ZIP SHA-256
+28d754145d1083e32d93e64ee1c8321d231aa88ef475c2cb31e254b119ab190c matched.
+All SHA256SUMS entries and all four published asset digests/sizes matched.
+The wheel's 42 application files match source after Windows text EOL normalization;
+all binaries, including the original WebM, match exactly. Installer is 59,754,609
+bytes; SHA-256 cfb975b5b21bd23344a9c829268e996d2039702596b8b6230021967819dc3aa1.
+No earlier release was overwritten. Source credential/local-data ignores and this
+completion documentation do not change the accepted runtime or require a rebuild.
+
+Full evidence and limitations: [RC6 completion report](rc6-completion-report.md).
+Live broadcaster consent/paid-event acceptance still needs a public Twitch Client ID
+and matching account authorization; no such success or physical GPU/OBS result is
+inferred from simulated-event tests or installer acceptance.

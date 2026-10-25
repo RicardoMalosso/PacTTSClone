@@ -18,3 +18,7 @@ build-sources/
 
 # User-authorized bundled reference samples; generated/user audio remains ignored.
 !src/pacttsclone/assets/voices/*.mp3
+
+# Local application data and OAuth credentials must never enter source control.
+local-data/
+**/credentials/

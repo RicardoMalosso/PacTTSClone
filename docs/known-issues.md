@@ -29,7 +29,7 @@ by the automated and source-level checks below, not a claim that no bugs exist.
   This remains the explicitly deferred feature in decisions.md, not a completed fix.
 - An automatic updater is not implemented. Upgrades use a newer installer with the
   same data directory. Authentication to private releases and rollback need design.
-- The RC5 installer uses anonymous IRC. RC6 source adds OAuth/EventSub for Bits,
+- The RC5 installer uses anonymous IRC. RC6 adds OAuth/EventSub for Bits,
   points and subscriptions; see [setup and acceptance limits](twitch-eventsub.md).
   Live broadcaster consent/paid-event acceptance remains separate.
 
@@ -66,3 +66,8 @@ installer during the bug/release review.
 
 Local rerun results are recorded in status.md. No installer rebuild was necessary
 for documentation corrections. The discarded temporary demonstration is excluded.
+
+
+RC6 is now [published and validated](rc6-completion-report.md). Its first release
+gate caught an initialization race; the fix and an EventSub handoff correction
+passed the complete gate before publication.
