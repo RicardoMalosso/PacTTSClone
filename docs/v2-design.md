@@ -98,3 +98,31 @@ and Brazilian SVG flags. UI strings are translated; voice names, original MP3
 filenames, chat text, transcripts and machine-readable diagnostic report fields
 are preserved verbatim. The transparent OBS page follows browser locale without
 rendering permanent flag controls into the stream.
+
+
+
+## RC6 authorized Twitch events — 2026-10-25
+
+The requested per-channel IRC/OAuth choice supersedes earlier IRC-only/no-paid-event
+scope exclusions. Existing channels default to IRC. OAuth uses a public-client
+Device Code grant and EventSub WebSockets, without a client secret or public
+server. Rules cover message commands, points, Bits/Power-ups, subs/gifts/resub
+messages, subscription endings, follows, raids and stream lifecycle.
+
+Host-only credential/reward endpoints, Windows DPAPI (0600 files on other systems),
+rotating refresh tokens, hourly validation, durable deduplication, moderation,
+OBS-acknowledged reward fulfillment, failure refunds and reconnect recovery are
+specified in [Twitch EventSub design and setup](twitch-eventsub.md).
+External consent/paid-event validation remains separate from deterministic tests.
+RC5 release assets are preserved; this source change is versioned RC6.
+
+
+## RC6 optional imports and pre-setup Configuration
+
+Configuration is available before Initial Setup completes. Imports are optional
+and independent: verified large model weights (explicit copy/move), and additive
+configuration/voices/completed output migration preserving the source. Generation
+and voice/chat/history tabs remain gated by verified setup readiness. See
+[optional import contract](optional-imports.md) for compatibility checks, backups,
+conflict handling, host-only endpoints, cancellation and validation. This supersedes
+earlier wording that locked every tab except Initial Setup.

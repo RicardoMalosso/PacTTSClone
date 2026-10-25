@@ -28,7 +28,7 @@ function el(tag, attrs = {}, ...children) {
   for (const child of children.flat()) if (child !== null && child !== undefined) node.append(child);
   return node;
 }
-function error(message) { $('error').textContent = t(message); $('error').hidden = false; }
+function error(message) { $('error').textContent = t(message); $('error').hidden = false; $('health').textContent = t(message); }
 function action(fn) { return async event => { try { await fn(event); } catch (e) { error(e.message); } }; }
 function button(text, fn, cls = 'secondary small-button') { return window.Locale.bind(el('button', {type: 'button', class: cls, onclick: action(fn)}), text); }
 function link(text, href, download = false) { return window.Locale.bind(el('a', {href, ...(download ? {download: ''} : {target: '_blank', rel: 'noopener noreferrer'})}), text); }
@@ -75,14 +75,14 @@ function openBugVideo() {
   }, 3000);
 }
 function tab(name) {
-  if (!runtimeSetup.ready && name !== 'setup') name = 'setup';
+  if (!runtimeSetup.ready && !['setup', 'config'].includes(name)) name = 'setup';
   window.Locale.apply();
   if (name === 'bugs') openBugVideo(); else stopBugVideo();
   const general = name === 'general';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
   window.Locale.bind($('playback-heading'), general ? 'Local OBS Sources' : 'Twitch & OBS');
-  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Read public Twitch chat. Commands queue local speech; this does not verify Bits or channel-point purchases.');
+  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Choose anonymous IRC for message commands, or authorize Twitch for chat, Channel Points, Bits and subscription events.');
   $('channel-form').hidden = general;
   $('channel-dashboard').hidden = general;
   $('general-form').hidden = !general;
@@ -298,7 +298,8 @@ $('add-command').addEventListener('click', () => commandRow());
 function fillChannel(name) {
   selectedChannel = name;
   const c = state.channels.find(c => c.name === name);
-  $('channel-name').value = c?.name || ''; $('channel-enabled').checked = c?.enabled || false;
+  $('channel-name').value = c?.name || ''; $('channel-transport').value = c?.transport || 'irc';
+  $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode(); $('channel-enabled').checked = c?.enabled || false;
   $('channel-paused').checked = c?.paused || false; $('channel-delay').value = c?.delay_seconds ?? 5;
   $('channel-cooldown').value = c?.user_cooldown_seconds ?? 15; $('channel-limit').value = c?.max_message_chars ?? 300;
   $('channel-filter').value = c?.filter_level || 'slurs'; $('channel-custom').value = (c?.custom_filters || []).join('\n');
@@ -310,7 +311,7 @@ $('channel-form').addEventListener('submit', action(async event => {
   event.preventDefault(); const name = $('channel-name').value.trim().toLowerCase(); const commands = {};
   document.querySelectorAll('.command-row').forEach(row => { const key = row.querySelector('input').value.trim().toLowerCase(); if (commands[key]) throw new Error(t('Duplicate command keyword.')); commands[key] = row.querySelector('select').value; });
   await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: $('channel-enabled').checked, paused: $('channel-paused').checked,
-    commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
+    transport: $('channel-transport').value, event_rules: readEventRules(), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
     delay_seconds: Number($('channel-delay').value), user_cooldown_seconds: Number($('channel-cooldown').value), max_message_chars: Number($('channel-limit').value)}});
   selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name);
 }));
@@ -318,6 +319,7 @@ $('pause-channel').addEventListener('click', action(async () => { if (selectedCh
 function renderChannels() {
   refreshCommandVoices();
   renderChannelDashboard();
+  refreshEventVoices();
   const key = JSON.stringify(state.channels.map(c => ({name: c.name})));
   if (key !== channelKey) {
     channelKey = key; $('channel-select').replaceChildren(el('option', {value: ''}, t('Create a channel')));
@@ -343,6 +345,7 @@ async function renderChannelState() {
   $('channel-queue').replaceChildren(...pending.map(i => el('div', {class: 'job-row'}, el('strong', {}, `${i.voice_title} · ${t(i.status)}`), el('p', {}, `${i.username || t('Replay')}: ${i.text}`),
     i.deadline && i.status === 'countdown' ? el('p', {class: 'muted'}, t('Starts in {seconds} s', {seconds: Math.max(0, i.deadline - snap.server_time).toFixed(1)})) : null,
     button('Cancel audio', async () => { await api(`/api/playback/${i.id}/cancel`, {method: 'POST'}); await renderChannelState(); }))));
+  renderTwitchEvents(snap.events || []);
   $('chat-events').replaceChildren(...snap.chat.map(c => el('div', {class: 'event-row'}, el('strong', {}, `${c.username} · ${c.accepted ? t('accepted') : t('blocked') + ': ' + t(c.reason)}`), el('p', {}, c.text))));
 }
 $('config-form').addEventListener('submit', action(async event => {
@@ -501,13 +504,15 @@ $('setup-too-long-yes').addEventListener('click', async () => {
 $('countermeasure-close').addEventListener('click', closeCountermeasures);
 
 function renderSetup(data) {
+  renderWeightDiscovery(data);
+  renderOptionalImport(data);
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
   if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
   if (data.stage === 'models' && data.download?.total_bytes) {
     modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
   }
-  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && node.dataset.tab !== 'setup'; });
+  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && !['setup', 'config'].includes(node.dataset.tab); });
   $('generate').disabled = busy || !data.ready;
   renderGlobalStatus();
   $('tunnel-card').hidden = !data.ready;
@@ -555,7 +560,7 @@ function renderSetup(data) {
     ` · ${d.reused_files || 0} ${t('verified cached files reused')}` :
     (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
   if (!data.ready && !setupAvailable) return;
-  if (!data.ready && (wasReady || !$('pane-setup').hidden)) tab('setup');
+  if (!data.ready && $('pane-config').hidden && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
 async function runtimeStatus() {
   if (session?.remote_access) { renderSetup({ready: state.setup_ready ?? session.setup_ready, status: 'host', stage: 'Waiting for host setup', ...(state.setup_activity || {})}); document.querySelector('[data-tab="setup"]').hidden = runtimeSetup.ready; $('setup-start').hidden = true; $('setup-cancel').hidden = true; $('setup-device').disabled = true; $('tunnel-card').hidden = true; return; }
@@ -595,6 +600,13 @@ function renderResidency() {
 function renderGlobalStatus() {
   $('live-generation').hidden = false;
   const running = state.active_job || state.jobs.find(job => job.status === 'running');
+  if (runtimeSetup.import_status?.status === 'running') {
+    $('live-generation-source').textContent = t('Import');
+    $('live-generation-status').textContent = t(runtimeSetup.import_status.category === 'models' ? 'Importing model weights' : 'Importing personal data');
+    $('live-generation-progress').removeAttribute('value');
+    $('live-generation-timer').textContent = duration(Date.now() / 1000 - runtimeSetup.import_status.started_at);
+    $('live-generation-cancel').hidden = true; return;
+  }
   if (runtimeSetup.status === 'running') {
     $('live-generation-source').textContent = t('Initial Setup');
     $('live-generation-status').textContent = t(runtimeSetup.stage === 'models' ? 'Downloading / verifying models' : 'Installing dependencies') + ' · ' + t(runtimeSetup.stage || '');
@@ -615,7 +627,8 @@ function renderChannelDashboard() {
   $('channel-list').replaceChildren();
   for (const channel of state.channels) {
     const row = el('div', {class: 'job-row', 'data-channel': channel.name},
-      el('strong', {}, '#' + channel.name), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + channel.connection_error : '')),
+      el('strong', {}, '#' + channel.name + ' · ' + (channel.transport === 'oauth' ? 'OAuth / EventSub' : 'IRC')), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + t(channel.connection_error) : '')),
+      channel.transport === 'oauth' ? el('details', {}, el('summary', {}, t('Event subscriptions')), ...channel.event_subscriptions.map(name => el('p', {}, name)), ...Object.entries(channel.event_errors).map(([name, reason]) => el('p', {class: 'error'}, name + ': ' + t(reason))), channel.reward_recovery ? el('p', {class: 'error'}, channel.reward_recovery.error) : null, el('p', {class: 'muted'}, t('Events during connection gaps may be missed. Managed point redemptions are checked for refunds on reconnect.'))) : null,
       el('div', {class: 'row-actions'},
         button(channel.enabled ? 'Disconnect' : 'Connect', async () => {
           await api(`/api/channels/${channel.name}/connection`, {method: 'POST', body: {enabled: !channel.enabled}});
@@ -630,4 +643,157 @@ function renderChannelDashboard() {
     $('channel-list').append(row);
   }
   if (!state.channels.length) $('channel-list').textContent = t('No saved Twitch channels. Add one below.');
+}
+
+
+const eventNames = {reward: 'Channel Points reward', bits: 'Bits and Power-ups', subscribe: 'New subscription', gift: 'Gift subscriptions', resub: 'Resubscription message', subscription_end: 'Subscription ended', follow: 'New follower', raid: 'Incoming raid', online: 'Stream online', offline: 'Stream offline'};
+let twitchAuthChannel = '', twitchAuthPending = false, twitchAuthBusy = false;
+function eventRuleRow(rule = {}) {
+  const kind = el('select', {'aria-label': t('Event type')}, ...Object.entries(eventNames).map(([value, name]) => el('option', {value}, t(name))));
+  kind.value = rule.kind || 'reward';
+  const voice = el('select', {'aria-label': t('Event voice'), 'data-voice': ''});
+  const reward = el('input', {'aria-label': t('Reward ID'), placeholder: t('Reward ID'), value: rule.reward_id || ''});
+  const minimum = el('input', {type: 'number', min: '1', max: '10000000', 'aria-label': t('Minimum Bits'), value: rule.min_bits || 1});
+  const template = el('textarea', {rows: '2', maxlength: '1000', 'aria-label': t('Event text template')}); template.value = rule.template || '{text}';
+  const row = el('section', {class: 'event-rule card'}, el('label', {}, t('Event type'), kind), el('label', {}, t('Event voice'), voice), el('label', {}, t('Reward ID'), reward), el('label', {}, t('Minimum Bits'), minimum), el('label', {}, t('Event text template'), template), button('Remove', () => row.remove()));
+  const visibility = () => { reward.parentElement.hidden = kind.value !== 'reward'; minimum.parentElement.hidden = kind.value !== 'bits'; };
+  kind.addEventListener('change', visibility); visibility();
+  $('event-rules').append(row); refreshEventVoices(); voice.value = rule.voice_id || '';
+}
+function refreshEventVoices() {
+  for (const select of document.querySelectorAll('#event-rules [data-voice]')) {
+    const key = JSON.stringify([window.Locale.language, state.voices.map(v => [v.id, v.title, v.status])]);
+    if (select.dataset.key === key) continue;
+    const selected = select.value; select.dataset.key = key;
+    select.replaceChildren(el('option', {value: ''}, t('Choose voice')), ...state.voices.filter(v => v.status === 'ready').map(v => el('option', {value: v.id}, v.title))); select.value = selected;
+  }
+}
+function readEventRules() {
+  return [...document.querySelectorAll('.event-rule')].map(row => {
+    const rule = {kind: row.querySelector('select').value, voice_id: row.querySelector('[data-voice]').value, reward_id: row.querySelector('input:not([type])').value.trim(), min_bits: Number(row.querySelector('input[type=number]').value), template: row.querySelector('textarea').value};
+    if (!rule.voice_id) throw new Error(t('Choose a voice for each event rule.'));
+    return rule;
+  });
+}
+function updateTwitchMode() {
+  const oauth = $('channel-transport').value === 'oauth';
+  $('event-rules-panel').hidden = !oauth;
+  $('twitch-oauth-panel').hidden = !oauth || Boolean(session?.remote_access);
+  twitchAuthChannel = ''; $('twitch-auth-status').textContent = ''; $('twitch-device').hidden = true; $('twitch-rewards').replaceChildren();
+  if (oauth && !session?.remote_access && selectedChannel && state.channels.some(c => c.name === selectedChannel)) loadTwitchAuth().catch(e => { $('twitch-auth-status').textContent = t(e.message); });
+}
+async function loadTwitchAuth() {
+  const channel = selectedChannel;
+  if (!channel || session?.remote_access || twitchAuthBusy) return;
+  twitchAuthBusy = true;
+  try {
+    const info = await api(`/api/twitch/${channel}/authorization`);
+    if (channel !== selectedChannel) return;
+    twitchAuthChannel = channel; twitchAuthPending = info.pending;
+    if (document.activeElement !== $('twitch-client-id')) $('twitch-client-id').value = info.client_id || $('twitch-client-id').value;
+    $('twitch-auth-status').textContent = info.error || (info.pending ? t('Waiting for Twitch authorization…') : info.authorized ? t('Authorized broadcaster') + ': ' + info.login + ' · ' + info.scopes.join(', ') : t('Not authorized'));
+    $('twitch-device').hidden = !info.pending; $('twitch-user-code').textContent = info.user_code || '';
+    $('twitch-activate').href = info.verification_uri || 'https://www.twitch.tv/activate';
+    $('twitch-authorize').disabled = Boolean(info.pending);
+    if (info.authorized && !info.pending) await refresh();
+  } finally { twitchAuthBusy = false; }
+}
+$('channel-transport').addEventListener('change', updateTwitchMode);
+$('add-event-rule').addEventListener('click', () => eventRuleRow());
+$('twitch-authorize').addEventListener('click', action(async () => {
+  if (!selectedChannel || !state.channels.some(c => c.name === selectedChannel)) throw new Error(t('Save the channel first.'));
+  await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'POST', body: {client_id: $('twitch-client-id').value.trim(), features: [...$('twitch-features').querySelectorAll('input:checked')].map(n => n.value)}});
+  await loadTwitchAuth();
+}));
+$('twitch-forget').addEventListener('click', action(async () => {
+  if (selectedChannel) { await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'DELETE'}); await loadTwitchAuth(); await refresh(); }
+}));
+async function loadTwitchRewards() {
+  const channel = selectedChannel; const rewards = await api(`/api/twitch/${channel}/rewards`);
+  if (channel !== selectedChannel) return;
+  $('twitch-rewards').replaceChildren(...rewards.map(r => el('div', {class: 'job-row'}, el('strong', {}, `${r.title} · ${r.cost}`), el('p', {class: 'muted'}, `${r.id} · ${t(r.manageable ? 'Automatic fulfillment / refund' : 'Manage in Twitch')}`), button('Use reward', () => eventRuleRow({kind: 'reward', reward_id: r.id})))));
+}
+$('twitch-load-rewards').addEventListener('click', action(loadTwitchRewards));
+$('twitch-create-reward').addEventListener('click', action(async () => {
+  const channel = selectedChannel;
+  const reward = await api(`/api/twitch/${channel}/rewards`, {method: 'POST', body: {title: $('twitch-reward-title').value, cost: Number($('twitch-reward-cost').value)}});
+  if (channel !== selectedChannel) return;
+  eventRuleRow({kind: 'reward', reward_id: reward.id}); await loadTwitchRewards();
+}));
+function renderTwitchEvents(events) {
+  let panel = $('twitch-event-history');
+  if (!panel) { panel = el('div', {id: 'twitch-event-history'}); $('chat-events').parentElement.append(panel); }
+  panel.replaceChildren(...events.map(e => el('div', {class: 'event-row'}, el('strong', {}, `${t(eventNames[e.kind] || e.kind)} · ${e.username} · ${t(e.status)}`), el('p', {}, e.text), e.reason ? el('p', {class: 'error'}, t(e.reason)) : null, el('p', {class: 'muted'}, `${t('Redemption status')}: ${e.settlement}${e.settlement_error ? ' · ' + t(e.settlement_error) : ''}`))));
+}
+setInterval(() => { if (twitchAuthPending && twitchAuthChannel === selectedChannel && !session?.remote_access) loadTwitchAuth().catch(() => {}); }, 2000);
+window.addEventListener('localechange', () => { refreshEventVoices(); });
+window.addEventListener('localechange', () => {
+  for (const row of document.querySelectorAll('.event-rule')) {
+    const kind = row.querySelector('select');
+    for (const option of kind.options) option.textContent = t(eventNames[option.value]);
+    const fields = [kind, row.querySelector('[data-voice]'), row.querySelector('input:not([type])'), row.querySelector('input[type=number]'), row.querySelector('textarea')];
+    ['Event type', 'Event voice', 'Reward ID', 'Minimum Bits', 'Event text template'].forEach((key, i) => { fields[i].setAttribute('aria-label', t(key)); fields[i].parentElement.firstChild.nodeValue = t(key); });
+  }
+});
+
+function weightSearchRoots() { return $('weight-search-roots').value.split('\n').map(v => v.trim()).filter(Boolean); }
+function renderWeightDiscovery(data) {
+  $('weight-reuse-panel').hidden = Boolean(session?.remote_access);
+  if (document.activeElement !== $('weight-search-roots') && !$('weight-search-roots').dataset.edited) $('weight-search-roots').value = (data.weight_search_roots || []).join('\n');
+  const scan = data.weight_discovery || {status: 'idle', files: []};
+  const running = scan.status === 'running';
+  $('weight-scan').disabled = running || data.status === 'running';
+  $('weight-scan-cancel').hidden = !running;
+  $('weight-search-roots').disabled = running || data.status === 'running';
+  $('weight-move').disabled = running || data.status === 'running';
+  $('weight-scan-status').textContent = t('Model search') + ': ' + t(scan.status) + ' · ' + (scan.files || []).length + ' ' + t('candidate weights') + (scan.limited ? ' · ' + t('Search limit reached; add a more specific folder.') : '');
+  if (data.weight_import?.files) $('weight-scan-status').textContent += ' · ' + t('Moved verified weights') + ': ' + formatTransferBytes(data.weight_import.moved_bytes || 0);
+  const key = JSON.stringify(scan.files || []);
+  if ($('weight-candidates').dataset.key !== key) {
+    $('weight-candidates').dataset.key = key;
+    $('weight-candidates').replaceChildren(...(scan.files || []).map(file => el('p', {class: 'muted'}, file.path + ' · ' + formatTransferBytes(file.size))));
+  }
+}
+$('weight-search-roots').addEventListener('input', () => { $('weight-search-roots').dataset.edited = 'true'; });
+$('weight-scan').addEventListener('click', importAction(async () => {
+  renderSetup(await api('/api/setup/weights/scan', {method: 'POST', body: {search_roots: weightSearchRoots(), move_weights: $('weight-move').checked}}));
+}));
+$('weight-scan-cancel').addEventListener('click', importAction(async () => {
+  renderSetup(await api('/api/setup/weights/cancel', {method: 'POST'}));
+}));
+
+function importAction(fn) { return async () => { try { await fn(); } catch (e) { $('optional-import-status').textContent = t(e.message); } }; }
+$('weight-import').addEventListener('click', importAction(async () => {
+  renderSetup(await api('/api/import/start', {method: 'POST', body: {category: 'models', search_roots: weightSearchRoots(), move_weights: $('weight-move').checked}}));
+}));
+$('personal-import').addEventListener('click', importAction(async () => {
+  renderSetup(await api('/api/import/start', {method: 'POST', body: {category: 'personal', source: $('personal-import-source').value.trim(), sections: [...$('personal-import-sections').querySelectorAll('input:checked')].map(n => n.value), replace_config: $('personal-replace-config').checked}}));
+}));
+$('optional-import-cancel').addEventListener('click', importAction(async () => {
+  renderSetup(await api('/api/import/cancel', {method: 'POST'}));
+}));
+function renderOptionalImport(data) {
+  $('import-card').hidden = Boolean(session?.remote_access);
+  const job = data.import_status || {status: 'idle'};
+  const running = job.status === 'running';
+  $('weight-import').disabled = running || data.status === 'running' || data.weight_discovery?.status === 'running';
+  $('personal-import').disabled = running || data.status === 'running';
+  $('optional-import-cancel').hidden = !running;
+  $('optional-import-status').textContent = t('Import') + ': ' + t(job.status) + (job.error ? ' · ' + t(job.error) : '') + (job.bytes ? ' · ' + formatTransferBytes(job.bytes) : '');
+  const result = job.result || {};
+  const key = JSON.stringify(result);
+  if ($('optional-import-result').dataset.key === key) return;
+  $('optional-import-result').dataset.key = key;
+  const notes = [];
+  if (job.category === 'personal' && job.status === 'succeeded') {
+    notes.push(`${t('Imported voices')}: ${result.voices || 0} · ${t('Imported audio')}: ${result.outputs || 0} · ${t('Imported channels')}: ${result.channels || 0}`);
+    if (result.backup) notes.push(t('Current database backup') + ': ' + result.backup);
+    notes.push(...(result.warnings || []));
+  }
+  if (job.category === 'models' && job.status === 'succeeded') {
+    notes.push(t('Verified local weight files') + ': ' + (result.files || []).length);
+    notes.push(t('Missing weights can be downloaded in Initial Setup.') + ' ' + (result.missing_weights || []).map(f => f.repo + '/' + f.file).join(', '));
+    notes.push(t('Moved verified weights') + ': ' + (result.weight_import || []).filter(f => f.moved).length);
+  }
+  $('optional-import-result').replaceChildren(...notes.map(note => el('p', {class: 'muted'}, note)));
 }

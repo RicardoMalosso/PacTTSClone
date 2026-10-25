@@ -3,12 +3,18 @@
 import argparse
 import hashlib
 import json
-import os
 import re
-import shutil
 import time
 import urllib.request
 from pathlib import Path
+
+from .model_cache import (
+    import_weight,
+    is_weight,
+    move_verified_weights,
+    scan_weights,
+    validate_roots,
+)
 
 MARKER = "@@PACTTS_SETUP@@"
 
@@ -109,7 +115,7 @@ def make_plan(repo):
     return {"repo": repo, "revision": revision, "files": files}
 
 
-def download_models(root, repos, hf_cache):
+def download_models(root, repos, hf_cache, search_roots=(), move_weights=False, import_only=False):
     root.mkdir(parents=True, exist_ok=True)
     plans = []
     for repo in repos:
@@ -146,14 +152,22 @@ def download_models(root, repos, hf_cache):
                 raise ValueError("Invalid model integrity metadata.")
             entry["url"] = f"https://huggingface.co/{repo}/resolve/{plan['revision']}/{name}"
         plans.append(plan)
-    total = sum(f["size"] for p in plans for f in p["files"])
+    total = sum(f["size"] for p in plans for f in p["files"] if not import_only or is_weight(f))
+    weight_sizes = {entry["size"] for plan in plans for entry in plan["files"] if is_weight(entry)}
+    roots = list(dict.fromkeys([str(hf_cache), *search_roots]))
+    discovered = scan_weights(roots, sizes=weight_sizes) if weight_sizes else {"files": []}
+    emit(weight_discovery={**discovered, "status": "complete"})
     done, reused = 0, 0
     manifest = []
+    verified_entries = []
+    missing_weights = []
     result = {}
     for plan in plans:
         key = plan["repo"].replace("/", "--")
         target = root / key / plan["revision"]
         for entry in plan["files"]:
+            if import_only and not is_weight(entry):
+                continue
             destination = target / entry["name"]
             last_emit = [0.0]
 
@@ -176,19 +190,28 @@ def download_models(root, repos, hf_cache):
                     )
                     last_emit[0] = now
 
-            # Reuse the exact existing HF snapshot if present, without destroying
-            # that cache. The copy/link is still fully hashed before use.
-            old = hf_cache / ("models--" + key) / "snapshots" / plan["revision"] / entry["name"]
-            if not destination.exists() and old.is_file() and old.stat().st_size == entry["size"]:
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                try:
-                    os.link(old.resolve(), destination)
-                except OSError:
-                    shutil.copyfile(old, destination)
-            state = fetch_file(entry, destination, progress)
+            # External folders supply large current weights only, never configuration.
+            if (
+                not destination.exists()
+                or destination.stat().st_size != entry["size"]
+                or (
+                    import_only
+                    and not verify_file(
+                        destination, entry["size"], entry["hash"], entry["algorithm"]
+                    )
+                )
+            ):
+                import_weight(entry, destination, discovered["files"], progress)
+            if import_only and not verify_file(
+                destination, entry["size"], entry["hash"], entry["algorithm"]
+            ):
+                missing_weights.append({"repo": plan["repo"], "file": entry["name"]})
+                continue
+            state = "verified cache" if import_only else fetch_file(entry, destination, progress)
             if state.startswith("verified"):
                 reused += 1
             done += entry["size"]
+            verified_entries.append((entry, destination))
             manifest.append(
                 {
                     "path": str(destination),
@@ -210,7 +233,27 @@ def download_models(root, repos, hf_cache):
                 }
             )
         result[plan["repo"]] = str(target)
-    return {"paths": result, "files": manifest, "reused_files": reused}
+    transfers = (
+        move_verified_weights(verified_entries, discovered["files"], search_roots, verify_file)
+        if move_weights
+        else []
+    )
+    if transfers:
+        receipt = root / "weight-import-receipt.json"
+        receipt.write_text(json.dumps(transfers, indent=2), encoding="utf-8")
+        emit(
+            weight_import={
+                "files": transfers,
+                "moved_bytes": sum(t["bytes"] for t in transfers if t["moved"]),
+            }
+        )
+    return {
+        "paths": result,
+        "files": manifest,
+        "reused_files": reused,
+        "weight_import": transfers,
+        "missing_weights": missing_weights,
+    }
 
 
 def main():
@@ -219,9 +262,20 @@ def main():
     parser.add_argument("--model", required=True)
     parser.add_argument("--asr-model", required=True)
     parser.add_argument("--hf-cache", type=Path, required=True)
+    parser.add_argument("--search-root", action="append", default=[])
+    parser.add_argument("--move-weights", action="store_true")
+    parser.add_argument("--import-only", action="store_true")
     args = parser.parse_args()
     args.root.mkdir(parents=True, exist_ok=True)
-    emit(models=download_models(args.root, [args.model, args.asr_model], args.hf_cache))
+    result = download_models(
+        args.root,
+        [args.model, args.asr_model],
+        args.hf_cache,
+        validate_roots(args.search_root),
+        args.move_weights,
+        args.import_only,
+    )
+    emit(**{"imported_models" if args.import_only else "models": result})
 
 
 if __name__ == "__main__":
