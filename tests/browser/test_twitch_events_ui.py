@@ -109,3 +109,27 @@ def test_event_generation_appears_in_monitor_and_event_history(page, live_server
     page.locator('[data-tab="history"]').click()
     expect(page.locator("#history-list")).to_contain_text("Speak this event")
     assert studio.service.history()[0]["channel"] == "streamer"
+
+
+def test_slow_initialization_preserves_unsaved_oauth_selection(page, live_server):
+    url, app = live_server
+    app.state.studio.save_channel(ChannelConfig(name="streamer"))
+    app.state.studio.accounts.http = FakeTwitch()
+    held = []
+    page.route("**/api/resources", lambda route: held.append(route))
+    page.goto(url)
+    page.locator('[data-tab="channels"]').click()
+    page.locator("#channel-select").select_option("streamer")
+    page.locator("#channel-transport").select_option("oauth")
+    page.locator("#twitch-client-id").fill(CLIENT_ID)
+    expect(page.locator("#twitch-oauth-panel")).to_be_visible()
+    assert held
+    resources = page.request.get(url + "/api/resources").json()
+    # The next state poll starts only after all initialization requests finish.
+    with page.expect_response("**/api/state"):
+        held[0].fulfill(json=resources)
+    page.unroute("**/api/resources")
+    expect(page.locator("#channel-transport")).to_have_value("oauth")
+    expect(page.locator("#twitch-oauth-panel")).to_be_visible()
+    expect(page.locator("#twitch-client-id")).to_have_value(CLIENT_ID)
+    expect(page.locator("#twitch-authorize")).to_be_visible()

@@ -465,3 +465,15 @@ assets are preserved; source, installer version metadata and future draft recipe
 advance to RC6 without overwriting RC5. The user subsequently authorized RC6
 publication after passing tests and installer acceptance; the explicit merged-PR
 publication workflow enforces that gate. Final results will be reported from Actions.
+
+
+## RC6 release gate caught initialization race
+
+PR #5 passed all seven checks and merged as 96bd04378b7e7d02fa97abec4b89486cb86fcc49
+with an identical tested tree. Release run 40162639296 correctly blocked the
+installer/publication when Chromium reproduced a late initialization response
+resetting an unsaved OAuth mode back to the persisted IRC setting. Initialization
+now honors the user's selected tab and channel draft. A deterministic browser
+regression holds the initial resources response, edits the mode, releases the
+response and verifies OAuth remains visible after the next poll.
+Publication remains blocked until validation of this corrected source completes.

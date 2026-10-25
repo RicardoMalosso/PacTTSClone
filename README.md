@@ -25,9 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.5.exe` in the [verified RC5 draft preview](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/untagged-0cf1bf3f4f2fd79d08d7). The unsigned setup is 59.73 MB and includes the verified FFmpeg binaries. Draft releases are
-visible only to repository collaborators with the appropriate access; a private
-repository does not provide public downloads.
+`PacTTSClone-Setup-0.3.0-rc.6.exe` in the [RC6 prerelease](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v0.3.0-rc.6). The unsigned setup includes verified FFmpeg binaries. Release downloads in this private repository require appropriate repository access. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -379,7 +377,7 @@ a separate per-person model. Preparation/transcription is tracked separately.
 
 
 
-## Twitch OAuth / EventSub (RC6 source)
+## Twitch OAuth / EventSub (RC6)
 
 Twitch & OBS now lets each channel choose **IRC · no authorization, message commands
 only** or **OAuth · chat, Channel Points, Bits and subscriptions**. Existing channels
@@ -390,10 +388,10 @@ The app marks managed redemptions fulfilled after OBS playback, not merely gener
 A registered **public Twitch application Client ID** and the broadcaster's consent
 are required; no Client ID is bundled and no client secret is needed. Complete
 [setup, permissions, rules and limitations](docs/twitch-eventsub.md) on the host PC.
-The existing RC5 draft installer predates this feature; source version RC6 is separate.
+RC6 includes these features; the older RC5 draft installer predates them.
 
 
-## Import from a previous installation (RC6 source)
+## Import from a previous installation (RC6)
 
 **Configuration → Import stuff (optional)** is accessible before Initial Setup
 completes and afterward. Import **models** separately from **configuration, voices
