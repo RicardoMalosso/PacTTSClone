@@ -403,3 +403,31 @@ GIF dependency to remove. Local core suite: 142 passed; Ruff, Python compilation
 JavaScript syntax, actual video/audio FFmpeg decode and wheel hash verification
 passed. All 26 local Chromium tests passed (69.20 seconds), including two observed
 full loops and audio decoding. Final GitHub/installer results remain pending; no model inference or physical audio-device claim is implied.
+
+
+
+## Overnight known-issue and release review — 2026-10-25
+
+Current review: [known issues](known-issues.md). Rechecked original pending items
+against main e71b39bf8caaf7d4c01466c69da5df3ecf481551, source/tests, all seven
+post-merge CI jobs and the successful Windows installer acceptance job logs.
+The earlier RC5 pending-results note is superseded: those runs passed.
+
+Fresh local Linux/Python 3.12 rerun: 142 core tests passed (18.11 s), 26 Chromium
+tests passed (70.45 s); Ruff, Python compilation and all three JavaScript syntax
+checks passed. One upstream Starlette TestClient/httpx deprecation warning was
+reported; no failed tests. These checks use deterministic inference substitutes
+and real FFmpeg/browser playback, not new real-model or physical CUDA inference.
+
+Confirmed draft RC5 already contains the validated installer, wheel, FFmpeg
+provenance and SHA256SUMS. Re-downloaded the accepted Actions ZIP, verified its
+archive hash, every packaged checksum and original WebM identity in the wheel;
+installer/wheel/provenance hashes match draft release asset digests. Corrected
+README's stale RC4 download recommendation to RC5 (59.73 MB). Existing binaries
+were preserved; no redundant installer build or release publication was needed.
+
+No critical regression reproduced. Punctuation/prosody, automatic updates and
+Bits/Channel Points remain unimplemented features, explicitly listed separately
+from resolved bugs. Public routing, live Twitch, OBS CEF, physical hotkey/audio
+and user GPU validation still need the relevant environment. The discarded
+temporary demonstration was not preserved.

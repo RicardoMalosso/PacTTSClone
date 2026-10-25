@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.4.exe` in the [verified RC4 draft preview](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/untagged-6b421e5dab1ef8ce46d5). The unsigned setup is 4.33 MB. Draft releases are
+`PacTTSClone-Setup-0.3.0-rc.5.exe` in the [verified RC5 draft preview](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/untagged-0cf1bf3f4f2fd79d08d7). The unsigned setup is 59.73 MB and includes the verified FFmpeg binaries. Draft releases are
 visible only to repository collaborators with the appropriate access; a private
 repository does not provide public downloads.
 
@@ -368,8 +368,12 @@ they are debugging labels, not verified accounts. History includes generation,
 voice preparation and blocked Twitch commands, with origin/name/IDs/status. The
 request lifecycle log is downloadable separately from final hardware reports.
 
+The current [known-issue review](docs/known-issues.md) separates resolved regressions,
+future features and validation requiring real hardware or external services.
+
 The fixed top bar shows the current operation and progress across tabs. Language
 flags are next to Local Voice Studio. Generate also displays base-model residency
 and voice availability: every ready voice shares the same warm/cold OmniVoice
 model. Switching voice repeats reference conditioning, without training or loading
 a separate per-person model. Preparation/transcription is tracked separately.
+
