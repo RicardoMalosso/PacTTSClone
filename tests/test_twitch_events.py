@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -432,6 +433,8 @@ def test_websocket_reconnect_transfers_without_resubscription(event_studio):
                 order.append(("welcome", self.number))
                 return json.dumps(welcome)
             if self.number == 1:
+                if self.count > 2:
+                    raise TimeoutError
                 return json.dumps(
                     {
                         "metadata": {"message_type": "session_reconnect"},
@@ -643,3 +646,58 @@ def test_oauth_errors_do_not_leak_request_or_response_secrets(monkeypatch):
         http_json("POST", "https://id.twitch.tv/oauth2/token", form={"device_code": "secret"})
     assert caught.value.code == "authorization_pending"
     assert "secret" not in str(caught.value)
+
+
+def test_handoff_drains_notifications_while_new_welcome_is_pending(event_studio):
+    _, studio, _, _ = event_studio
+    received, order = [], []
+    client = EventSubClient(
+        "streamer", studio.accounts, studio.store, lambda *args: received.append(args)
+    )
+    client.subscriptions = [CHAT]
+    release = threading.Event()
+
+    class NewSocket:
+        def recv(self, timeout):
+            assert release.wait(2)
+            order.append("new welcome")
+            return json.dumps(
+                {
+                    "metadata": {"message_type": "session_welcome"},
+                    "payload": {"session": {"id": "new", "keepalive_timeout_seconds": 30}},
+                }
+            )
+
+        def close(self):
+            order.append("new close")
+
+    class OldSocket:
+        count = 0
+
+        def recv(self, timeout):
+            self.count += 1
+            if self.count == 1:
+                release.set()
+                return json.dumps(
+                    {
+                        "metadata": {"message_type": "notification", "subscription_type": CHAT},
+                        "payload": {
+                            "event": {
+                                "broadcaster_user_id": "123",
+                                "message": {"text": "during handoff"},
+                            }
+                        },
+                    }
+                )
+            time.sleep(0.01)
+            raise TimeoutError
+
+        def close(self):
+            order.append("old close")
+
+    new, session = client._handoff(
+        OldSocket(), lambda *a, **kw: NewSocket(), "wss://eventsub.wss.twitch.tv/ws?reconnect=1"
+    )
+    assert session["id"] == "new" and isinstance(new, NewSocket)
+    assert received[0][2]["message"]["text"] == "during handoff"
+    assert order.index("new welcome") < order.index("old close")

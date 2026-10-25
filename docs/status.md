@@ -477,3 +477,9 @@ now honors the user's selected tab and channel draft. A deterministic browser
 regression holds the initial resources response, edits the mode, releases the
 response and verifies OAuth remains visible after the next poll.
 Publication remains blocked until validation of this corrected source completes.
+
+The RC6 follow-up also drains notifications from the old EventSub socket while the
+replacement opens/waits for its welcome, rather than leaving them unread in the
+old socket's buffer. Its regression delivers a notification during a deliberately
+blocked new welcome and verifies delivery before old-socket closure. The focused
+26 Twitch core tests pass, and all 30 Chromium tests pass locally after the UI fix.
