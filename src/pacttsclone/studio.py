@@ -8,6 +8,9 @@ from .models import AppConfig, ChannelConfig
 from .moderation import blocked_reason
 from .playback import GENERAL_PLAYER, Playback
 from .twitch import TwitchClient
+from .twitch_actions import TwitchActions
+from .twitch_events import EventSubClient
+from .twitch_oauth import TwitchAccounts
 from .voices import Voices
 
 
@@ -29,6 +32,9 @@ class Studio:
         self.hotkey = GlobalHotkey(self.playback.panic)
         service.on_finished = self.completed
         self.started = False
+        self.client_modes = {}
+        self.accounts = TwitchAccounts(service.settings.data_dir, self.authorization_changed)
+        self.events = TwitchActions(self)
 
     def start(self):
         self.started = True
@@ -47,10 +53,17 @@ class Studio:
         return {**value.model_dump(), "hotkey_status": self.hotkey.status}
 
     def save_channel(self, value: ChannelConfig):
-        for voice_id in value.commands.values():
+        for voice_id in [*value.commands.values(), *[r.voice_id for r in value.event_rules]]:
             if not self.store.get("voice", voice_id):
                 raise UserError("A command refers to a voice that does not exist.")
+        old = self.store.get("channel", value.name)
         config = self.store.put("channel", value.name, value.model_dump())
+        if old and (
+            old.get("transport", "irc") != value.transport
+            or old.get("commands") != config["commands"]
+            or old.get("event_rules", []) != config["event_rules"]
+        ):
+            self.disconnect_client(value.name)
         if self.started:
             self.connect(config)
         return config
@@ -83,7 +96,21 @@ class Studio:
         # A closing IRC thread may be waiting for chat_lock.
         if client:
             client.close()
+        self.accounts.forget(name)
+        self.client_modes.pop(name, None)
         return {"deleted": name}
+
+    def disconnect_client(self, name):
+        client = self.clients.pop(name, None)
+        self.client_modes.pop(name, None)
+        if client:
+            client.close()
+
+    def authorization_changed(self, name):
+        self.disconnect_client(name)
+        config = self.store.get("channel", name)
+        if self.started and config:
+            self.connect(config)
 
     def connect(self, config):
         if not self.service.setup_ready():
@@ -91,6 +118,9 @@ class Studio:
         if config.get("kind") == "general":
             return
         name = config["name"]
+        mode = config.get("transport", "irc")
+        if name in self.clients and self.client_modes.get(name, "irc") != mode:
+            self.disconnect_client(name)
         old = self.clients.get(name)
         if not config["enabled"]:
             if old:
@@ -98,7 +128,19 @@ class Studio:
                 del self.clients[name]
             return
         if not old:
-            client = self.twitch_factory(name, self.receive)
+            if mode == "oauth":
+                if not self.accounts.snapshot(name)["authorized"]:
+                    return
+                client = EventSubClient(
+                    name,
+                    self.accounts,
+                    self.store,
+                    self.events.receive,
+                    on_connected=self.events.reconcile,
+                )
+            else:
+                client = self.twitch_factory(name, self.receive_irc)
+            self.client_modes[name] = mode
             self.clients[name] = client
             client.start()
 
@@ -111,11 +153,28 @@ class Studio:
             result.append(
                 {
                     **config,
-                    "connection": client.status if client else "disconnected",
+                    "connection": client.status
+                    if client
+                    else (
+                        "Authorization required"
+                        if config.get("transport") == "oauth" and config["enabled"]
+                        else "disconnected"
+                    ),
                     "connection_error": client.error if client else None,
+                    "oauth_authorized": self.accounts.snapshot(config["name"])["authorized"],
+                    "event_subscriptions": getattr(client, "subscriptions", []),
+                    "event_errors": getattr(client, "subscription_errors", {}),
+                    "event_gap_since": getattr(client, "gap_since", None),
+                    "reward_recovery": self.store.get("twitch_recovery", config["name"]),
                 }
             )
         return result
+
+    def receive_irc(self, channel, username, message, message_id=None):
+        config = self.store.get("channel", channel)
+        if config and config.get("transport", "irc") == "irc":
+            return self.receive(channel, username, message, message_id)
+        return None
 
     def receive(self, channel, username, message, message_id=None):
         with self.chat_lock:
@@ -221,7 +280,10 @@ class Studio:
             self.connect({**channel, "enabled": False})
 
     def close(self):
-        for client in self.clients.values():
+        self.started = False
+        self.accounts.close()
+        for client in list(self.clients.values()):
             client.close()
+        self.events.close()
         self.hotkey.close()
         self.service.close()

@@ -183,7 +183,28 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.post("/api/setup/start")
     def setup_start(value: dict):
-        return runtime_setup.start(value.get("device"))
+        return runtime_setup.start(
+            value.get("device"), value.get("search_roots"), value.get("move_weights", False)
+        )
+
+    @app.post("/api/setup/weights/scan")
+    def scan_model_weights(value: dict):
+        return runtime_setup.discover_weights(value.get("search_roots", []))
+
+    @app.post("/api/setup/weights/cancel")
+    def cancel_weight_scan():
+        runtime_setup.scan_stop.set()
+        return runtime_setup.snapshot()
+
+    @app.post("/api/import/start")
+    def optional_import(value: dict):
+        return runtime_setup.start_import(studio, value)
+
+    @app.post("/api/import/cancel")
+    def cancel_optional_import():
+        runtime_setup.cancelled.set()
+        runtime_setup._kill()
+        return runtime_setup.snapshot()
 
     @app.post("/api/setup/cancel")
     def setup_cancel():
@@ -496,6 +517,39 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         studio.playback.pause(GENERAL_PLAYER, config["paused"])
         return config
 
+    def twitch_channel(channel, request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Twitch authorization and reward management are host-only.")
+        value = service.store.get("channel", channel)
+        if not value or value.get("kind") == "general":
+            raise HTTPException(404, "Save a Twitch channel first.")
+        return value
+
+    @app.get("/api/twitch/{channel}/authorization")
+    def twitch_authorization(channel: str, request: Request):
+        twitch_channel(channel, request)
+        return studio.accounts.snapshot(channel)
+
+    @app.post("/api/twitch/{channel}/authorization")
+    def twitch_authorize(channel: str, value: dict, request: Request):
+        twitch_channel(channel, request)
+        return studio.accounts.start(channel, value.get("client_id"), value.get("features"))
+
+    @app.delete("/api/twitch/{channel}/authorization")
+    def twitch_forget(channel: str, request: Request):
+        twitch_channel(channel, request)
+        return studio.accounts.forget(channel)
+
+    @app.get("/api/twitch/{channel}/rewards")
+    def twitch_rewards(channel: str, request: Request):
+        twitch_channel(channel, request)
+        return studio.events.rewards(channel)
+
+    @app.post("/api/twitch/{channel}/rewards", status_code=201)
+    def twitch_create_reward(channel: str, value: dict, request: Request):
+        twitch_channel(channel, request)
+        return studio.events.create_reward(channel, value.get("title"), value.get("cost"))
+
     @app.get("/api/channels")
     def channels():
         return studio.channels()
@@ -528,6 +582,9 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                 service.get(j["id"]) for j in service.history(200) if j.get("channel") == channel
             ],
             "chat": [c for c in service.store.all("chat", 1000) if c["channel"] == channel][:100],
+            "events": [
+                e for e in service.store.all("twitch_event", 1000) if e["channel"] == channel
+            ][:100],
         }
 
     @app.post("/api/channels/{channel}/pause")

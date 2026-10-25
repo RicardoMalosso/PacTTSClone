@@ -1,10 +1,10 @@
-#define AppVersion "0.3.0-rc.5"
+#define AppVersion "0.3.0-rc.6"
 [Setup]
 AppId={{7FF568CE-33A3-40B1-A7C0-15AA76F1DB84}
 AppName=PacTTSClone
 AppVersion={#AppVersion}
 AppVerName=PacTTSClone {#AppVersion}
-VersionInfoVersion=0.3.0.5
+VersionInfoVersion=0.3.0.6
 DefaultDirName={localappdata}\Programs\PacTTSClone
 DefaultGroupName=PacTTSClone
 PrivilegesRequired=lowest
@@ -278,3 +278,4 @@ begin
     LogButton.Visible := FileExists(SetupLogPath);
   end;
 end;
+

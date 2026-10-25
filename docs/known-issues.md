@@ -29,8 +29,9 @@ by the automated and source-level checks below, not a claim that no bugs exist.
   This remains the explicitly deferred feature in decisions.md, not a completed fix.
 - An automatic updater is not implemented. Upgrades use a newer installer with the
   same data directory. Authentication to private releases and rollback need design.
-- Bits/Channel Points redemptions are not implemented. Current Twitch integration
-  uses anonymous read-only IRC commands with queues, filtering and cooldowns.
+- The RC5 installer uses anonymous IRC. RC6 source adds OAuth/EventSub for Bits,
+  points and subscriptions; see [setup and acceptance limits](twitch-eventsub.md).
+  Live broadcaster consent/paid-event acceptance remains separate.
 
 These features were not added to or represented as part of the validated RC5
 installer during the bug/release review.

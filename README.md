@@ -43,7 +43,7 @@ repository does not provide public downloads.
    A compatible NVIDIA driver is required; setup never installs drivers.
 5. Click **Install / verify setup**. The web interface installs the selected inference
    packages, downloads OmniVoice and Whisper Small, verifies the files and unlocks
-   the other tabs. Model progress shows real file bytes, cache verification and
+   generation tabs. Configuration is available beforehand for optional imports. Model progress shows real file bytes, cache verification and
    resumed downloads. Package installation shows actual log activity; it has no
    reliable combined byte percentage. Cancel/retry and a downloadable setup log
    are available. Only then prepare the included voices.
@@ -183,7 +183,7 @@ samples are unchanged. Original uploaded files are not modified. Sample quality
 4. In **Twitch & OBS**, save a channel login (without URL), map commands like
    `!lula` / `!dilma` to ready voices, choose filters/delay and enable connection.
    `viewer: !lula oi bom dia` queues local generation. This is read-only IRC; it
-   does not post chat or validate Bits/channel-point purchases.
+   does not post chat. Choose OAuth mode for authorized Twitch events; see below.
 5. Add **http://127.0.0.1:7860/channelname** as an OBS Browser Source. The separate
    control page is **http://127.0.0.1:7860/channelname/control**. Only the OBS page
    automatically plays channel audio. Route its audio through OBS as desired.
@@ -377,3 +377,28 @@ and voice availability: every ready voice shares the same warm/cold OmniVoice
 model. Switching voice repeats reference conditioning, without training or loading
 a separate per-person model. Preparation/transcription is tracked separately.
 
+
+
+## Twitch OAuth / EventSub (RC6 source)
+
+Twitch & OBS now lets each channel choose **IRC · no authorization, message commands
+only** or **OAuth · chat, Channel Points, Bits and subscriptions**. Existing channels
+keep IRC. OAuth adds event-to-voice rules, broadcaster device authorization, reward
+creation/listing, event history and managed point refunds after failure/cancellation.
+The app marks managed redemptions fulfilled after OBS playback, not merely generation.
+
+A registered **public Twitch application Client ID** and the broadcaster's consent
+are required; no Client ID is bundled and no client secret is needed. Complete
+[setup, permissions, rules and limitations](docs/twitch-eventsub.md) on the host PC.
+The existing RC5 draft installer predates this feature; source version RC6 is separate.
+
+
+## Import from a previous installation (RC6 source)
+
+**Configuration → Import stuff (optional)** is accessible before Initial Setup
+completes and afterward. Import **models** separately from **configuration, voices
+and outputs**. Model import checks exact pinned hashes and offers copy/move;
+personal data is copied with a metadata backup, stable remapped IDs and no silent
+overwrite of current assets. Neither import is mandatory.
+
+[Old-folder examples, safety behavior and limitations](docs/optional-imports.md).

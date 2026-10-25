@@ -325,3 +325,42 @@ and reapply it to request another acceptance run after changes. The workflow
 retains its full reusable test gate, actual Windows install/model-download/wizard/
 reinstall/uninstall checks, and uploads the distributable only after acceptance.
 Draft release creation remains manual and main-only.
+
+
+
+## RC6 authorized Twitch events — 2026-10-25
+
+The requested per-channel IRC/OAuth choice supersedes earlier IRC-only/no-paid-event
+scope exclusions. Existing channels default to IRC. OAuth uses a public-client
+Device Code grant and EventSub WebSockets, without a client secret or public
+server. Rules cover message commands, points, Bits/Power-ups, subs/gifts/resub
+messages, subscription endings, follows, raids and stream lifecycle.
+
+Host-only credential/reward endpoints, Windows DPAPI (0600 files on other systems),
+rotating refresh tokens, hourly validation, durable deduplication, moderation,
+OBS-acknowledged reward fulfillment, failure refunds and reconnect recovery are
+specified in [Twitch EventSub design and setup](twitch-eventsub.md).
+External consent/paid-event validation remains separate from deterministic tests.
+RC5 release assets are preserved; this source change is versioned RC6.
+
+
+## RC6 optional imports and pre-setup Configuration
+
+Configuration is available before Initial Setup completes. Imports are optional
+and independent: verified large model weights (explicit copy/move), and additive
+configuration/voices/completed output migration preserving the source. Generation
+and voice/chat/history tabs remain gated by verified setup readiness. See
+[optional import contract](optional-imports.md) for compatibility checks, backups,
+conflict handling, host-only endpoints, cancellation and validation. This supersedes
+earlier wording that locked every tab except Initial Setup.
+
+
+## Explicit RC6 publication gate
+
+The `publish-release` PR label requests publication only after that same-repository
+PR is merged into main. `Publish validated RC6` calls the installer workflow, which
+reruns the full reusable tests and real Windows installer acceptance before creating
+a new RC6 draft. Only a successful caller continuation may publish that draft as
+a prerelease, and it checks the release target equals the merged event commit.
+Existing releases are never overwritten. Ordinary PRs/commits do not build
+installers or publish. This implements the user's explicit publication request.

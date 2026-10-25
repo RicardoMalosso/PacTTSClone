@@ -16,6 +16,7 @@ function Set-LocalEnvironment([string]$AppRoot, [string]$DataRoot) {
     $env:UV_PYTHON_BIN_DIR = Join-Path $AppRoot 'runtime\bin'
     $env:UV_NO_CONFIG = '1'
     $env:UV_PYTHON_PREFERENCE = 'only-managed'
+    if ($env:HF_HUB_CACHE -and -not $env:PACTTS_PREVIOUS_HF_CACHE) { $env:PACTTS_PREVIOUS_HF_CACHE = $env:HF_HUB_CACHE }
     $env:HF_HOME = Join-Path $DataRoot 'cache\huggingface'
     $env:HF_HUB_CACHE = Join-Path $env:HF_HOME 'hub'
     $env:PIP_CACHE_DIR = Join-Path $DataRoot 'cache\pip'
@@ -55,3 +56,4 @@ function Get-VerifiedDownload([string]$Url, [string]$Hash, [string]$Destination)
         }
     }
 }
+

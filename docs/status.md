@@ -431,3 +431,37 @@ Bits/Channel Points remain unimplemented features, explicitly listed separately
 from resolved bugs. Public routing, live Twitch, OBS CEF, physical hotkey/audio
 and user GPU validation still need the relevant environment. The discarded
 temporary demonstration was not preserved.
+
+## RC6 Twitch events and optional imports — 2026-10-25
+
+Implemented per-channel anonymous IRC or authorized EventSub, public-client Device
+OAuth, host-only credential/reward endpoints, Windows DPAPI, refresh/validation,
+configurable event-to-voice rules, individual subscription diagnostics, durable
+deduplication, managed reward settlement after OBS playback, refunds and bounded
+reconnect recovery. See twitch-eventsub.md for exact scopes and limitations.
+
+Configuration is available before Initial Setup completes. Optional imports are
+independent: verified large model weights with explicit copy/move; and additive
+configuration/voice/completed-audio migration preserving the source and backing up
+current metadata. Models never import old configs. Personal data remaps IDs, keeps
+existing assets/channels, supports explicit application-settings replacement and
+never replays old pending queues. See optional-imports.md.
+
+Local Linux/Python 3.12 validation: 177 core tests passed (27.11 s), 29 Chromium
+tests passed (78.81 s), Ruff/Python compilation/JavaScript syntax passed. Final wheel
+built and includes the new modules. Desktop/mobile Twitch and pre-setup Configuration
+screens inspected; no horizontal overflow at 390px. One upstream Starlette
+TestClient/httpx deprecation warning, no failed tests. The model-import fixtures
+lower the 64 MiB threshold; real files still require exact pinned size/SHA-256.
+Tests cover source preservation, incompatible weights, shared-cache copies,
+explicit moves, migration mapping/idempotency, backup/rollback/cancellation,
+pre-setup Config access and generation gating. Twitch tests use simulated service
+responses and explicit fake inference, not real paid transactions or new synthesis.
+
+Cross-platform CI results will be checked before merging this source change.
+No registered public Twitch Client ID is bundled: broadcaster authorization and
+live paid-event acceptance require one and remain unverified here. RC5 release
+assets are preserved; source, installer version metadata and future draft recipe
+advance to RC6 without overwriting RC5. The user subsequently authorized RC6
+publication after passing tests and installer acceptance; the explicit merged-PR
+publication workflow enforces that gate. Final results will be reported from Actions.

@@ -17,8 +17,10 @@ from pathlib import Path
 
 import psutil
 
+from .data_import import import_personal_data
 from .domain import BusyError, UserError
 from .engine import dependencies_available
+from .model_cache import default_roots, scan_weights, validate_roots
 
 
 class RuntimeSetup:
@@ -47,6 +49,11 @@ class RuntimeSetup:
             self.lines = self.log_path.read_text(encoding="utf-8").splitlines()[-500:]
         except OSError:
             self.lines = []
+        self.import_thread = None
+        self.import_status = {"status": "idle"}
+        self.scan_thread = None
+        self.scan_stop = threading.Event()
+        self.discovery = {"status": "idle", "files": [], "checked_files": 0, "limited": False}
         self.on_ready = lambda: None
         self._apply_models()
         service.setup_ready = lambda: self.snapshot()["ready"]
@@ -84,14 +91,135 @@ class RuntimeSetup:
                     )
                 )
             )
-            return {**self.state, "ready": ready, "lines": self.lines[-500:]}
+            return {
+                **self.state,
+                "ready": ready,
+                "lines": self.lines[-500:],
+                "weight_discovery": self.discovery,
+                "import_status": self.import_status,
+            }
 
     def update(self, **values):
         with self.lock:
             self.state.update(values)
+            if "weight_discovery" in values:
+                self.discovery = values["weight_discovery"]
             tmp = self.state_path.with_suffix(".tmp")
             tmp.write_text(json.dumps(self.state), encoding="utf-8")
             tmp.replace(self.state_path)
+
+    def discover_weights(self, roots):
+        roots = validate_roots(roots)
+        with self.lock:
+            if self.service.setup_busy or (self.scan_thread and self.scan_thread.is_alive()):
+                raise BusyError("Wait for the current setup or model search to finish.")
+            self.update(weight_search_roots=roots)
+            self.scan_stop.clear()
+            self.discovery = {
+                "status": "running",
+                "files": [],
+                "checked_files": 0,
+                "limited": False,
+            }
+
+            def report(result):
+                with self.lock:
+                    self.discovery = result
+
+            def run():
+                report(
+                    scan_weights(
+                        [*default_roots(self.service.settings.data_dir), *roots],
+                        stop=self.scan_stop,
+                        report=report,
+                    )
+                )
+
+            self.scan_thread = threading.Thread(target=run, daemon=True, name="model-discovery")
+            self.scan_thread.start()
+        return self.snapshot()
+
+    def start_import(self, studio, value):
+        category = value.get("category")
+        if category not in {"models", "personal"}:
+            raise UserError("Choose models or personal data to import.")
+        with self.service._lock:
+            if self.service.setup_busy or self.service.pending():
+                raise BusyError("Wait for setup/generation to finish before importing.")
+            if any(c["enabled"] for c in studio.channels()):
+                raise BusyError("Disconnect Twitch channels before importing data.")
+            if self.scan_thread and self.scan_thread.is_alive():
+                raise BusyError("Wait for the model search to finish before importing.")
+            self.service.setup_busy = True
+            self.service.runner.reset()
+            self.cancelled.clear()
+            self.import_status = {
+                "status": "running",
+                "category": category,
+                "bytes": 0,
+                "started_at": time.time(),
+            }
+            self.import_thread = threading.Thread(
+                target=self._import, args=(studio, dict(value)), daemon=True, name="optional-import"
+            )
+            self.import_thread.start()
+        return self.snapshot()
+
+    def _import(self, studio, value):
+        try:
+            if value["category"] == "personal":
+
+                def report_import(result):
+                    with self.lock:
+                        self.import_status = {**self.import_status, **result}
+
+                result = import_personal_data(
+                    studio,
+                    value.get("source"),
+                    value.get("sections"),
+                    value.get("replace_config", False),
+                    self.cancelled,
+                    report_import,
+                )
+            else:
+                roots = validate_roots(value.get("search_roots", []))
+                if not roots:
+                    raise UserError("Choose the old model/cache folders to import from.")
+                if not isinstance(value.get("move_weights", False), bool):
+                    raise UserError("Choose copy or move for model weights.")
+                ids = self.state.get("model_ids") or self.model_ids
+                command = [
+                    sys.executable,
+                    "-m",
+                    "pacttsclone.model_setup",
+                    "--root",
+                    str(self.service.settings.data_dir / "models"),
+                    "--model",
+                    ids[0],
+                    "--asr-model",
+                    ids[1],
+                    "--hf-cache",
+                    os.environ.get("HF_HUB_CACHE", str(Path.home() / ".cache/huggingface/hub")),
+                    "--import-only",
+                ]
+                for root in roots:
+                    command.extend(["--search-root", root])
+                if value.get("move_weights"):
+                    command.append("--move-weights")
+                self.update(imported_models=None, weight_import=None)
+                with self.log_path.open("a", encoding="utf-8") as log:
+                    self._run_command(command, log)
+                result = self.state.get("imported_models") or {}
+            self.import_status = {**self.import_status, "status": "succeeded", "result": result}
+        except InterruptedError as exc:
+            self.import_status.update(status="cancelled", error=str(exc))
+        except Exception as exc:
+            self.import_status.update(status="failed", error=str(exc))
+        finally:
+            with self.service._lock:
+                self.service.setup_busy = False
+            with self.lock:
+                self.process = None
 
     def offer_countermeasures(self):
         """Atomically claim the once-only prompt, including across browser reloads."""
@@ -123,11 +251,24 @@ class RuntimeSetup:
         return self.snapshot()
 
     def close(self):
+        self.scan_stop.set()
+        self.cancelled.set()
+        if self.import_thread:
+            self._kill()
+            self.import_thread.join(5)
+        if self.scan_thread:
+            self.scan_thread.join(2)
         self.cancel()
         if self.thread:
             self.thread.join(5)
 
-    def start(self, device):
+    def start(self, device, search_roots=None, move_weights=False):
+        if not isinstance(move_weights, bool):
+            raise UserError("Choose copy or move for the selected old model folders.")
+        if search_roots is not None:
+            search_roots = validate_roots(search_roots)
+        if self.scan_thread and self.scan_thread.is_alive():
+            raise BusyError("Wait for the model search to finish before installing.")
         if device not in {"cpu", "cuda"}:
             raise UserError("Choose CPU or NVIDIA CUDA.")
         with self.service._lock:
@@ -135,6 +276,9 @@ class RuntimeSetup:
                 raise BusyError("Finish or cancel generation/setup before installing dependencies.")
             if "torch" in sys.modules:
                 raise UserError("Restart the application before changing inference dependencies.")
+            if search_roots is not None:
+                self.update(weight_search_roots=search_roots)
+            self.update(move_weights=move_weights)
             self.service.setup_busy = True
             self.service.runner.reset()
             self.cancelled.clear()
@@ -332,8 +476,7 @@ class RuntimeSetup:
                                 "percent": round(100 * current / total, 1) if total else None,
                                 "speed_bytes_per_second": round(speed) if speed else None,
                                 "eta_seconds": (
-                                    round((total - current) / speed)
-                                    if total and speed else None
+                                    round((total - current) / speed) if total and speed else None
                                 ),
                                 "timestamp": time.time(),
                             }
@@ -341,17 +484,21 @@ class RuntimeSetup:
                         last_sample_at = now
                         last_sample_bytes = current
                     elif "Installing collected packages" in line:
-                        self.update(dependency_progress={
-                            "message": line.strip(),
-                            "phase": "installing",
-                            "timestamp": time.time(),
-                        })
+                        self.update(
+                            dependency_progress={
+                                "message": line.strip(),
+                                "phase": "installing",
+                                "timestamp": time.time(),
+                            }
+                        )
                     elif "Successfully installed" in line:
-                        self.update(dependency_progress={
-                            "message": line.strip(),
-                            "phase": "complete",
-                            "timestamp": time.time(),
-                        })
+                        self.update(
+                            dependency_progress={
+                                "message": line.strip(),
+                                "phase": "complete",
+                                "timestamp": time.time(),
+                            }
+                        )
             with self.lock:
                 self.lines.append(formatted)
                 self.lines = self.lines[-500:]
@@ -380,16 +527,16 @@ class RuntimeSetup:
                             log,
                         )
                     else:
-                        self._run_command(
-                            [sys.executable, "-m", "ensurepip", "--upgrade"], log
-                        )
+                        self._run_command([sys.executable, "-m", "ensurepip", "--upgrade"], log)
                     importlib.invalidate_caches()
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
                     self.update(
-                        stage=stage, completed_steps=number - 1,
-                        dependency_progress=None, download=None,
+                        stage=stage,
+                        completed_steps=number - 1,
+                        dependency_progress=None,
+                        download=None,
                     )
                     self._run_command(command, log)
                 importlib.invalidate_caches()
@@ -403,13 +550,18 @@ class RuntimeSetup:
                         AppConfig(**{**self.service.config.model_dump(), "device": device})
                     )
                 self.update(
-                    status="succeeded", stage="ready", completed_steps=5,
-                    finished_at=time.time(), initial_setup_completed=True,
+                    status="succeeded",
+                    stage="ready",
+                    completed_steps=5,
+                    finished_at=time.time(),
+                    initial_setup_completed=True,
                 )
                 self._apply_models()
         except InterruptedError as exc:
             self.update(
-                status="cancelled", stage="cancelled", error=str(exc),
+                status="cancelled",
+                stage="cancelled",
+                error=str(exc),
                 finished_at=time.time(),
             )
         except Exception as exc:

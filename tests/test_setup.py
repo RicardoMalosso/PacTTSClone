@@ -209,6 +209,7 @@ def test_verified_model_paths_are_used_offline_after_restart(tmp_path, engine):
 
 
 def test_model_setup_reuses_existing_hf_snapshot_and_reports_real_bytes(tmp_path, monkeypatch):
+    monkeypatch.setattr("pacttsclone.model_cache.MIN_WEIGHT_BYTES", 1)
     root, cache = tmp_path / "models", tmp_path / "hf"
     revision, payload = "a" * 40, b"verified weights"
     entry = dict(
@@ -308,3 +309,4 @@ def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
         assert restored.offer_countermeasures() == {"offered": False}
     finally:
         app.state.studio.close()
+

@@ -70,7 +70,7 @@ class Tunnel:
     def permitted(self, capability, path, method):
         if not capability:
             return False
-        if path.startswith(("/api/tunnel", "/api/setup")):
+        if path.startswith(("/api/tunnel", "/api/setup", "/api/twitch", "/api/import")):
             return False  # Tunnel lifecycle stays local, even for shared admins.
         if capability[0] == "admin":
             return True
@@ -257,3 +257,4 @@ class Tunnel:
         if self.thread and self.thread is not threading.current_thread():
             self.thread.join(3)
         self.status = "stopped"
+
