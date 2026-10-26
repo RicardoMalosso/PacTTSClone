@@ -55,6 +55,16 @@ async function api(url, options = {}) {
   }
   return response.json();
 }
+$('restart-cuda').addEventListener('click', action(async () => {
+  if (!confirm('Restart the GPU inference worker? This unloads the model; the next generation will reload CUDA. Active work must finish or be cancelled first.')) return;
+  const control = $('restart-cuda');
+  control.disabled = true;
+  try {
+    const result = await api('/api/inference/restart', {method: 'POST'});
+    $('health').textContent = result.message;
+    await refresh();
+  } finally { control.disabled = false; }
+}));
 function stopBugVideo() {
   clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false;
   $('bug-video').replaceChildren();

@@ -253,6 +253,20 @@ class GenerationService:
                 self.cancel_event.set()
             return self.get(job_id)
 
+    def restart_inference_worker(self):
+        """Drop the resident inference process without changing hardware settings."""
+        with self._lock:
+            if self.pending() or self.active_id is not None:
+                raise BusyError("Wait for the active generation to finish or cancel it first.")
+            old_pid = self.runner.pid
+            self.runner.reset()
+            return {
+                "ok": True,
+                "previous_worker_pid": old_pid,
+                "worker_pid": self.runner.pid,
+                "message": "Inference worker reset. CUDA will initialize on the next generation.",
+            }
+
     def cancel_all(self):
         with self._lock:
             for job in self.pending():
