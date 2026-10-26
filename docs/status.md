@@ -577,3 +577,9 @@ full run, with one ambiguous test locator after adding the second OBS link;
 that locator was scoped to the existing channel control and rechecked separately.
 The new saved-card/Setup-toggle browser regression passed. Windows bootstrap
 execution and the updated reinstall assertions remain pending Windows CI.
+
+
+## RC8 public Twitch identity and ready-gated bug video
+Bundled owner-supplied public Client ID 93mkh0su05k4ouzlkdk9jtu55f9ak2; the normal UI no longer asks for keys or registration. Backend defaults to the bundled ID while retaining developer environment overrides and existing account IDs. Twitch's real device endpoint accepted this ID (200), and secret-free token polling returned authorization_pending. No broadcaster account was authorized.
+Bug-video player uses the official YouTube IFrame API readiness event, opens its tab only when ready, and requests playback 200 ms later. Navigation/panic cancels it; a 20-second loading timeout offers a direct video link.
+Local core 184 passed; browser/release checks tracked in Actions. Actual consent and browser autoplay restrictions remain separate acceptance items.

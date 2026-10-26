@@ -15,6 +15,8 @@ from pathlib import Path
 
 from .domain import UserError
 
+PUBLIC_CLIENT_ID = "93mkh0su05k4ouzlkdk9jtu55f9ak2"
+
 FEATURE_SCOPES = {
     "chat": "user:read:chat",
     "rewards": "channel:manage:redemptions",
@@ -156,7 +158,7 @@ class TwitchAccounts:
                 "login": account.get("login") if account else None,
                 "client_id": account.get("client_id", "")
                 if account
-                else os.environ.get("PACTTS_TWITCH_CLIENT_ID", ""),
+                else os.environ.get("PACTTS_TWITCH_CLIENT_ID") or PUBLIC_CLIENT_ID,
                 "scopes": account.get("scopes", []) if account else [],
                 "features": list(FEATURE_SCOPES),
                 "pending": bool(pending),
@@ -167,6 +169,7 @@ class TwitchAccounts:
             }
 
     def start(self, channel, client_id, features):
+        client_id = client_id or os.environ.get("PACTTS_TWITCH_CLIENT_ID") or PUBLIC_CLIENT_ID
         if not isinstance(client_id, str) or not re.fullmatch(r"[a-zA-Z0-9]{10,100}", client_id):
             raise UserError("Enter the Client ID of a public Twitch application.")
         if (

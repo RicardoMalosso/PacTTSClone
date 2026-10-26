@@ -1,6 +1,9 @@
 'use strict';
 (() => {
   const pt = {
+    "Save the channel first, then connect the matching broadcaster account. No developer registration, Client ID or client secret is needed.": "Salve o canal e conecte a conta correspondente. Não é necessário cadastro de desenvolvedor, Client ID ou client secret.",
+    "The tab opens when the video player is ready.": "A aba abre quando o player de vídeo estiver pronto.",
+    "Loading bug reporting video…": "Carregando guia para relatar problemas…",
     "Show Initial Setup tab": "Mostrar aba Configuração inicial",
     "Resume playback": "Retomar reprodução",
     "Pause playback": "Pausar reprodução",

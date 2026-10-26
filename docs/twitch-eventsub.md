@@ -18,10 +18,7 @@ External donation providers are not connected. Current scope is Twitch only.
 ## Setup on the host PC
 
 1. Save the channel's Twitch login. IRC starts automatically. Click **Enable Bits, Channel Points and subscriptions**.
-2. Register an application at <https://dev.twitch.tv/console/apps> with **Public**
-   client type, or use your already registered public application. Supply its
-   **Client ID**, never a client secret. The project has no registered public
-   Client ID bundled. `PACTTS_TWITCH_CLIENT_ID` can provide a default Client ID.
+2. PacTTSClone bundles its public Twitch Client ID. No developer registration or key entry is required. Developer builds may override PACTTS_TWITCH_CLIENT_ID; existing stored authorizations keep their original identity until reauthorized.
 3. Select permission groups and click **Connect Twitch account**. Open the returned
    Twitch activation link/code and authorize **the broadcaster matching that channel**.
    A random viewer or moderator account cannot authorize someone else's broadcaster

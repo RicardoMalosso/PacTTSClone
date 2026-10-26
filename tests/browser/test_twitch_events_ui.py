@@ -2,7 +2,7 @@ from playwright.sync_api import expect
 
 from pacttsclone.models import ChannelConfig
 from tests.browser.test_ui import live_server as live_server
-from tests.test_twitch_events import CLIENT_ID, FakeTwitch, metadata, seed_account
+from tests.test_twitch_events import FakeTwitch, metadata, seed_account
 
 
 def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3, monkeypatch):
@@ -22,7 +22,7 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     expect(page.locator("#twitch-oauth-panel")).to_be_hidden()
     page.locator("#enable-twitch-events").click()
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
-    page.locator("#twitch-client-id").fill(CLIENT_ID)
+    expect(page.locator("#twitch-client-id")).to_have_count(0)
     page.locator("#twitch-authorize").click()
     expect(page.locator("#twitch-user-code")).to_have_text("ABCD")
     expect(page.locator("#twitch-auth-status")).to_contain_text(
@@ -128,7 +128,6 @@ def test_slow_initialization_preserves_unsaved_oauth_selection(page, live_server
     page.locator('[data-tab="channels"]').click()
     page.locator("#channel-select").select_option("streamer")
     page.locator("#enable-twitch-events").click()
-    page.locator("#twitch-client-id").fill(CLIENT_ID)
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
     assert held
     resources = page.request.get(url + "/api/resources").json()
@@ -138,7 +137,7 @@ def test_slow_initialization_preserves_unsaved_oauth_selection(page, live_server
     page.unroute("**/api/resources")
     expect(page.locator("#channel-transport")).to_have_value("oauth")
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
-    expect(page.locator("#twitch-client-id")).to_have_value(CLIENT_ID)
+    expect(page.locator("#twitch-client-id")).to_have_count(0)
     expect(page.locator("#twitch-authorize")).to_be_visible()
 
 

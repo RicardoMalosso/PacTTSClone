@@ -386,46 +386,58 @@ def test_default_voice_first_use_preparation(page, live_server, monkeypatch):
     assert len(app.state.service.history()) == 1
 
 
-def test_bug_video_lazy_delay_cancel_and_locale(page, live_server):
+def test_bug_video_ready_before_tab_and_200ms_autoplay(page, live_server):
     url, _ = live_server
-    requests = []
-
-    def video_route(route):
-        requests.append(route.request.url)
-        route.fulfill(status=200, content_type="text/html", body="<p>Video embed test stub</p>")
-
-    page.route("https://www.youtube-nocookie.com/**", video_route)
+    script = """
+    window.YT = {Player: function(mount, options) {
+      const frame = document.createElement('iframe');
+      frame.src = 'https://www.youtube-nocookie.com/embed/b2eEl2oKXLA';
+      frame.allow = 'autoplay'; mount.replaceWith(frame);
+      this.getIframe = () => frame;
+      this.playVideo = () => { window.videoPlays = (window.videoPlays || 0) + 1; };
+      this.destroy = () => frame.remove();
+      window.readyBugPlayer = () => options.events.onReady({target: this});
+    }};
+    window.onYouTubeIframeAPIReady();
+    """
+    page.route(
+        "https://www.youtube.com/iframe_api",
+        lambda r: r.fulfill(content_type="application/javascript", body=script),
+    )
+    page.route("https://www.youtube-nocookie.com/**", lambda r: r.fulfill(body="player stub"))
     page.goto(url)
     expect(page.locator("#generate")).to_be_enabled()
-    clock_start = datetime(2030, 1, 1, tzinfo=UTC)
-    page.clock.install(time=clock_start)
-    page.clock.pause_at(clock_start + timedelta(seconds=1))
-    page.clock.run_for(3500)
-    assert requests == []
+    assert page.locator("#bug-video iframe").count() == 0
     page.locator('[data-tab="bugs"]').click()
-    page.clock.run_for(2999)
-    expect(page.locator("#bug-video iframe")).to_have_count(0)
-    page.clock.run_for(1)
-    frame = page.locator("#bug-video iframe")
-    expect(frame).to_have_attribute(
-        "src", "https://www.youtube-nocookie.com/embed/b2eEl2oKXLA?autoplay=1&rel=0"
-    )
-    expect(frame).to_have_attribute(
-        "allow", "autoplay; encrypted-media; picture-in-picture; fullscreen"
-    )
+    page.wait_for_function("() => typeof window.readyBugPlayer === 'function'")
+    expect(page.locator("#pane-bugs")).to_be_hidden()
+    page.clock.install()
+    page.evaluate("window.readyBugPlayer()")
+    expect(page.locator("#pane-bugs")).to_be_visible()
+    page.clock.pause_at(datetime.now(UTC) + timedelta(seconds=1))
+    # The clock may advance to pause_at, so reset the play counter and verify
+    # cancellation on a fresh ready event using the controlled clock below.
     page.locator('[data-tab="voices"]').click()
-    expect(frame).to_have_count(0)
-    page.locator('[data-tab="bugs"]').click()
-    page.clock.run_for(2000)
-    page.locator('[data-tab="studio"]').click()
-    page.clock.run_for(2000)
-    expect(frame).to_have_count(0)
+    expect(page.locator("#bug-video iframe")).to_have_count(0)
+    page.evaluate("window.videoPlays = 0")
     page.locator('[data-locale="pt"]').click()
-    expect(page.locator('[data-tab="bugs"]')).to_have_text("Relatar um problema")
     page.locator('[data-tab="bugs"]').click()
-    page.clock.run_for(3000)
-    expect(frame).to_have_attribute("title", "Guia para relatar problemas")
+    expect(page.locator("#pane-bugs")).to_be_hidden()
+    page.evaluate("window.readyBugPlayer()")
+    expect(page.locator("#bug-video iframe")).to_have_attribute(
+        "title", "Guia para relatar problemas"
+    )
+    page.clock.run_for(199)
+    assert page.evaluate("window.videoPlays") == 0
+    page.clock.run_for(1)
+    assert page.evaluate("window.videoPlays") == 1
     page.locator('[data-tab="studio"]').click()
+    page.locator('[data-tab="bugs"]').click()
+    page.evaluate("window.readyBugPlayer()")
+    page.locator('[data-tab="studio"]').click()
+    page.clock.run_for(500)
+    assert page.evaluate("window.videoPlays") == 1
+    expect(page.locator("#bug-video iframe")).to_have_count(0)
     page.unroute_all(behavior="wait")
 
 
