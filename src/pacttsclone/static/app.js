@@ -65,25 +65,64 @@ $('restart-cuda').addEventListener('click', action(async () => {
     await refresh();
   } finally { control.disabled = false; }
 }));
+let bugPlayer = null, bugPlayerReady = false, youtubeApiPromise = null, bugVideoRequest = 0;
 function stopBugVideo() {
-  clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false;
+  bugVideoRequest++;
+  clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false; bugPlayerReady = false;
+  if (bugPlayer) { bugPlayer.destroy(); bugPlayer = null; }
   $('bug-video').replaceChildren();
-  window.Locale.bind($('bug-video-status'), 'The video loads three seconds after you open this tab.');
+  document.querySelector('[data-tab="bugs"]').removeAttribute('aria-busy');
 }
-function openBugVideo() {
+function youtubeApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (!youtubeApiPromise) youtubeApiPromise = new Promise((resolve, reject) => {
+    window.onYouTubeIframeAPIReady = resolve;
+    const script = el('script', {src: 'https://www.youtube.com/iframe_api'});
+    script.onerror = () => { youtubeApiPromise = null; script.remove(); reject(new Error('Cannot load video player. Try again or use the YouTube link.')); };
+    document.head.append(script);
+  });
+  return youtubeApiPromise;
+}
+async function openBugVideo() {
   if (bugVideoOpen) return;
   bugVideoOpen = true;
-  window.Locale.bind($('bug-video-status'), 'Starting the video in three seconds…');
+  const request = ++bugVideoRequest;
+  document.querySelector('[data-tab="bugs"]').setAttribute('aria-busy', 'true');
+  $('health').textContent = t('Loading bug reporting video…');
   bugVideoTimer = setTimeout(() => {
-    bugVideoTimer = null;
-    if (!bugVideoOpen || $('pane-bugs').hidden) return;
-    $('bug-video').append(el('iframe', {
-      src: 'https://www.youtube-nocookie.com/embed/b2eEl2oKXLA?autoplay=1&rel=0',
-      title: t('Bug reporting guide'), allow: 'autoplay; encrypted-media; picture-in-picture; fullscreen',
-      allowfullscreen: '', referrerpolicy: 'strict-origin-when-cross-origin'
-    }));
-    window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
-  }, 3000);
+    if (request !== bugVideoRequest) return;
+    stopBugVideo();
+    $('health').replaceChildren(t('Video player unavailable. '), link('Watch on YouTube ↗', 'https://youtu.be/b2eEl2oKXLA'));
+  }, 20000);
+  try {
+    await youtubeApi();
+    if (!bugVideoOpen || request !== bugVideoRequest) return;
+    const mount = el('div', {id: 'bug-player-mount'}); $('bug-video').append(mount);
+    bugPlayer = new YT.Player(mount, {
+      host: 'https://www.youtube-nocookie.com', videoId: 'b2eEl2oKXLA',
+      playerVars: {autoplay: 0, rel: 0, playsinline: 1},
+      events: {
+        onReady: event => {
+          if (!bugVideoOpen || request !== bugVideoRequest) return;
+          clearTimeout(bugVideoTimer);
+          bugPlayerReady = true;
+          event.target.getIframe().title = t('Bug reporting guide');
+          document.querySelector('[data-tab="bugs"]').removeAttribute('aria-busy');
+          tab('bugs');
+          window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
+          bugVideoTimer = setTimeout(() => {
+            if (bugVideoOpen && request === bugVideoRequest) event.target.playVideo();
+          }, 200);
+        },
+        onError: () => {
+          if (request !== bugVideoRequest) return;
+          stopBugVideo(); $('health').textContent = t('Video unavailable. Open the bug reporting guide on YouTube.');
+        }
+      }
+    });
+  } catch (error) {
+    if (request === bugVideoRequest) { stopBugVideo(); $('health').textContent = error.message; }
+  }
 }
 const localPlaybackHost = el('section', {id: 'local-playback-host'});
 $('pane-studio').append($('general-form'), localPlaybackHost);
@@ -92,8 +131,9 @@ const channelControlsHost = channelControls.parentElement;
 function tab(name) {
   if (name === 'general') name = 'studio';
   if (!runtimeSetup.ready && !['setup', 'config'].includes(name)) name = 'setup';
+  if (name === 'bugs' && !bugPlayerReady) { openBugVideo(); return; }
   window.Locale.apply();
-  if (name === 'bugs') openBugVideo(); else stopBugVideo();
+  if (name !== 'bugs') stopBugVideo();
   const general = name === 'studio';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
@@ -768,7 +808,6 @@ async function loadTwitchAuth() {
     const info = await api(`/api/twitch/${channel}/authorization`);
     if (channel !== selectedChannel) return;
     twitchAuthChannel = channel; twitchAuthPending = info.pending;
-    if (document.activeElement !== $('twitch-client-id')) $('twitch-client-id').value = info.client_id || $('twitch-client-id').value;
     $('twitch-auth-status').textContent = info.error || (info.pending ? t('Waiting for Twitch authorization…') : info.authorized ? t('Authorized broadcaster') + ': ' + info.login + ' · ' + info.scopes.join(', ') : t('Not authorized'));
     $('twitch-device').hidden = !info.pending; $('twitch-user-code').textContent = info.user_code || '';
     $('twitch-activate').href = info.verification_uri || 'https://www.twitch.tv/activate';
@@ -781,7 +820,7 @@ $('disable-twitch-events').addEventListener('click', () => { $('channel-transpor
 $('add-event-rule').addEventListener('click', () => eventRuleRow());
 $('twitch-authorize').addEventListener('click', action(async () => {
   if (!selectedChannel || !state.channels.some(c => c.name === selectedChannel)) throw new Error(t('Save the channel first.'));
-  await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'POST', body: {client_id: $('twitch-client-id').value.trim(), features: [...$('twitch-features').querySelectorAll('input:checked')].map(n => n.value)}});
+  await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'POST', body: {features: [...$('twitch-features').querySelectorAll('input:checked')].map(n => n.value)}});
   await loadTwitchAuth();
 }));
 $('twitch-forget').addEventListener('click', action(async () => {

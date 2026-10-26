@@ -16,7 +16,7 @@ from pacttsclone.twitch_events import CHAT, EVENT_TYPES, REWARD_UPDATE, EventSub
 from pacttsclone.twitch_oauth import FEATURE_SCOPES, TwitchAccounts, TwitchAPIError
 from tests.conftest import wait_job
 
-CLIENT_ID = "publicclient123456789"
+CLIENT_ID = "93mkh0su05k4ouzlkdk9jtu55f9ak2"
 
 
 class FakeTwitch:

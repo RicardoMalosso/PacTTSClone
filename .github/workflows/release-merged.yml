@@ -1,4 +1,4 @@
-name: Publish validated RC7
+name: Publish validated RC8
 on:
   pull_request:
     types: [closed]
@@ -6,7 +6,7 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: release-rc7
+  group: release-rc8
   cancel-in-progress: false
 jobs:
   installer:
@@ -24,7 +24,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag='v0.3.0-rc.7'
+          tag='v0.3.0-rc.8'
           target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
           draft=$(gh release view "$tag" --json isDraft --jq .isDraft)
           test "$target" = "$GITHUB_SHA"
