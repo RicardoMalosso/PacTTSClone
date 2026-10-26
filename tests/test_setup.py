@@ -310,3 +310,26 @@ def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
     finally:
         app.state.studio.close()
 
+
+
+def test_automatic_setup_prefers_nvidia_and_falls_back_to_cpu(monkeypatch):
+    from pacttsclone.setup_runtime import RuntimeSetup
+
+    monkeypatch.setattr("pacttsclone.setup_runtime.sys.platform", "win32")
+    monkeypatch.setattr(
+        "pacttsclone.setup_runtime.subprocess.run",
+        lambda *args, **kwargs: type("Result", (), {"returncode": 0, "stdout": "NVIDIA GeForce GTX 1660 SUPER\\n"})(),
+    )
+    assert RuntimeSetup._auto_device() == "cuda"
+
+    monkeypatch.setattr(
+        "pacttsclone.setup_runtime.subprocess.run",
+        lambda *args, **kwargs: type("Result", (), {"returncode": 1, "stdout": ""})(),
+    )
+    assert RuntimeSetup._auto_device() == "cpu"
+
+    def missing_driver(*args, **kwargs):
+        raise FileNotFoundError("nvidia-smi")
+
+    monkeypatch.setattr("pacttsclone.setup_runtime.subprocess.run", missing_driver)
+    assert RuntimeSetup._auto_device() == "cpu"
