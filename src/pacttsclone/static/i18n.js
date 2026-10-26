@@ -1,6 +1,22 @@
 'use strict';
 (() => {
   const pt = {
+    "Channel saved": "Canal salvo",
+    "IRC chat starts automatically for saved channels. Optionally authorize Bits, Channel Points and subscriptions.": "O chat IRC inicia automaticamente nos canais salvos. Autorize Bits, pontos do canal e inscrições se desejar.",
+    "Chat commands use anonymous IRC automatically. Turn channels on or off in the channel list.": "Comandos de chat usam IRC anônimo automaticamente. Ative ou desative canais na lista ao lado.",
+    "Enable Bits, Channel Points and subscriptions": "Ativar Bits, pontos do canal e inscrições",
+    "Disable Twitch events": "Desativar eventos da Twitch",
+    "Turn each channel on or off. On starts IRC chat automatically; authorized Twitch events run alongside it. Audio history is kept.": "Ative ou desative cada canal. Quando ativo, o chat IRC inicia automaticamente e os eventos autorizados funcionam em paralelo. O histórico de áudio é mantido.",
+    "Turn on": "Ativar",
+    "Turn off": "Desativar",
+    "On": "Ativo",
+    "Off": "Desativado",
+    "Enable Bits, points and subscriptions": "Ativar Bits, pontos e inscrições",
+    "Configure Twitch events": "Configurar eventos da Twitch",
+    "Twitch events": "Eventos da Twitch",
+    "Points, Bits and subscription actions": "Ações de pontos, Bits e inscrições",
+    "External donations (StreamElements, Streamlabs, Pix and other providers) are not connected.": "Doações externas (StreamElements, Streamlabs, Pix e outros serviços) não estão conectadas.",
+
     "Import stuff (optional)": "Importar dados (opcional)",
     "Import from a previous installation whenever needed. Models can be downloaded again. Your voices, configuration and generated audio are separate personal data. Stop the old app and disconnect Twitch channels before importing.": "Importe de uma instalação anterior quando precisar. Modelos podem ser baixados novamente. Vozes, configurações e áudios gerados são dados pessoais separados. Feche o app antigo e desconecte os canais da Twitch antes de importar.",
     "Import model weights from a previous installation": "Importar pesos de modelos de uma instalação anterior",

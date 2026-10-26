@@ -563,12 +563,12 @@ def test_voice_only_generation_and_channel_dashboard(page, live_server):
     first = page.locator('[data-channel="channelone"]')
     second = page.locator('[data-channel="channeltwo"]')
     expect(first).to_contain_text("disconnected")
-    first.get_by_role("button", name="Connect", exact=True).click()
-    expect(first.get_by_role("button", name="Disconnect", exact=True)).to_be_visible()
+    first.get_by_role("button", name="Turn on", exact=True).click()
+    expect(first.get_by_role("button", name="Turn off", exact=True)).to_be_visible()
     assert app.state.studio.clients["channelone"].status == "connected"
-    expect(second.get_by_role("button", name="Connect", exact=True)).to_be_visible()
-    first.get_by_role("button", name="Disconnect", exact=True).click()
-    expect(first.get_by_role("button", name="Connect", exact=True)).to_be_visible()
+    expect(second.get_by_role("button", name="Turn on", exact=True)).to_be_visible()
+    first.get_by_role("button", name="Turn off", exact=True).click()
+    expect(first.get_by_role("button", name="Turn on", exact=True)).to_be_visible()
     assert not app.state.studio.store.get("channel", "channelone")["enabled"]
     first.get_by_role("button", name="Delete channel", exact=True).click()
     expect(first).to_have_count(0)

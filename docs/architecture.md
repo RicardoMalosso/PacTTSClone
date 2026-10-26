@@ -262,3 +262,8 @@ and voice/chat/history tabs remain gated by verified setup readiness. See
 [optional import contract](optional-imports.md) for compatibility checks, backups,
 conflict handling, host-only endpoints, cancellation and validation. This supersedes
 earlier wording that locked every tab except Initial Setup.
+
+
+Twitch connectivity: IRC remains the chat receiver for every active channel. An
+optional independent EventSub receiver handles authorized events only. Channel
+on/off controls both receivers; authorization changes restart only EventSub.

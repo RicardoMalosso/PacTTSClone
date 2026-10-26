@@ -238,10 +238,10 @@ def test_subscription_conditions_partial_revocation_and_identity(event_studio):
     assert client.status == "partial"
     assert EVENT_TYPES["bits"] in client.subscription_errors
     bodies = [kw["body"] for _, url, kw in fake.calls if "/eventsub/" in url]
-    chat = next(b for b in bodies if b["type"] == CHAT)
-    assert chat["condition"] == dict(broadcaster_user_id="123", user_id="123")
+    assert not any(b["type"] == CHAT for b in bodies)
+    assert all(b["condition"] == {"broadcaster_user_id": "123"} for b in bodies)
     notification = {
-        "metadata": {"message_type": "notification", "subscription_type": CHAT},
+        "metadata": {"message_type": "notification", "subscription_type": EVENT_TYPES["reward"]},
         "payload": {"event": {"broadcaster_user_id": "wrong"}},
     }
     client.handle(notification)
@@ -250,9 +250,12 @@ def test_subscription_conditions_partial_revocation_and_identity(event_studio):
     client.handle(notification)
     assert len(calls) == 1
     client.handle(
-        {"metadata": {"message_type": "revocation"}, "payload": {"subscription": {"type": CHAT}}}
+        {
+            "metadata": {"message_type": "revocation"},
+            "payload": {"subscription": {"type": EVENT_TYPES["reward"]}},
+        }
     )
-    assert CHAT not in client.subscriptions
+    assert EVENT_TYPES["reward"] not in client.subscriptions
     with pytest.raises(UserError):
         client.handle(
             {
@@ -550,11 +553,19 @@ def test_irc_and_oauth_switch_closes_old_client(tmp_path, engine, monkeypatch):
         studio.save_channel(ChannelConfig(name="streamer", enabled=True))
         first = studio.clients["streamer"]
         studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="oauth"))
-        assert first.closed
-        second = studio.clients["streamer"]
+        assert not first.closed
+        assert studio.clients["streamer"] is first
+        second = studio.event_clients["streamer"]
+        assert studio.clients["streamer"] is not second
         assert studio.client_modes["streamer"] == "oauth"
         studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="irc"))
         assert second.closed and studio.client_modes["streamer"] == "irc"
+        assert "streamer" not in studio.event_clients
+        studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="oauth"))
+        irc, events = studio.clients["streamer"], studio.event_clients["streamer"]
+        studio.set_channel_connection("streamer", False)
+        assert irc.closed and events.closed
+        assert "streamer" not in studio.clients and "streamer" not in studio.event_clients
     finally:
         studio.close()
 

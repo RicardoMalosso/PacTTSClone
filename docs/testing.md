@@ -364,3 +364,11 @@ a new RC6 draft. Only a successful caller continuation may publish that draft as
 a prerelease, and it checks the release target equals the merged event commit.
 Existing releases are never overwritten. Ordinary PRs/commits do not build
 installers or publish. This implements the user's explicit publication request.
+
+
+Twitch UI simplification validation: 178 core and 31 Chromium tests passed locally.
+Regression coverage checks IRC retention when events change, dual receiver closure
+on channel off, absence of EventSub chat subscriptions, new-channel auto-on, Off
+preservation on edit, right sidebar placement and 390px overflow. All Twitch and
+inference dependencies in these tests are simulated. Live consent/paid-event and
+Windows installer acceptance must be verified separately for the new source.

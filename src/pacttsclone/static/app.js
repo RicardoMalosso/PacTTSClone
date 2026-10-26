@@ -82,7 +82,7 @@ function tab(name) {
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
   window.Locale.bind($('playback-heading'), general ? 'Local OBS Sources' : 'Twitch & OBS');
-  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Choose anonymous IRC for message commands, or authorize Twitch for chat, Channel Points, Bits and subscription events.');
+  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'IRC chat starts automatically for saved channels. Optionally authorize Bits, Channel Points and subscriptions.');
   $('channel-form').hidden = general;
   $('channel-dashboard').hidden = general;
   $('general-form').hidden = !general;
@@ -299,7 +299,7 @@ function fillChannel(name) {
   selectedChannel = name;
   const c = state.channels.find(c => c.name === name);
   $('channel-name').value = c?.name || ''; $('channel-transport').value = c?.transport || 'irc';
-  $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode(); $('channel-enabled').checked = c?.enabled || false;
+  $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode();
   $('channel-paused').checked = c?.paused || false; $('channel-delay').value = c?.delay_seconds ?? 5;
   $('channel-cooldown').value = c?.user_cooldown_seconds ?? 15; $('channel-limit').value = c?.max_message_chars ?? 300;
   $('channel-filter').value = c?.filter_level || 'slurs'; $('channel-custom').value = (c?.custom_filters || []).join('\n');
@@ -308,12 +308,12 @@ function fillChannel(name) {
 }
 $('channel-select').addEventListener('change', () => fillChannel($('channel-select').value));
 $('channel-form').addEventListener('submit', action(async event => {
-  event.preventDefault(); const name = $('channel-name').value.trim().toLowerCase(); const commands = {};
+  event.preventDefault(); $('channel-save-status').textContent = ''; const name = $('channel-name').value.trim().toLowerCase(); const commands = {};
   document.querySelectorAll('.command-row').forEach(row => { const key = row.querySelector('input').value.trim().toLowerCase(); if (commands[key]) throw new Error(t('Duplicate command keyword.')); commands[key] = row.querySelector('select').value; });
-  await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: $('channel-enabled').checked, paused: $('channel-paused').checked,
-    transport: $('channel-transport').value, event_rules: readEventRules(), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
+  await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: state.channels.find(c => c.name === name)?.enabled ?? true, paused: $('channel-paused').checked,
+    transport: $('channel-transport').value, event_rules: $('channel-transport').value === 'oauth' ? readEventRules() : (state.channels.find(c => c.name === name)?.event_rules || []), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
     delay_seconds: Number($('channel-delay').value), user_cooldown_seconds: Number($('channel-cooldown').value), max_message_chars: Number($('channel-limit').value)}});
-  selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name);
+  selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name); $('channel-save-status').textContent = t('Channel saved');
 }));
 $('pause-channel').addEventListener('click', action(async () => { if (selectedChannel) { await api(`/api/channels/${selectedChannel}/pause`, {method: 'POST', body: {paused: !latestChannelState?.paused}}); await refresh(); } }));
 function renderChannels() {
@@ -637,14 +637,16 @@ function renderChannelDashboard() {
   $('channel-list').replaceChildren();
   for (const channel of state.channels) {
     const row = el('div', {class: 'job-row', 'data-channel': channel.name},
-      el('strong', {}, '#' + channel.name + ' · ' + (channel.transport === 'oauth' ? 'OAuth / EventSub' : 'IRC')), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + t(channel.connection_error) : '')),
+      el('strong', {}, '#' + channel.name + ' · IRC · ' + t(channel.enabled ? 'On' : 'Off')), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + t(channel.connection_error) : '')),
+      channel.transport === 'oauth' ? el('p', {}, t('Twitch events') + ': ' + t(channel.event_connection) + (channel.event_connection_error ? ' · ' + t(channel.event_connection_error) : '')) : null,
       channel.transport === 'oauth' ? el('details', {}, el('summary', {}, t('Event subscriptions')), ...channel.event_subscriptions.map(name => el('p', {}, name)), ...Object.entries(channel.event_errors).map(([name, reason]) => el('p', {class: 'error'}, name + ': ' + t(reason))), channel.reward_recovery ? el('p', {class: 'error'}, channel.reward_recovery.error) : null, el('p', {class: 'muted'}, t('Events during connection gaps may be missed. Managed point redemptions are checked for refunds on reconnect.'))) : null,
       el('div', {class: 'row-actions'},
-        button(channel.enabled ? 'Disconnect' : 'Connect', async () => {
+        button(channel.enabled ? 'Turn off' : 'Turn on', async () => {
           await api(`/api/channels/${channel.name}/connection`, {method: 'POST', body: {enabled: !channel.enabled}});
           await refresh(); if (selectedChannel === channel.name) fillChannel(channel.name);
         }),
         button('Edit channel', () => fillChannel(channel.name)),
+        button(channel.oauth_authorized ? 'Configure Twitch events' : 'Enable Bits, points and subscriptions', () => { fillChannel(channel.name); $('enable-twitch-events').click(); }),
         button('Delete channel', async () => {
           await api(`/api/channels/${channel.name}`, {method: 'DELETE'});
           if (selectedChannel === channel.name) { selectedChannel = ''; }
@@ -657,6 +659,7 @@ function renderChannelDashboard() {
 
 
 const eventNames = {reward: 'Channel Points reward', bits: 'Bits and Power-ups', subscribe: 'New subscription', gift: 'Gift subscriptions', resub: 'Resubscription message', subscription_end: 'Subscription ended', follow: 'New follower', raid: 'Incoming raid', online: 'Stream online', offline: 'Stream offline'};
+const eventTemplates = {reward: '{text}', bits: '{username} used {bits} Bits. {text}', subscribe: 'Welcome {username}', gift: '{username} gifted {total} subscriptions', resub: '{username}: {text}', subscription_end: "{username}'s subscription ended", follow: 'Welcome {username}', raid: '{username} raided with {viewers} viewers', online: 'Stream is online', offline: 'Stream is offline'};
 let twitchAuthChannel = '', twitchAuthPending = false, twitchAuthBusy = false;
 function eventRuleRow(rule = {}) {
   const kind = el('select', {'aria-label': t('Event type')}, ...Object.entries(eventNames).map(([value, name]) => el('option', {value}, t(name))));
@@ -664,10 +667,11 @@ function eventRuleRow(rule = {}) {
   const voice = el('select', {'aria-label': t('Event voice'), 'data-voice': ''});
   const reward = el('input', {'aria-label': t('Reward ID'), placeholder: t('Reward ID'), value: rule.reward_id || ''});
   const minimum = el('input', {type: 'number', min: '1', max: '10000000', 'aria-label': t('Minimum Bits'), value: rule.min_bits || 1});
-  const template = el('textarea', {rows: '2', maxlength: '1000', 'aria-label': t('Event text template')}); template.value = rule.template || '{text}';
+  const template = el('textarea', {rows: '2', maxlength: '1000', 'aria-label': t('Event text template')}); template.value = rule.template || eventTemplates[kind.value];
   const row = el('section', {class: 'event-rule card'}, el('label', {}, t('Event type'), kind), el('label', {}, t('Event voice'), voice), el('label', {}, t('Reward ID'), reward), el('label', {}, t('Minimum Bits'), minimum), el('label', {}, t('Event text template'), template), button('Remove', () => row.remove()));
   const visibility = () => { reward.parentElement.hidden = kind.value !== 'reward'; minimum.parentElement.hidden = kind.value !== 'bits'; };
-  kind.addEventListener('change', visibility); visibility();
+  let previousKind = kind.value;
+  kind.addEventListener('change', () => { if (template.value === eventTemplates[previousKind]) template.value = eventTemplates[kind.value]; previousKind = kind.value; visibility(); }); visibility();
   $('event-rules').append(row); refreshEventVoices(); voice.value = rule.voice_id || '';
 }
 function refreshEventVoices() {
@@ -687,6 +691,8 @@ function readEventRules() {
 }
 function updateTwitchMode() {
   const oauth = $('channel-transport').value === 'oauth';
+  $('enable-twitch-events').hidden = oauth;
+  $('disable-twitch-events').hidden = !oauth;
   $('event-rules-panel').hidden = !oauth;
   $('twitch-oauth-panel').hidden = !oauth || Boolean(session?.remote_access);
   twitchAuthChannel = ''; $('twitch-auth-status').textContent = ''; $('twitch-device').hidden = true; $('twitch-rewards').replaceChildren();
@@ -708,7 +714,8 @@ async function loadTwitchAuth() {
     if (info.authorized && !info.pending) await refresh();
   } finally { twitchAuthBusy = false; }
 }
-$('channel-transport').addEventListener('change', updateTwitchMode);
+$('enable-twitch-events').addEventListener('click', () => { $('channel-transport').value = 'oauth'; updateTwitchMode(); $('twitch-oauth-panel').scrollIntoView({behavior: 'smooth', block: 'start'}); });
+$('disable-twitch-events').addEventListener('click', () => { $('channel-transport').value = 'irc'; updateTwitchMode(); });
 $('add-event-rule').addEventListener('click', () => eventRuleRow());
 $('twitch-authorize').addEventListener('click', action(async () => {
   if (!selectedChannel || !state.channels.some(c => c.name === selectedChannel)) throw new Error(t('Save the channel first.'));

@@ -507,3 +507,20 @@ Full evidence and limitations: [RC6 completion report](rc6-completion-report.md)
 Live broadcaster consent/paid-event acceptance still needs a public Twitch Client ID
 and matching account authorization; no such success or physical GPU/OBS result is
 inferred from simulated-event tests or installer acceptance.
+
+
+## Twitch connection UI simplification
+
+New UI-created channels start IRC automatically. Removed the monitoring checkbox
+and transport dropdown. Channel on/off controls now live in the right-hand list;
+edits preserve Off. An explicit enable-events button opens broadcaster authorization,
+reward creation and event rules. IRC and EventSub run alongside each other, with
+EventSub chat subscriptions omitted to avoid duplicate command speech. Disabling
+events preserves IRC and existing rules; channel off/delete/shutdown closes both.
+Added PT-BR labels, save confirmation and event-specific template defaults. External
+donations are explicitly unavailable; user selected Twitch-only scope for now.
+
+Local validation: 178 core tests and 31 Chromium tests passed; Ruff, Python
+compilation and JavaScript syntax checks passed. Desktop sidebar placement and
+390px overflow are covered. Tests use fake IRC, Twitch
+responses and inference, not real broadcaster consent or paid transactions.

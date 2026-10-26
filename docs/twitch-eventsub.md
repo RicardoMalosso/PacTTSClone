@@ -1,18 +1,23 @@
 # Twitch IRC and OAuth / EventSub
 
-Each channel chooses one connection mode in **Twitch & OBS**. Existing saved
-channels default to **IRC** and need no migration or authorization. IRC remains
-anonymous and read-only, with `!command text` mapped to saved ready voices.
+Saved channels created in the UI start with anonymous, read-only IRC chat enabled.
+The right-hand channel list provides Turn on / Turn off, editing and an optional
+Enable Bits, points and subscriptions action. Editing a disabled channel preserves
+its Off state. IRC remains the chat-command receiver when Twitch events are enabled.
 
-**OAuth** uses EventSub WebSockets for message commands and configured Channel
-Points, Bits/Power-ups, subscriptions, gifts, resub messages, subscription endings,
-followers, incoming raids and stream online/offline events. It creates no public
-server, tunnel or webhook and never posts chat. A channel has only one active
-transport; switching mode/settings closes the old receiver before replacing it.
+Enable Bits, Channel Points and subscriptions opens the broadcaster authorization
+and reward controls without replacing IRC. EventSub runs as a separate optional
+receiver and does not subscribe to chat, preventing duplicate command generation.
+Turning the channel off, deleting it or shutting down closes both receivers.
+Disabling events or forgetting authorization leaves IRC running. The internal
+transport field is retained for existing installations: oauth means optional events
+alongside IRC; irc means IRC alone.
+
+External donation providers are not connected. Current scope is Twitch only.
 
 ## Setup on the host PC
 
-1. Save the channel's Twitch login and choose OAuth mode.
+1. Save the channel's Twitch login. IRC starts automatically. Click **Enable Bits, Channel Points and subscriptions**.
 2. Register an application at <https://dev.twitch.tv/console/apps> with **Public**
    client type, or use your already registered public application. Supply its
    **Client ID**, never a client secret. The project has no registered public
@@ -21,13 +26,12 @@ transport; switching mode/settings closes the old receiver before replacing it.
    Twitch activation link/code and authorize **the broadcaster matching that channel**.
    A random viewer or moderator account cannot authorize someone else's broadcaster
    Bits/subscription/reward permissions. Every broadcaster authorizes separately.
-4. Add event rules, choose a ready saved voice and save the channel with monitoring
-   enabled. Message commands also work in OAuth mode using `user:read:chat`.
+4. Add event rules, choose a ready saved voice and save the channel. Use the right-hand list to turn the channel on if it was previously off. Chat commands continue through IRC without chat authorization.
 5. Review connection and individual event subscription errors in the dashboard.
    Selecting a rule without granting its permission produces a visible partial
    connection; authorize again with the missing group.
 
-Permission groups: chat (`user:read:chat`), rewards (`channel:manage:redemptions`),
+Permission groups: rewards (`channel:manage:redemptions`),
 Bits (`bits:read`), subscriptions (`channel:read:subscriptions`), followers
 (`moderator:read:followers`). Select only the groups needed. Raids and stream
 online/offline need no additional event-specific scope. Twitch channel eligibility
