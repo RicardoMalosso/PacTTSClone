@@ -2,6 +2,7 @@
 const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
+let showSetupTab = false;
 let modelDownloaded = 0, modelSession = null, setupEventsConnected = false;
 const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
@@ -526,8 +527,8 @@ function renderSetup(data) {
   renderOptionalImport(data);
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
-  document.querySelector('[data-tab="setup"]').hidden = data.ready;
-  if (data.ready && !$('pane-setup').hidden) tab('config');
+  document.querySelector('[data-tab="setup"]').hidden = data.ready && !showSetupTab;
+  if (data.ready && !showSetupTab && !$('pane-setup').hidden) tab('config');
   if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
   if (data.stage === 'models' && data.download?.total_bytes) {
     modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
@@ -650,9 +651,31 @@ function renderGlobalStatus() {
   $('live-generation-progress').value = 0; $('live-generation-timer').textContent = '00:00.0'; $('live-generation-cancel').hidden = true;
 }
 
+function refreshDashboardQueues() {
+  for (const channel of state.channels) {
+    const list = document.querySelector(`[data-channel="${channel.name}"] [data-queue-items]`);
+    if (!list) continue;
+    const items = channel.playback_queue || [];
+    const key = JSON.stringify(items);
+    if (list.dataset.key === key) continue;
+    list.dataset.key = key;
+    list.parentElement.querySelector('summary').textContent = t('Queue') + ' · ' + items.length;
+    list.replaceChildren(...(items.length ? items.map(item => el('div', {class: 'event-row'},
+      el('strong', {}, t(item.status)), el('p', {}, item.text),
+      button('Cancel audio', async () => { await api(`/api/playback/${item.id}/cancel`, {method: 'POST'}); await refresh(); }))) : [el('p', {}, t('Queue is empty'))]));
+  }
+}
+$('config-show-setup').addEventListener('change', () => {
+  showSetupTab = $('config-show-setup').checked;
+  try { localStorage.setItem('pactts-show-setup', String(showSetupTab)); } catch {}
+  renderSetup(runtimeSetup);
+});
+try { showSetupTab = localStorage.getItem('pactts-show-setup') === 'true'; } catch {}
+$('config-show-setup').checked = showSetupTab;
 function renderChannelDashboard() {
-  const key = JSON.stringify([window.Locale.language, state.channels]);
-  if (channelDashboardKey === key) return;
+  const key = JSON.stringify([window.Locale.language, state.channels.map(({playback_queue, ...channel}) => channel), state.player_links]);
+  if (channelDashboardKey === key) { refreshDashboardQueues(); return; }
+  const expanded = new Set([...document.querySelectorAll('[data-channel] details[open][data-queue]')].map(node => node.closest('[data-channel]').dataset.channel));
   channelDashboardKey = key;
   $('channel-list').replaceChildren();
   for (const channel of state.channels) {
@@ -665,6 +688,11 @@ function renderChannelDashboard() {
           await api(`/api/channels/${channel.name}/connection`, {method: 'POST', body: {enabled: !channel.enabled}});
           await refresh(); if (selectedChannel === channel.name) fillChannel(channel.name);
         }),
+        button(channel.paused ? 'Resume playback' : 'Pause playback', async () => {
+          await api(`/api/channels/${channel.name}/pause`, {method: 'POST', body: {paused: !channel.paused}});
+          await refresh();
+        }),
+        el('a', {href: session?.remote_access ? state.player_links?.[channel.name] || `/${channel.name}` : `/${channel.name}`, target: '_blank', rel: 'noopener noreferrer', class: 'download'}, t('Open OBS player')),
         button('Edit channel', () => fillChannel(channel.name)),
         button(channel.oauth_authorized ? 'Configure Twitch events' : 'Enable Bits, points and subscriptions', () => { fillChannel(channel.name); $('enable-twitch-events').click(); }),
         button('Delete channel', async () => {
@@ -672,8 +700,12 @@ function renderChannelDashboard() {
           if (selectedChannel === channel.name) { selectedChannel = ''; }
           await refresh(); fillChannel(selectedChannel);
         }, 'danger small-button')));
+    const queue = el('details', {'data-queue': ''}, el('summary', {}, t('Queue')), el('div', {'data-queue-items': ''}));
+    queue.open = expanded.has(channel.name);
+    row.append(queue);
     $('channel-list').append(row);
   }
+  refreshDashboardQueues();
   if (!state.channels.length) $('channel-list').textContent = t('No saved Twitch channels. Add one below.');
 }
 

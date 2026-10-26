@@ -464,7 +464,7 @@ def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_ser
     expect(page.locator("#generate")).to_be_enabled()
     open_tab(page, "Twitch & OBS")
     page.locator("#channel-select").select_option("testchannel")
-    player = page.get_by_role("link", name="Open OBS player", exact=True)
+    player = page.locator("#channel-links").get_by_role("link", name="Open OBS player", exact=True)
     expect(player).to_have_attribute("target", "_blank")
     # Polling must not replace a link while a physical click is in progress.
     node = player.element_handle()
@@ -475,7 +475,7 @@ def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_ser
         ("Open separate control page", "/testchannel/control"),
     ]:
         with page.expect_popup() as popup:
-            page.get_by_role("link", name=label, exact=True).click()
+            page.locator("#channel-links").get_by_role("link", name=label, exact=True).click()
         popup.value.wait_for_url(url + path)
         assert page.url == url + "/"
         popup.value.close()
@@ -485,7 +485,7 @@ def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_ser
         ("Open local OBS control page", "/playbackMain/control"),
     ]:
         with page.expect_popup() as popup:
-            page.get_by_role("link", name=label, exact=True).click()
+            page.locator("#general-form").get_by_role("link", name=label, exact=True).click()
         popup.value.wait_for_url(url + path)
         assert page.url == url + "/"
         popup.value.close()

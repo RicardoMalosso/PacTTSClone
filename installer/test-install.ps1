@@ -69,7 +69,12 @@ try {
 }
 $marker = Join-Path $data 'keep-user-audio.txt'
 Set-Content $marker 'Preserve user data'
+$previousPython = $config.python
 Install-Checked
+$reinstalledConfig = Get-Content -Raw (Join-Path $app 'active.json') | ConvertFrom-Json
+if ($reinstalledConfig.python -ne $previousPython) { throw 'Reinstall replaced the reusable application environment.' }
+& $reinstalledConfig.python -c "import torch, torchaudio, omnivoice"
+if ($LASTEXITCODE -ne 0) { throw 'Reinstall lost existing inference dependencies.' }
 if (-not (Test-Path $marker)) { throw 'Upgrade removed user data.' }
 $uninstall = Start-Process (Join-Path $parent 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
 if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed.' }

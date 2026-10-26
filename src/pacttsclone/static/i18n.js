@@ -1,6 +1,11 @@
 'use strict';
 (() => {
   const pt = {
+    "Show Initial Setup tab": "Mostrar aba Configuração inicial",
+    "Resume playback": "Retomar reprodução",
+    "Pause playback": "Pausar reprodução",
+    "Queue": "Fila",
+    "Queue is empty": "Fila vazia",
     "Local": "Local",
     "initialize_model": "Inicializando modelo",
     "pending": "Dispositivo pendente",

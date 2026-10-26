@@ -161,6 +161,10 @@ class Studio:
             result.append(
                 {
                     **config,
+                    "playback_queue": [
+                        item for item in self.playback.items(config["name"])
+                        if item["status"] in {"queued", "countdown", "playing"}
+                    ],
                     "connection": client.status if client else "disconnected",
                     "connection_error": client.error if client else None,
                     "oauth_authorized": self.accounts.snapshot(config["name"])["authorized"],

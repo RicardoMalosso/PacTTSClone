@@ -553,3 +553,27 @@ acceptance script has not been run locally. Restart persistence verified
 for channel config and blocked/queued/running/failed/cancelled requests. Interrupted
 jobs become cancelled without replay. Tests use simulated inference/CUDA; no real
 GPU gaming benchmark or new Windows installer acceptance is claimed.
+
+
+## Channel cards, setup visibility and reinstall reuse
+All saved Twitch channel cards expose playback pause/resume, OBS player link and
+a collapsible pending queue without first selecting the channel editor. Queue
+refreshes preserve expanded state; channel configuration remains persisted.
+Healthy setup remains hidden unless the Configuration checkbox is enabled; this
+visibility preference is browser-local and survives refresh. Unhealthy setup stays
+available.
+The Windows bootstrap reuses an existing compatible application environment only
+inside this installation's environments directory, preserving downloaded inference
+packages across app version upgrades. Existing managed Python is reused; uv/pip
+caches and checksum-verified downloader reuse remain active. Models retain their
+verified manifest reuse or existing-file checksum validation after fresh setup.
+Missing/incompatible/corrupt files may still need downloading. Different installation
+roots require optional data/model imports; no arbitrary disk scanning is implied.
+Windows acceptance now asserts repeat setup retains the Python environment and
+inference imports. Local native Windows execution remains unavailable.
+
+Local follow-up checks: 184 core tests passed. Chromium: 31 passed in the
+full run, with one ambiguous test locator after adding the second OBS link;
+that locator was scoped to the existing channel control and rechecked separately.
+The new saved-card/Setup-toggle browser regression passed. Windows bootstrap
+execution and the updated reinstall assertions remain pending Windows CI.

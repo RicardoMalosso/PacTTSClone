@@ -174,3 +174,45 @@ def test_new_channel_starts_irc_and_sidebar_off_survives_edit(page, live_server)
     expect(page.locator("#twitch-oauth-panel")).to_be_hidden()
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+def test_saved_channel_cards_control_without_selecting_and_setup_toggle(page, live_server):
+    url, app = live_server
+    studio = app.state.studio
+    studio.save_channel(ChannelConfig(name="savedchannel", paused=True))
+    studio.store.put(
+        "playback",
+        "queueditem",
+        {
+            "id": "queueditem",
+            "channel": "savedchannel",
+            "status": "queued",
+            "created_at": 1,
+            "text": "Waiting audio",
+            "job_id": "example",
+        },
+    )
+    page.goto(url)
+    page.locator('[data-tab="channels"]').click()
+    expect(page.locator("#channel-select")).to_have_value("")
+    row = page.locator('[data-channel="savedchannel"]')
+    row.get_by_role("button", name="Resume playback", exact=True).click()
+    expect(row.get_by_role("button", name="Pause playback", exact=True)).to_be_visible()
+    assert studio.store.get("channel", "savedchannel")["paused"] is False
+    expect(row.get_by_role("link", name="Open OBS player")).to_have_attribute(
+        "href", "/savedchannel"
+    )
+    row.locator("details[data-queue] summary").click()
+    expect(row).to_contain_text("Waiting audio")
+    page.reload()
+    page.locator('[data-tab="channels"]').click()
+    expect(row.get_by_role("button", name="Pause playback", exact=True)).to_be_visible()
+    expect(page.locator('[data-tab="setup"]')).to_be_hidden()
+    page.locator('[data-tab="config"]').click()
+    page.locator("#config-show-setup").check()
+    expect(page.locator('[data-tab="setup"]')).to_be_visible()
+    page.locator('[data-tab="setup"]').click()
+    expect(page.locator("#pane-setup")).to_be_visible()
+    page.locator('[data-tab="config"]').click()
+    page.locator("#config-show-setup").uncheck()
+    expect(page.locator('[data-tab="setup"]')).to_be_hidden()
