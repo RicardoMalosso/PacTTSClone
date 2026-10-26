@@ -262,6 +262,22 @@ class RuntimeSetup:
         if self.thread:
             self.thread.join(5)
 
+    @staticmethod
+    def _auto_device():
+        """Choose a CUDA installation only when the NVIDIA driver reports a GPU."""
+        if sys.platform not in {"win32", "linux"}:
+            return "cpu"
+        try:
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=8, check=False,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return "cuda"
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        return "cpu"
+
     def start(self, device, search_roots=None, move_weights=False):
         if not isinstance(move_weights, bool):
             raise UserError("Choose copy or move for the selected old model folders.")
@@ -269,8 +285,10 @@ class RuntimeSetup:
             search_roots = validate_roots(search_roots)
         if self.scan_thread and self.scan_thread.is_alive():
             raise BusyError("Wait for the model search to finish before installing.")
-        if device not in {"cpu", "cuda"}:
-            raise UserError("Choose CPU or NVIDIA CUDA.")
+        if device not in {"auto", "cpu", "cuda"}:
+            raise UserError("Choose Automatic, CPU or NVIDIA CUDA.")
+        if device == "auto":
+            device = self._auto_device()
         with self.service._lock:
             if self.service.pending() or self.service.setup_busy:
                 raise BusyError("Finish or cancel generation/setup before installing dependencies.")
