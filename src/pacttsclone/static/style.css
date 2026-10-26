@@ -30,5 +30,3 @@ body{padding-top:calc(var(--status-bar-height,130px) + 16px)}.live-generation{po
 .countermeasure-window video{display:block;width:100%;max-height:75vh;object-fit:contain}
 .countermeasure-close{position:absolute;top:6px;right:6px}
 
-/* Deliberately conspicuous manual CUDA recovery control. */
-.restart-cuda{background:#cc241d;color:#fff;font-size:15px;font-weight:900;padding:15px 20px;border:3px solid #fb4934;box-shadow:0 0 0 3px #cc241d55;max-width:100%;white-space:normal;text-transform:uppercase}.restart-cuda:hover{background:#fb4934;color:#1d2021}.restart-cuda:disabled{opacity:.5}
