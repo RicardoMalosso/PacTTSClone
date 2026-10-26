@@ -79,3 +79,59 @@ def test_polling_access_filter_keeps_errors_and_generation_requests():
     assert not filter_.filter(record("/api/channels/playbackMain/player/tick", 200))
     assert filter_.filter(record("/api/session", 403))
     assert filter_.filter(record("/api/jobs", 202))
+
+
+def test_channel_and_unrendered_requests_survive_restart(tmp_path, engine):
+    settings = Settings(data_dir=tmp_path / "data")
+    service = GenerationService(settings, engine)
+    studio = Studio(service)
+    studio.save_channel(ChannelConfig(name="persisted", commands={}, enabled=False))
+    service.reject_request("Blocked speech", "filter", channel="persisted", username="Viewer")
+    for status in ("queued", "running", "failed", "cancelled"):
+        service.store.put(
+            "job",
+            status,
+            {
+                "id": status,
+                "status": status,
+                "kind": "speech",
+                "channel": "persisted",
+                "created_at": 1,
+                "request": {"text": status},
+                "workspace": "",
+                "metrics": {},
+            },
+        )
+    studio.close()
+    service = GenerationService(settings, engine)
+    studio = Studio(service)
+    try:
+        assert studio.store.get("channel", "persisted")["enabled"] is False
+        assert len(service.request_history()) == 5
+        for key in ("queued", "running", "failed", "cancelled"):
+            job = service.get(key)
+            assert job["status"] == ("failed" if key == "failed" else "cancelled")
+            assert job["request"]["text"] == key
+        assert any(r["status"] == "blocked" for r in service.request_history())
+    finally:
+        studio.close()
+
+
+def test_vram_warning_threshold_and_transition_logging(tmp_path, engine):
+    service = GenerationService(Settings(data_dir=tmp_path), engine)
+    try:
+        low = {"gpus": [{"total_bytes": 6000 * 1024**2, "used_bytes": 5900 * 1024**2}]}
+        warning = service.check_gpu_pressure(low)
+        assert warning["free_bytes"] == 100 * 1024**2
+        service.check_gpu_pressure(low)
+        service.check_gpu_pressure({"gpus": [{"total_bytes": 6000 * 1024**2, "used_bytes": 0}]})
+        rows = [
+            json.loads(line)
+            for line in (service.logs / "gpu-status.jsonl").read_text().splitlines()
+        ]
+        assert [r["event"] for r in rows] == ["low_vram", "vram_recovered"]
+        service.config.vram_warning_mib = 0
+        assert service.check_gpu_pressure(low) is None
+        assert service.check_gpu_pressure({"gpus": []}) is None
+    finally:
+        service.close()

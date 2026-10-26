@@ -1,6 +1,16 @@
 'use strict';
 (() => {
   const pt = {
+    "Local": "Local",
+    "initialize_model": "Inicializando modelo",
+    "pending": "Dispositivo pendente",
+    "Low free VRAM warning (MiB) · 0 disables": "Alerta de VRAM livre (MiB) · 0 desativa",
+    "Low free GPU memory; generation may slow down or fail. CPU fallback is disabled.": "Pouca VRAM livre; a geração pode ficar lenta ou falhar. Geração por CPU desativada.",
+    "Reward cooldown (seconds) · 0 disables": "Intervalo da recompensa (segundos) · 0 desativa",
+    "Redemptions per stream · 0 disables": "Resgates por transmissão · 0 desativa",
+    "Redemptions per user per stream · 0 disables": "Resgates por usuário por transmissão · 0 desativa",
+    "Save reward limits": "Salvar limites da recompensa",
+    "Edit limits for this reward in Twitch.": "Edite os limites desta recompensa na Twitch.",
     "Channel saved": "Canal salvo",
     "IRC chat starts automatically for saved channels. Optionally authorize Bits, Channel Points and subscriptions.": "O chat IRC inicia automaticamente nos canais salvos. Autorize Bits, pontos do canal e inscrições se desejar.",
     "Chat commands use anonymous IRC automatically. Turn channels on or off in the channel list.": "Comandos de chat usam IRC anônimo automaticamente. Ative ou desative canais na lista ao lado.",

@@ -43,7 +43,7 @@ def test_voice_screen_transcription_edit_config_persistence(page, live_server, m
         )
     )
     open_tab(page, "Configuration")
-    page.locator("#config-device").select_option("cpu")
+    page.locator("#config-device").select_option("cuda")
     page.locator("#config-threads").fill("2")
     page.locator("#config-hotkey").fill("Ctrl+Alt+F8")
     page.get_by_role("button", name="Save configuration").click()
@@ -51,7 +51,7 @@ def test_voice_screen_transcription_edit_config_persistence(page, live_server, m
     page.reload()
     expect(page.locator("#generate")).to_be_enabled()
     open_tab(page, "Configuration")
-    expect(page.locator("#config-device")).to_have_value("cpu")
+    expect(page.locator("#config-device")).to_have_value("cuda")
     expect(page.locator("#config-threads")).to_have_value("2")
     expect(page.locator("#config-hotkey")).to_have_value("Ctrl+Alt+F8")
 
@@ -319,7 +319,9 @@ def test_general_player_generate_queue_and_controls(page, live_server, mp3):
     expect(page.locator("#send-general")).to_be_visible(timeout=15000)
     page.locator("#send-general").click()
     expect(page.locator("#playback-note")).to_have_text("Queued on local OBS source.")
-    open_tab(page, "Local OBS Sources")
+    open_tab(page, "Local")
+    expect(page.locator("nav button").last).to_have_text("Local")
+    expect(page.locator('[data-tab="setup"]')).to_be_hidden()
     expect(page.locator("#channel-queue")).to_contain_text("General player browser test")
     expect(page.locator("#channel-form")).to_be_hidden()
     page.locator("#general-delay").fill("0")
@@ -444,7 +446,7 @@ def test_local_autoqueue_checkbox_persists_and_queues_without_autoplay(page, liv
     )
     assert len(app.state.studio.playback.items("playbackMain")) == 1
     assert page.locator("#player").evaluate("audio => audio.paused")
-    page.locator('[data-tab="general"]').click()
+    page.locator('[data-tab="studio"]').click()
     expect(page.locator("#channel-queue")).to_contain_text(
         "Automatically queue my local generation"
     )
@@ -477,7 +479,7 @@ def test_obs_and_control_links_open_new_tabs_without_polling_race(page, live_ser
         popup.value.wait_for_url(url + path)
         assert page.url == url + "/"
         popup.value.close()
-    open_tab(page, "Local OBS Sources")
+    open_tab(page, "Local")
     for label, path in [
         ("Open local OBS player", "/playbackMain"),
         ("Open local OBS control page", "/playbackMain/control"),
@@ -576,7 +578,7 @@ def test_voice_only_generation_and_channel_dashboard(page, live_server):
     page.reload()
     open_tab(page, "Twitch & OBS")
     expect(page.locator('[data-channel="channelone"]')).to_have_count(0)
-    open_tab(page, "Local OBS Sources")
+    open_tab(page, "Local")
     expect(page.locator("#channel-dashboard")).to_be_hidden()
     open_tab(page, "Configuration")
     expect(page.locator("#tunnel-start")).to_be_visible()
@@ -665,7 +667,7 @@ def test_shared_admin_voices_history_scoped_obs_and_revocation(browser, live_ser
             )
             == 200
         )
-        open_tab(page, "Local OBS Sources")
+        open_tab(page, "Local")
         link = page.locator("#local-obs-player-link").get_attribute("href")
         assert "#play=" in link
         obs = contexts[1].new_page()

@@ -74,15 +74,21 @@ function openBugVideo() {
     window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
   }, 3000);
 }
+const localPlaybackHost = el('section', {id: 'local-playback-host'});
+$('pane-studio').append($('general-form'), localPlaybackHost);
+const channelControls = $('channel-connection').parentElement;
+const channelControlsHost = channelControls.parentElement;
 function tab(name) {
+  if (name === 'general') name = 'studio';
   if (!runtimeSetup.ready && !['setup', 'config'].includes(name)) name = 'setup';
   window.Locale.apply();
   if (name === 'bugs') openBugVideo(); else stopBugVideo();
-  const general = name === 'general';
+  const general = name === 'studio';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
   window.Locale.bind($('playback-heading'), general ? 'Local OBS Sources' : 'Twitch & OBS');
   window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'IRC chat starts automatically for saved channels. Optionally authorize Bits, Channel Points and subscriptions.');
+  (general ? localPlaybackHost : channelControlsHost).append(channelControls);
   $('channel-form').hidden = general;
   $('channel-dashboard').hidden = general;
   $('general-form').hidden = !general;
@@ -94,7 +100,7 @@ function tab(name) {
   }
   renderChannels();
   if (session) renderChannelState().catch(e => error(e.message));
-  const pane = general ? 'channels' : name;
+  const pane = name;
   document.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + pane; });
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
 }
@@ -349,7 +355,7 @@ async function renderChannelState() {
   $('chat-events').replaceChildren(...snap.chat.map(c => el('div', {class: 'event-row'}, el('strong', {}, `${c.username} · ${c.accepted ? t('accepted') : t('blocked') + ': ' + t(c.reason)}`), el('p', {}, c.text))));
 }
 $('config-form').addEventListener('submit', action(async event => {
-  event.preventDefault(); const value = {device: $('config-device').value, cpu_threads: Number($('config-threads').value), keep_model_loaded: $('config-resident').checked, hotkey: $('config-hotkey').value, max_queue: Number($('config-queue').value)};
+  event.preventDefault(); const value = {device: $('config-device').value, cpu_threads: Number($('config-threads').value), keep_model_loaded: $('config-resident').checked, hotkey: $('config-hotkey').value, max_queue: Number($('config-queue').value), vram_warning_mib: Number($('config-vram-warning').value)};
   const saved = await api('/api/config', {method: 'PUT', body: value}); config = saved;
   $('hotkey-status').textContent = t(saved.hotkey_status); $('health').textContent = t('Configuration saved. Model will load on the selected device for the next job.');
 }));
@@ -370,6 +376,8 @@ async function refresh() {
 }
 async function resources() {
   const data = await api('/api/resources'), r = data.live, gpu = r.gpus[0];
+  $('gpu-pressure-warning').hidden = !data.gpu_warning;
+  $('gpu-pressure-warning').textContent = data.gpu_warning ? t(data.gpu_warning.message) + ' ' + bytes(data.gpu_warning.free_bytes) + ' / ' + bytes(data.gpu_warning.threshold_bytes) : '';
   $('cpu').textContent = `${r.system_cpu_percent.toFixed(0)}%`;
   $('ram').textContent = data.worker_pid ? bytes(r.process_ram_bytes) : t('Worker unloaded');
   $('system-ram').textContent = `${bytes(r.system_ram_used_bytes)} / ${bytes(r.system_ram_total_bytes)}`;
@@ -386,8 +394,8 @@ async function init() {
       history.replaceState(null, '', location.pathname + location.search);
     }
     session = await api('/api/session'); config = await api('/api/config');
-    $('config-device').value = config.device; $('config-threads').value = config.cpu_threads; $('config-resident').checked = config.keep_model_loaded;
-    $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
+    $('config-device').value = config.device === 'cpu' ? 'cuda' : config.device; $('config-threads').value = config.cpu_threads; $('config-resident').checked = config.keep_model_loaded;
+    $('config-vram-warning').value = config.vram_warning_mib ?? 512; $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
     await runtimeStatus();
@@ -518,6 +526,8 @@ function renderSetup(data) {
   renderOptionalImport(data);
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
+  document.querySelector('[data-tab="setup"]').hidden = data.ready;
+  if (data.ready && !$('pane-setup').hidden) tab('config');
   if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
   if (data.stage === 'models' && data.download?.total_bytes) {
     modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
@@ -602,6 +612,16 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const residency = state.model_residency || {};
+  const active = state.active_job;
+  const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
+  const lastFailure = latest?.status === 'failed' && /CUDA|GPU memory/i.test(latest.error || '') ? latest : null;
+  const currentError = lastFailure && (!active || lastFailure.finished_at > active.created_at);
+  $('cuda-status').textContent = currentError ? 'CUDA error: ' + lastFailure.error :
+    active?.device === 'cuda' ? 'CUDA: active · ' + t(active.stage) :
+    residency.loaded && residency.device === 'cuda' ? 'CUDA: model loaded on GPU · idle' :
+    'CUDA: not checked · no model loaded. GPU utilization alone does not confirm CUDA.';
+
   const model = state.model_residency || {};
   const warm = Boolean(model.loaded);
   $('model-residency').textContent = `${model.model || 'k2-fsa/OmniVoice'} · ${t(warm ? 'Warm · loaded in memory' : 'Cold · not loaded')} · ${model.device || t('N/A')}`;
@@ -725,15 +745,33 @@ $('twitch-authorize').addEventListener('click', action(async () => {
 $('twitch-forget').addEventListener('click', action(async () => {
   if (selectedChannel) { await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'DELETE'}); await loadTwitchAuth(); await refresh(); }
 }));
+const rewardLimitFields = [
+  ['global_cooldown_seconds', 'Reward cooldown (seconds) · 0 disables', 604800],
+  ['max_per_stream', 'Redemptions per stream · 0 disables', 2147483647],
+  ['max_per_user_per_stream', 'Redemptions per user per stream · 0 disables', 2147483647]
+];
+function rewardLimitsEditor(reward = {}, disabled = false) {
+  return el('div', {class: 'reward-limits'}, ...rewardLimitFields.map(([key, label, maximum]) =>
+    el('label', {}, t(label), el('input', {type: 'number', min: '0', max: maximum, step: '1', value: reward[key] || 0, 'data-reward-limit': key, 'aria-label': t(label), ...(disabled ? {disabled: ''} : {})}))));
+}
+function readRewardLimits(container) {
+  return Object.fromEntries([...container.querySelectorAll('[data-reward-limit]')].map(input => [input.dataset.rewardLimit, Number(input.value)]));
+}
+$('twitch-new-reward-limits').append(rewardLimitsEditor());
 async function loadTwitchRewards() {
   const channel = selectedChannel; const rewards = await api(`/api/twitch/${channel}/rewards`);
   if (channel !== selectedChannel) return;
-  $('twitch-rewards').replaceChildren(...rewards.map(r => el('div', {class: 'job-row'}, el('strong', {}, `${r.title} · ${r.cost}`), el('p', {class: 'muted'}, `${r.id} · ${t(r.manageable ? 'Automatic fulfillment / refund' : 'Manage in Twitch')}`), button('Use reward', () => eventRuleRow({kind: 'reward', reward_id: r.id})))));
+  $('twitch-rewards').replaceChildren(...rewards.map(r => {
+    const limits = rewardLimitsEditor(r, !r.manageable);
+    return el('div', {class: 'job-row', 'data-reward-id': r.id}, el('strong', {}, `${r.title} · ${r.cost}`), el('p', {class: 'muted'}, `${r.id} · ${t(r.manageable ? 'Automatic fulfillment / refund' : 'Manage in Twitch')}`), limits,
+      r.manageable ? button('Save reward limits', async () => { await api(`/api/twitch/${channel}/rewards/${encodeURIComponent(r.id)}`, {method: 'PATCH', body: readRewardLimits(limits)}); if (channel === selectedChannel) await loadTwitchRewards(); }) : el('p', {}, t('Edit limits for this reward in Twitch.')),
+      button('Use reward', () => eventRuleRow({kind: 'reward', reward_id: r.id})));
+  }));
 }
 $('twitch-load-rewards').addEventListener('click', action(loadTwitchRewards));
 $('twitch-create-reward').addEventListener('click', action(async () => {
   const channel = selectedChannel;
-  const reward = await api(`/api/twitch/${channel}/rewards`, {method: 'POST', body: {title: $('twitch-reward-title').value, cost: Number($('twitch-reward-cost').value)}});
+  const reward = await api(`/api/twitch/${channel}/rewards`, {method: 'POST', body: {title: $('twitch-reward-title').value, cost: Number($('twitch-reward-cost').value), ...readRewardLimits($('twitch-new-reward-limits'))}});
   if (channel !== selectedChannel) return;
   eventRuleRow({kind: 'reward', reward_id: reward.id}); await loadTwitchRewards();
 }));

@@ -59,7 +59,8 @@ try {
             throw 'Web setup exceeded its 20-minute test deadline.'
         }
     } while ($state.status -eq 'running')
-    if (-not $state.ready) { throw "Web CPU/model setup failed: $($state.error)" }
+    if ($state.status -ne 'succeeded') { throw "Dependency/model acceptance failed: $($state.error)" }
+    if ($state.ready) { throw 'CPU-only dependency acceptance must not unlock CUDA-only generation.' }
     if ($state.models.files.Count -lt 2) { throw 'Model verification manifest missing.' }
     & $config.python (Join-Path $PSScriptRoot 'verify-runtime.py') --device cpu
     if ($LASTEXITCODE -ne 0) { throw 'Web-installed CPU runtime smoke failed.' }

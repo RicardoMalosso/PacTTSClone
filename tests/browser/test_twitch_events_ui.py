@@ -59,6 +59,16 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     )
     page.locator("#twitch-load-rewards").click()
     expect(page.locator("#twitch-rewards")).to_contain_text("Voice reward")
+    existing_limits = page.locator('[data-reward-id="reward1"]')
+    existing_limits.locator('[data-reward-limit="global_cooldown_seconds"]').fill("90")
+    with page.expect_request(
+        lambda r: r.method == "PATCH" and "/rewards/reward1" in r.url
+    ) as saved:
+        existing_limits.get_by_role("button", name="Save reward limits", exact=True).click()
+    assert saved.value.post_data_json["global_cooldown_seconds"] == 90
+    page.locator('#twitch-new-reward-limits [data-reward-limit="global_cooldown_seconds"]').fill(
+        "60"
+    )
     page.locator("#twitch-reward-title").fill("Read with voice")
     page.locator("#twitch-create-reward").click()
     expect(page.locator(".event-rule")).to_have_count(2)
@@ -148,9 +158,10 @@ def test_new_channel_starts_irc_and_sidebar_off_survives_edit(page, live_server)
     row = page.locator('[data-channel="newchannel"]')
     expect(row.get_by_role("button", name="Turn off", exact=True)).to_be_visible()
     assert app.state.studio.clients["newchannel"].status == "connected"
-    assert page.locator("#channel-dashboard").bounding_box()["x"] > page.locator(
-        "#channel-form"
-    ).bounding_box()["x"]
+    assert (
+        page.locator("#channel-dashboard").bounding_box()["x"]
+        > page.locator("#channel-form").bounding_box()["x"]
+    )
     row.get_by_role("button", name="Turn off", exact=True).click()
     expect(row.get_by_role("button", name="Turn on", exact=True)).to_be_visible()
     page.get_by_role("button", name="Save channel", exact=True).click()

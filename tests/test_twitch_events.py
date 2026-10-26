@@ -712,3 +712,27 @@ def test_handoff_drains_notifications_while_new_welcome_is_pending(event_studio)
     assert session["id"] == "new" and isinstance(new, NewSocket)
     assert received[0][2]["message"]["text"] == "during handoff"
     assert order.index("new welcome") < order.index("old close")
+
+
+def test_reward_limits_creation_update_and_disable(event_studio):
+    _, studio, fake, _ = event_studio
+    limits = {"global_cooldown_seconds": 60, "max_per_stream": 20, "max_per_user_per_stream": 2}
+    studio.events.create_reward("streamer", "TTS", 500, limits)
+    studio.events.update_reward_limits("streamer", "reward1", limits)
+    writes = [
+        kw["body"]
+        for method, url, kw in fake.calls
+        if method in {"POST", "PATCH"} and "/custom_rewards?" in url
+    ]
+    assert len(writes) == 2
+    for body in writes:
+        assert all(body[key] == value for key, value in limits.items())
+        assert body["is_global_cooldown_enabled"]
+    body = studio.events.reward_limits({})
+    assert not body["is_global_cooldown_enabled"]
+    assert "global_cooldown_seconds" not in body
+    for bad in (-1, True, 1.5, 604801):
+        with pytest.raises(UserError):
+            studio.events.reward_limits({"global_cooldown_seconds": bad})
+    with pytest.raises(UserError, match="Only rewards"):
+        studio.events.update_reward_limits("streamer", "unknown", limits)

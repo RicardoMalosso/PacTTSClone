@@ -64,6 +64,7 @@ class Resources:
                             "index": index,
                             "name": name.decode() if isinstance(name, bytes) else name,
                             "used_bytes": mem.used,
+                            "free_bytes": mem.free,
                             "total_bytes": mem.total,
                             "utilization_percent": util,
                         }

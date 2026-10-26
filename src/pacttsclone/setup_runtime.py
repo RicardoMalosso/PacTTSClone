@@ -86,6 +86,7 @@ class RuntimeSetup:
                     self.service.engine is not None
                     or (
                         dependencies_available()
+                        and self.state.get("device") == "cuda"
                         and self.state["status"] == "succeeded"
                         and self._models_present()
                     )
@@ -271,6 +272,23 @@ class RuntimeSetup:
             raise BusyError("Wait for the model search to finish before installing.")
         if device not in {"cpu", "cuda"}:
             raise UserError("Choose CPU or NVIDIA CUDA.")
+        # Re-selecting an installed CUDA runtime is a no-op, not a repair.
+        # Configuration changes never call the installer. A successful prior manifest
+        # is checked for presence/size only; downloads/imports retain full hashing.
+        if (
+            device == "cuda"
+            and self.state.get("device") == "cuda"
+            and self.state.get("status") == "succeeded"
+            and dependencies_available()
+            and self._models_present()
+        ):
+            with self.service._lock:
+                from .models import AppConfig
+
+                self.service.configure(
+                    AppConfig(**{**self.service.config.model_dump(), "device": "cuda"})
+                )
+            return self.snapshot()
         with self.service._lock:
             if self.service.pending() or self.service.setup_busy:
                 raise BusyError("Finish or cancel generation/setup before installing dependencies.")
@@ -532,6 +550,12 @@ class RuntimeSetup:
                 for number, (stage, command) in enumerate(self._commands(device), 1):
                     if self.cancelled.is_set():
                         raise InterruptedError("Setup cancelled.")
+                    if stage == "models" and self._models_present():
+                        self._record_setup_line(
+                            log,
+                            "Reusing verified model manifest; files present with matching sizes.",
+                        )
+                        continue
                     self.update(
                         stage=stage,
                         completed_steps=number - 1,

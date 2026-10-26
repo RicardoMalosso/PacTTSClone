@@ -372,3 +372,32 @@ on channel off, absence of EventSub chat subscriptions, new-channel auto-on, Off
 preservation on edit, right sidebar placement and 390px overflow. All Twitch and
 inference dependencies in these tests are simulated. Live consent/paid-event and
 Windows installer acceptance must be verified separately for the new source.
+
+
+## CUDA-only and Local UI follow-up
+Speech inference now requires CUDA, including legacy CPU selections. CPU remains
+for transcription/audio processing. Initialization no longer claims CPU inference.
+CUDA/OOM failures preserve actionable errors in request history and generation logs.
+The status shows unchecked, model loaded, active stage, or latest CUDA failure; it
+is not a continuous independent CUDA probe. Windows driver-reset recovery and the
+reported gaming stall still need real hardware evidence. No VRAM preallocation.
+
+Setup hides after success; Configuration owns settings. Re-selecting an existing
+CUDA setup does not install/hash again. Existing verified manifests reuse model
+files by presence/size; CPU-only installations require the one-time CUDA setup.
+Local generation and local OBS controls share the final Local tab. Native reward
+cooldown and per-stream/per-user limits support creation and editing manageable
+rewards; other rewards remain editable in Twitch.
+
+Per-job logs/generation-vram.jsonl records start, half-second worker samples and end
+(including failures/cancellation): total/used/free device VRAM plus separate PyTorch
+allocated/reserved bytes. Missing readings stay unavailable, not zero. A configurable
+512 MiB advisory warning logs pressure/recovery transitions; it reserves no memory.
+
+Validation: final full core 184 passed and Chromium 31 passed with logging/status
+changes; Ruff and syntax checks passed. Windows installer acceptance now expects
+its CPU dependency-only smoke to leave CUDA generation locked; this updated
+acceptance script has not been run locally. Restart persistence verified
+for channel config and blocked/queued/running/failed/cancelled requests. Interrupted
+jobs become cancelled without replay. Tests use simulated inference/CUDA; no real
+GPU gaming benchmark or new Windows installer acceptance is claimed.

@@ -7,13 +7,15 @@ from .domain import GenerationRequest, UserError, Waveform
 
 
 def choose_device(torch, requested: str) -> str:
-    if requested == "auto":
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    if requested == "cuda" and not torch.cuda.is_available():
-        raise UserError("CUDA indisponível. Instale PyTorch com CUDA ou use --device cpu.")
-    if requested not in {"cpu", "cuda"}:
-        raise UserError("Dispositivo inválido: use auto, cuda ou cpu.")
-    return requested
+    if requested not in {"auto", "cuda", "cpu"}:
+        raise UserError("Choose automatic CUDA or NVIDIA CUDA.")
+    if not torch.cuda.is_available():
+        raise UserError(
+            "CUDA indisponível. Speech generation requires NVIDIA CUDA. "
+            "Check the driver and CUDA PyTorch installation; CPU fallback is disabled."
+        )
+    # Legacy CPU settings migrate to CUDA; never silently generate speech on CPU.
+    return "cuda"
 
 
 def dependencies_available() -> bool:
@@ -36,7 +38,7 @@ class OmniVoiceEngine:
     def _load(self):
         if self.model is not None:
             return
-        self.observer("load_model", "cpu")
+        self.observer("initialize_model", "pending")
         try:
             import torch
             from omnivoice import OmniVoice
@@ -123,7 +125,12 @@ class OmniVoiceEngine:
                 except ImportError:
                     pass
                 raise UserError(
-                    "Memória insuficiente. Reduza o texto ou reinicie com --device cpu."
+                    "Insufficient GPU memory. Close GPU applications or shorten the text. "
+                    "CPU fallback is disabled."
+                ) from exc
+            if any(term in message for term in ("cuda", "driver", "device-side")):
+                raise UserError(
+                    "CUDA generation failed; CPU fallback is disabled. " + str(exc)[:800]
                 ) from exc
             raise UserError(
                 "Falha no OmniVoice. Verifique a instalação, conexão para baixar modelos "

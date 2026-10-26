@@ -153,7 +153,7 @@ def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     page.route("**/api/setup", lambda route: route.fulfill(json=state))
 
     def start(route):
-        assert route.request.post_data_json == {"device": "cpu"}
+        assert route.request.post_data_json == {"device": "cuda"}
         state.update(
             status="running",
             stage="models",
@@ -180,7 +180,7 @@ def test_initial_setup_gate_progress_cancel_and_unlock(page, live_app):
     for tab in ["studio", "voices", "channels"]:
         expect(page.locator(f'[data-tab="{tab}"]')).to_be_disabled()
     expect(page.locator("#tunnel-card")).to_be_hidden()
-    page.locator("#setup-device").select_option("cpu")
+    page.locator("#setup-device").select_option("cuda")
     page.locator("#setup-start").click()
     expect(page.locator("#setup-file-progress")).to_have_attribute("value", "50")
     expect(page.locator("#setup-download-status")).to_contain_text("resuming download")
