@@ -104,13 +104,14 @@ def test_transcribe_decoded_mp3_passes_pcm_without_second_ffmpeg(
         np.testing.assert_array_equal(samples, expected)
 
 
-def test_cpu_uses_float32(modules):
+@pytest.mark.parametrize("requested", ["auto", "cuda", "cpu"])
+def test_no_cpu_fallback_when_cuda_unavailable(modules, requested):
     torch, _, factory = modules
     torch.cuda.is_available = lambda: False
-    engine = OmniVoiceEngine(Settings())
-    engine.synthesize("reference.wav", GenerationRequest(text="Olá", ref_text="Ref"))
-    assert factory.call_args.kwargs["device_map"] == "cpu"
-    assert factory.call_args.kwargs["dtype"] == "fp32"
+    engine = OmniVoiceEngine(Settings(device=requested))
+    with pytest.raises(UserError, match="CPU fallback is disabled"):
+        engine.synthesize("reference.wav", GenerationRequest(text="Olá", ref_text="Ref"))
+    factory.assert_not_called()
 
 
 def test_explicit_unavailable_cuda_fails(modules):
@@ -124,7 +125,7 @@ def test_oom_drops_cache_and_allows_retry(modules):
     torch, model, factory = modules
     engine = OmniVoiceEngine(Settings())
     model.generate.side_effect = RuntimeError("CUDA out of memory")
-    with pytest.raises(UserError, match="Memória insuficiente"):
+    with pytest.raises(UserError, match="GPU memory"):
         engine.synthesize("reference.wav", GenerationRequest(text="Olá", ref_text="Ref"))
     assert engine.model is None
     torch.cuda.empty_cache.assert_called_once()
@@ -173,7 +174,7 @@ def test_residency_is_shared_across_voice_changes_and_cleared_on_oom(modules):
     assert factory.call_count == 1
     assert events == [(True, "cuda")]
     model.generate.side_effect = RuntimeError("out of memory")
-    with pytest.raises(UserError, match="Memória"):
+    with pytest.raises(UserError, match="GPU memory"):
         engine.synthesize("voice-a.wav", request)
     assert events[-1] == (False, "cuda")
 

@@ -238,10 +238,10 @@ def test_subscription_conditions_partial_revocation_and_identity(event_studio):
     assert client.status == "partial"
     assert EVENT_TYPES["bits"] in client.subscription_errors
     bodies = [kw["body"] for _, url, kw in fake.calls if "/eventsub/" in url]
-    chat = next(b for b in bodies if b["type"] == CHAT)
-    assert chat["condition"] == dict(broadcaster_user_id="123", user_id="123")
+    assert not any(b["type"] == CHAT for b in bodies)
+    assert all(b["condition"] == {"broadcaster_user_id": "123"} for b in bodies)
     notification = {
-        "metadata": {"message_type": "notification", "subscription_type": CHAT},
+        "metadata": {"message_type": "notification", "subscription_type": EVENT_TYPES["reward"]},
         "payload": {"event": {"broadcaster_user_id": "wrong"}},
     }
     client.handle(notification)
@@ -250,9 +250,12 @@ def test_subscription_conditions_partial_revocation_and_identity(event_studio):
     client.handle(notification)
     assert len(calls) == 1
     client.handle(
-        {"metadata": {"message_type": "revocation"}, "payload": {"subscription": {"type": CHAT}}}
+        {
+            "metadata": {"message_type": "revocation"},
+            "payload": {"subscription": {"type": EVENT_TYPES["reward"]}},
+        }
     )
-    assert CHAT not in client.subscriptions
+    assert EVENT_TYPES["reward"] not in client.subscriptions
     with pytest.raises(UserError):
         client.handle(
             {
@@ -550,11 +553,19 @@ def test_irc_and_oauth_switch_closes_old_client(tmp_path, engine, monkeypatch):
         studio.save_channel(ChannelConfig(name="streamer", enabled=True))
         first = studio.clients["streamer"]
         studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="oauth"))
-        assert first.closed
-        second = studio.clients["streamer"]
+        assert not first.closed
+        assert studio.clients["streamer"] is first
+        second = studio.event_clients["streamer"]
+        assert studio.clients["streamer"] is not second
         assert studio.client_modes["streamer"] == "oauth"
         studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="irc"))
         assert second.closed and studio.client_modes["streamer"] == "irc"
+        assert "streamer" not in studio.event_clients
+        studio.save_channel(ChannelConfig(name="streamer", enabled=True, transport="oauth"))
+        irc, events = studio.clients["streamer"], studio.event_clients["streamer"]
+        studio.set_channel_connection("streamer", False)
+        assert irc.closed and events.closed
+        assert "streamer" not in studio.clients and "streamer" not in studio.event_clients
     finally:
         studio.close()
 
@@ -701,3 +712,27 @@ def test_handoff_drains_notifications_while_new_welcome_is_pending(event_studio)
     assert session["id"] == "new" and isinstance(new, NewSocket)
     assert received[0][2]["message"]["text"] == "during handoff"
     assert order.index("new welcome") < order.index("old close")
+
+
+def test_reward_limits_creation_update_and_disable(event_studio):
+    _, studio, fake, _ = event_studio
+    limits = {"global_cooldown_seconds": 60, "max_per_stream": 20, "max_per_user_per_stream": 2}
+    studio.events.create_reward("streamer", "TTS", 500, limits)
+    studio.events.update_reward_limits("streamer", "reward1", limits)
+    writes = [
+        kw["body"]
+        for method, url, kw in fake.calls
+        if method in {"POST", "PATCH"} and "/custom_rewards?" in url
+    ]
+    assert len(writes) == 2
+    for body in writes:
+        assert all(body[key] == value for key, value in limits.items())
+        assert body["is_global_cooldown_enabled"]
+    body = studio.events.reward_limits({})
+    assert not body["is_global_cooldown_enabled"]
+    assert "global_cooldown_seconds" not in body
+    for bad in (-1, True, 1.5, 604801):
+        with pytest.raises(UserError):
+            studio.events.reward_limits({"global_cooldown_seconds": bad})
+    with pytest.raises(UserError, match="Only rewards"):
+        studio.events.update_reward_limits("streamer", "unknown", limits)

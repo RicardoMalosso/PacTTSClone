@@ -310,3 +310,18 @@ def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
     finally:
         app.state.studio.close()
 
+
+
+def test_completed_cuda_setup_reselection_does_not_install_or_hash(tmp_path, engine, monkeypatch):
+    app = create_app(Settings(data_dir=tmp_path / "data"), engine)
+    setup = app.state.runtime_setup
+    setup.update(status="succeeded", device="cuda")
+    monkeypatch.setattr(setup, "_models_present", lambda: True)
+    monkeypatch.setattr("pacttsclone.setup_runtime.dependencies_available", lambda: True)
+    monkeypatch.setattr(setup, "_run", lambda *_: pytest.fail("Unexpected reinstall or hashing"))
+    try:
+        assert setup.start("cuda")["ready"]
+        assert setup.thread is None
+        assert app.state.service.config.device == "cuda"
+    finally:
+        app.state.studio.close()

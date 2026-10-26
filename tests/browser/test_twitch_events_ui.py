@@ -20,7 +20,7 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     page.locator("#channel-select").select_option("streamer")
     expect(page.locator("#channel-transport")).to_have_value("irc")
     expect(page.locator("#twitch-oauth-panel")).to_be_hidden()
-    page.locator("#channel-transport").select_option("oauth")
+    page.locator("#enable-twitch-events").click()
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
     page.locator("#twitch-client-id").fill(CLIENT_ID)
     page.locator("#twitch-authorize").click()
@@ -36,9 +36,9 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     row.get_by_label("Event voice", exact=True).select_option(voice["id"])
     row.get_by_label("Minimum Bits", exact=True).fill("100")
     row.get_by_label("Event text template", exact=True).fill("{username}: {text}")
-    page.locator("#channel-enabled").check()
     page.get_by_role("button", name="Save channel", exact=True).click()
-    expect(page.locator("#channel-list")).to_contain_text("OAuth / EventSub")
+    expect(page.locator("#channel-save-status")).to_have_text("Channel saved")
+    expect(page.locator("#channel-list")).to_contain_text("IRC")
     page.reload()
     page.locator('[data-tab="channels"]').click()
     page.locator("#channel-select").select_option("streamer")
@@ -50,9 +50,6 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
         page.locator(".event-rule").get_by_label("Event text template", exact=True)
     ).to_have_value("{username}: {text}")
     page.locator('[data-locale="pt"]').click()
-    expect(page.locator("#channel-transport option:checked")).to_have_text(
-        "OAuth · chat, pontos do canal, Bits e inscrições"
-    )
     expect(page.locator(".event-rule").get_by_label("Mínimo de Bits", exact=True)).to_have_value(
         "100"
     )
@@ -62,6 +59,16 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     )
     page.locator("#twitch-load-rewards").click()
     expect(page.locator("#twitch-rewards")).to_contain_text("Voice reward")
+    existing_limits = page.locator('[data-reward-id="reward1"]')
+    existing_limits.locator('[data-reward-limit="global_cooldown_seconds"]').fill("90")
+    with page.expect_request(
+        lambda r: r.method == "PATCH" and "/rewards/reward1" in r.url
+    ) as saved:
+        existing_limits.get_by_role("button", name="Save reward limits", exact=True).click()
+    assert saved.value.post_data_json["global_cooldown_seconds"] == 90
+    page.locator('#twitch-new-reward-limits [data-reward-limit="global_cooldown_seconds"]').fill(
+        "60"
+    )
     page.locator("#twitch-reward-title").fill("Read with voice")
     page.locator("#twitch-create-reward").click()
     expect(page.locator(".event-rule")).to_have_count(2)
@@ -120,7 +127,7 @@ def test_slow_initialization_preserves_unsaved_oauth_selection(page, live_server
     page.goto(url)
     page.locator('[data-tab="channels"]').click()
     page.locator("#channel-select").select_option("streamer")
-    page.locator("#channel-transport").select_option("oauth")
+    page.locator("#enable-twitch-events").click()
     page.locator("#twitch-client-id").fill(CLIENT_ID)
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
     assert held
@@ -133,3 +140,79 @@ def test_slow_initialization_preserves_unsaved_oauth_selection(page, live_server
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
     expect(page.locator("#twitch-client-id")).to_have_value(CLIENT_ID)
     expect(page.locator("#twitch-authorize")).to_be_visible()
+
+
+def test_new_channel_starts_irc_and_sidebar_off_survives_edit(page, live_server):
+    from tests.test_v2 import FakeIRC
+
+    url, app = live_server
+    app.state.studio.twitch_factory = FakeIRC
+    page.set_viewport_size({"width": 1440, "height": 1000})
+    page.goto(url)
+    page.locator('[data-tab="channels"]').click()
+    expect(page.get_by_text("Connect and monitor chat", exact=True)).to_have_count(0)
+    page.locator("#channel-name").fill("newchannel")
+    page.locator("#commands-list .command-row button").click()
+    page.get_by_role("button", name="Save channel", exact=True).click()
+    expect(page.locator("#channel-save-status")).to_have_text("Channel saved")
+    row = page.locator('[data-channel="newchannel"]')
+    expect(row.get_by_role("button", name="Turn off", exact=True)).to_be_visible()
+    assert app.state.studio.clients["newchannel"].status == "connected"
+    assert (
+        page.locator("#channel-dashboard").bounding_box()["x"]
+        > page.locator("#channel-form").bounding_box()["x"]
+    )
+    row.get_by_role("button", name="Turn off", exact=True).click()
+    expect(row.get_by_role("button", name="Turn on", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Save channel", exact=True).click()
+    expect(page.locator("#channel-save-status")).to_have_text("Channel saved")
+    expect(row.get_by_role("button", name="Turn on", exact=True)).to_be_visible()
+    page.locator("#enable-twitch-events").click()
+    expect(page.locator("#twitch-oauth-panel")).to_be_visible()
+    expect(page.locator("#event-rules-panel")).to_contain_text("External donations")
+    page.locator("#disable-twitch-events").click()
+    expect(page.locator("#twitch-oauth-panel")).to_be_hidden()
+    page.set_viewport_size({"width": 390, "height": 844})
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+def test_saved_channel_cards_control_without_selecting_and_setup_toggle(page, live_server):
+    url, app = live_server
+    studio = app.state.studio
+    studio.save_channel(ChannelConfig(name="savedchannel", paused=True))
+    studio.store.put(
+        "playback",
+        "queueditem",
+        {
+            "id": "queueditem",
+            "channel": "savedchannel",
+            "status": "queued",
+            "created_at": 1,
+            "text": "Waiting audio",
+            "job_id": "example",
+        },
+    )
+    page.goto(url)
+    page.locator('[data-tab="channels"]').click()
+    expect(page.locator("#channel-select")).to_have_value("")
+    row = page.locator('[data-channel="savedchannel"]')
+    row.get_by_role("button", name="Resume playback", exact=True).click()
+    expect(row.get_by_role("button", name="Pause playback", exact=True)).to_be_visible()
+    assert studio.store.get("channel", "savedchannel")["paused"] is False
+    expect(row.get_by_role("link", name="Open OBS player")).to_have_attribute(
+        "href", "/savedchannel"
+    )
+    row.locator("details[data-queue] summary").click()
+    expect(row).to_contain_text("Waiting audio")
+    page.reload()
+    page.locator('[data-tab="channels"]').click()
+    expect(row.get_by_role("button", name="Pause playback", exact=True)).to_be_visible()
+    expect(page.locator('[data-tab="setup"]')).to_be_hidden()
+    page.locator('[data-tab="config"]').click()
+    page.locator("#config-show-setup").check()
+    expect(page.locator('[data-tab="setup"]')).to_be_visible()
+    page.locator('[data-tab="setup"]').click()
+    expect(page.locator("#pane-setup")).to_be_visible()
+    page.locator('[data-tab="config"]').click()
+    page.locator("#config-show-setup").uncheck()
+    expect(page.locator('[data-tab="setup"]')).to_be_hidden()

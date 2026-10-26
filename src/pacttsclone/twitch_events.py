@@ -1,4 +1,4 @@
-"""EventSub WebSocket receiver. Chat and paid events share no IRC connection."""
+"""EventSub receiver for optional events alongside anonymous IRC chat."""
 
 import contextlib
 import json
@@ -48,8 +48,6 @@ class EventSubClient:
         account = self.accounts.account(self.channel)
         uid = account["user_id"]
         types = {EVENT_TYPES[r["kind"]] for r in config.get("event_rules", [])}
-        if config.get("commands"):
-            types.add(CHAT)
         if EVENT_TYPES["reward"] in types:
             types.add(REWARD_UPDATE)
         # Always maintain a useful connection even before configuring actions.

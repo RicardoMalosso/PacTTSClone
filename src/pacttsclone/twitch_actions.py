@@ -37,17 +37,55 @@ class TwitchActions:
                 "cost": r["cost"],
                 "is_enabled": r["is_enabled"],
                 "manageable": r["id"] in ids,
+                **{
+                    key: r.get(setting, {}).get(key, 0)
+                    if r.get(setting, {}).get("is_enabled") else 0
+                    for key, setting in (
+                        ("global_cooldown_seconds", "global_cooldown_setting"),
+                        ("max_per_stream", "max_per_stream_setting"),
+                        ("max_per_user_per_stream", "max_per_user_per_stream_setting"),
+                    )
+                },
             }
             for r in all_rewards
         ]
         self.store.put("twitch_rewards", channel, {"rewards": result})
         return result
 
-    def create_reward(self, channel, title, cost):
+    @staticmethod
+    def reward_limits(values):
+        body = {}
+        for key, flag, maximum in (
+            ("global_cooldown_seconds", "is_global_cooldown_enabled", 604800),
+            ("max_per_stream", "is_max_per_stream_enabled", 2147483647),
+            ("max_per_user_per_stream", "is_max_per_user_per_stream_enabled", 2147483647),
+        ):
+            value = values.get(key, 0)
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= maximum:
+                raise UserError(f"{key} must be an integer between 0 and {maximum}.")
+            body[flag] = value > 0
+            if value:
+                body[key] = value
+        return body
+
+    def update_reward_limits(self, channel, reward_id, values):
+        body = self.reward_limits(values)
+        reward = next((r for r in self.rewards(channel) if r["id"] == reward_id), None)
+        if not reward or not reward["manageable"]:
+            raise UserError("Only rewards created by this Twitch application can be edited here.")
+        uid = self.accounts.account(channel)["user_id"]
+        self.accounts.api(
+            channel, "PATCH", "/channel_points/custom_rewards",
+            query={"broadcaster_id": uid, "id": reward_id}, body=body,
+        )
+        return self.rewards(channel)
+
+    def create_reward(self, channel, title, cost, limits=None):
         if not isinstance(title, str) or not 1 <= len(title.strip()) <= 45:
             raise UserError("Reward title must contain 1–45 characters.")
         if isinstance(cost, bool) or not isinstance(cost, int) or not 1 <= cost <= 1000000000:
             raise UserError("Reward cost must be a positive integer.")
+        limit_body = self.reward_limits(limits or {})
         uid = self.accounts.account(channel)["user_id"]
         result = self.accounts.api(
             channel,
@@ -55,6 +93,7 @@ class TwitchActions:
             "/channel_points/custom_rewards",
             query={"broadcaster_id": uid},
             body={
+                **limit_body,
                 "title": title.strip(),
                 "cost": cost,
                 "is_user_input_required": True,

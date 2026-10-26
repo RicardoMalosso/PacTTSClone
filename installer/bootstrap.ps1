@@ -26,16 +26,38 @@ try {
     $uvRoot = Join-Path $AppRoot 'runtime\uv'
     Expand-Archive -LiteralPath $uvArchive -DestinationPath $uvRoot -Force
     $uv = @(Get-ChildItem -LiteralPath $uvRoot -Filter uv.exe -Recurse)[0].FullName
-    Write-Host '[2/6] Downloading isolated Python runtime'
-    Invoke-Checked $uv @('python','install',$manifest.python)
+    Write-Host '[2/6] Reusing or installing isolated Python runtime'
     $managedPython = Join-Path $env:UV_PYTHON_INSTALL_DIR "cpython-$($manifest.python)-windows-x86_64-none\python.exe"
+    if (-not (Test-Path -LiteralPath $managedPython)) {
+        Invoke-Checked $uv @('python','install',$manifest.python)
+    } else {
+        Write-Host "Reusing private Python: $managedPython"
+    }
     if (-not (Test-Path -LiteralPath $managedPython)) {
         throw "Managed Python was not found at $managedPython"
     }
-    Write-Host "Using private Python: $managedPython"
+    Invoke-Checked $managedPython @('-c', 'import sys; print(sys.version)')
     $envRoot = Join-Path $AppRoot "environments\$version-$Device"
-    Invoke-Checked $uv @('venv','--allow-existing','--python',$managedPython,$envRoot)
-    $python = Join-Path $envRoot 'Scripts\python.exe'
+    $python = $null
+    $activePath = Join-Path $AppRoot 'active.json'
+    if (Test-Path -LiteralPath $activePath) {
+        try {
+            $previous = Get-Content -Raw -LiteralPath $activePath | ConvertFrom-Json
+            $previousPython = [IO.Path]::GetFullPath($previous.python)
+            $allowedRoot = [IO.Path]::GetFullPath((Join-Path $AppRoot 'environments')).TrimEnd('\') + '\'
+            if ($previousPython.StartsWith($allowedRoot, [StringComparison]::OrdinalIgnoreCase) -and (Test-Path -LiteralPath $previousPython)) {
+                & $previousPython -c 'import sys; assert sys.version_info[:2] == (3,12)'
+                if ($LASTEXITCODE -eq 0) {
+                    $python = $previousPython
+                    Write-Host "Reusing existing application environment: $python"
+                }
+            }
+        } catch { Write-Host 'Previous environment is unavailable; creating one from cached packages.' }
+    }
+    if (-not $python) {
+        Invoke-Checked $uv @('venv','--allow-existing','--python',$managedPython,$envRoot)
+        $python = Join-Path $envRoot 'Scripts\python.exe'
+    }
     Write-Host '[3/6] Installing verified gyan.dev FFmpeg Essentials binaries'
     $ffBin = Join-Path $AppRoot 'runtime\ffmpeg\bin'
     New-Item -ItemType Directory -Force -Path $ffBin | Out-Null

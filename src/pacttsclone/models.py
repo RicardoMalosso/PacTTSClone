@@ -10,6 +10,7 @@ class AppConfig(BaseModel):
     keep_model_loaded: bool = True
     hotkey: str = "Ctrl+Alt+F9"
     max_queue: int = Field(default=30, ge=1, le=100)
+    vram_warning_mib: int = Field(default=512, ge=0, le=32768)
 
     @field_validator("device")
     @classmethod

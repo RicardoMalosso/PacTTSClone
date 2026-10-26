@@ -59,7 +59,8 @@ try {
             throw 'Web setup exceeded its 20-minute test deadline.'
         }
     } while ($state.status -eq 'running')
-    if (-not $state.ready) { throw "Web CPU/model setup failed: $($state.error)" }
+    if ($state.status -ne 'succeeded') { throw "Dependency/model acceptance failed: $($state.error)" }
+    if ($state.ready) { throw 'CPU-only dependency acceptance must not unlock CUDA-only generation.' }
     if ($state.models.files.Count -lt 2) { throw 'Model verification manifest missing.' }
     & $config.python (Join-Path $PSScriptRoot 'verify-runtime.py') --device cpu
     if ($LASTEXITCODE -ne 0) { throw 'Web-installed CPU runtime smoke failed.' }
@@ -68,7 +69,12 @@ try {
 }
 $marker = Join-Path $data 'keep-user-audio.txt'
 Set-Content $marker 'Preserve user data'
+$previousPython = $config.python
 Install-Checked
+$reinstalledConfig = Get-Content -Raw (Join-Path $app 'active.json') | ConvertFrom-Json
+if ($reinstalledConfig.python -ne $previousPython) { throw 'Reinstall replaced the reusable application environment.' }
+& $reinstalledConfig.python -c "import torch, torchaudio, omnivoice"
+if ($LASTEXITCODE -ne 0) { throw 'Reinstall lost existing inference dependencies.' }
 if (-not (Test-Path $marker)) { throw 'Upgrade removed user data.' }
 $uninstall = Start-Process (Join-Path $parent 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
 if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed.' }

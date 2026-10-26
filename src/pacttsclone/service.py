@@ -19,7 +19,15 @@ from .worker import Cancelled, InlineRunner, ProcessRunner
 
 logger = logging.getLogger(__name__)
 TERMINAL = {"succeeded", "failed", "cancelled"}
-STAGES = ["configure", "decode", "load_model", "transcribe", "inference", "encode"]
+STAGES = [
+    "configure",
+    "decode",
+    "initialize_model",
+    "load_model",
+    "transcribe",
+    "inference",
+    "encode",
+]
 
 
 class GenerationService:
@@ -45,6 +53,7 @@ class GenerationService:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._closed = False
+        self.gpu_warning = None
         self.setup_busy = False
         self.setup_ready = lambda: True
         self.active_id = None
@@ -56,6 +65,9 @@ class GenerationService:
             cpu_threads=min(4, self.resources.hardware()["logical_cpus"] or 1),
         )
         self.config = AppConfig(**(self.store.get("config", "main") or default.model_dump()))
+        if self.config.device == "cpu" and engine is None:
+            self.config = self.config.model_copy(update={"device": "cuda"})
+            self.store.put("config", "main", self.config.model_dump())
         for old in self.store.all("job", 100000):
             if old["status"] not in TERMINAL:
                 self.store.patch(
@@ -121,6 +133,8 @@ class GenerationService:
         return sorted(records.values(), key=lambda j: j["created_at"], reverse=True)[:limit]
 
     def configure(self, config):
+        if config.device == "cpu" and self.engine is None:
+            config = config.model_copy(update={"device": "cuda"})
         with self._lock:
             if self.pending():
                 raise BusyError("Wait for generation or cancel the queue before changing hardware.")
@@ -239,12 +253,55 @@ class GenerationService:
                 self.cancel_event.set()
             return self.get(job_id)
 
+    def restart_inference_worker(self):
+        """Drop the resident inference process without changing hardware settings."""
+        with self._lock:
+            if self.pending() or self.active_id is not None:
+                raise BusyError("Wait for the active generation to finish or cancel it first.")
+            old_pid = self.runner.pid
+            self.runner.reset()
+            return {
+                "ok": True,
+                "previous_worker_pid": old_pid,
+                "worker_pid": self.runner.pid,
+                "message": "Inference worker reset. CUDA will initialize on the next generation.",
+            }
+
     def cancel_all(self):
         with self._lock:
             for job in self.pending():
                 self.cancel(job["id"])
             if self.active_id is None:
                 self.runner.reset()
+
+    def check_gpu_pressure(self, sample):
+        threshold = self.config.vram_warning_mib * 1024 * 1024
+        gpus = sample.get("gpus", [])
+        warning = None
+        if threshold and gpus:
+            gpu = gpus[0]
+            free = max(0, gpu["total_bytes"] - gpu["used_bytes"])
+            if free < threshold:
+                warning = {
+                    "message": (
+                        "Low free GPU memory; generation may slow down or fail. "
+                        "CPU fallback is disabled."
+                    ),
+                    "free_bytes": free,
+                    "threshold_bytes": threshold,
+                }
+        if bool(warning) != bool(self.gpu_warning):
+            record = {
+                "time": time.time(),
+                "event": "low_vram" if warning else "vram_recovered",
+                **(warning or {}),
+            }
+            with (self.logs / "gpu-status.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record) + "\n")
+            if warning:
+                logger.warning("Low free VRAM: %s", warning)
+        self.gpu_warning = warning
+        return warning
 
     def _dispatch(self):
         while not self._stop.is_set():
@@ -264,14 +321,44 @@ class GenerationService:
                 continue
             self._execute(job)
 
+    def log_generation_vram(self, job_id, event, sample, **extra):
+        record = {
+            "timestamp": time.time(),
+            "job_id": job_id,
+            "event": event,
+            "gpus": [
+                {
+                    **gpu,
+                    "free_bytes": gpu.get(
+                        "free_bytes", max(0, gpu["total_bytes"] - gpu["used_bytes"])
+                    ),
+                }
+                for gpu in sample.get("gpus", [])
+            ],
+            "cuda_allocator": sample.get("cuda", {}),
+            "note": "GPU totals include games and other applications; allocator is worker-only.",
+            **extra,
+        }
+        with (self.logs / "generation-vram.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record) + "\n")
+
     def _execute(self, job):
         job_id = job["id"]
         last_progress = {}
+        self.log_generation_vram(job_id, "start", self.resources.sample(self.runner.pid))
 
         def on_event(event):
             if event["type"] == "transcript":
                 self.store.patch("job", job_id, transcript=event["text"])
             elif event["type"] == "progress":
+                self.check_gpu_pressure(event["resources"])
+                self.log_generation_vram(
+                    job_id,
+                    "sample",
+                    event["resources"],
+                    stage=event["stage"],
+                    device=event["device"],
+                )
                 last_progress.update(event)
                 stage = event["stage"]
                 # Milestone completion, not estimated time or model download percentage.
@@ -344,6 +431,13 @@ class GenerationService:
                 }
                 metrics["partial"] = True
                 metrics["accounting_note"] = "Partial metrics sampled before process cancellation."
+            self.log_generation_vram(
+                job_id,
+                "end",
+                self.resources.sample(self.runner.pid),
+                status=outcome.get("status"),
+                error=outcome.get("error"),
+            )
             metrics["model"] = self.settings.model
             metrics["asr_model"] = self.settings.asr_model
             with self._lock:
@@ -358,7 +452,12 @@ class GenerationService:
                 self.active_id = None
                 self.active_start = None
                 self._log(finished)
-                if not job["config"]["keep_model_loaded"]:
+                if not job["config"]["keep_model_loaded"] or (
+                    outcome.get("status") == "failed"
+                    and any(
+                        term in outcome.get("error", "").lower() for term in ("cuda", "gpu memory")
+                    )
+                ):
                     self.runner.reset()
             try:
                 self.on_finished(copy.deepcopy(finished))

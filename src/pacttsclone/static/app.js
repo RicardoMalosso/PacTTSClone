@@ -2,6 +2,7 @@
 const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
+let showSetupTab = false;
 let modelDownloaded = 0, modelSession = null, setupEventsConnected = false;
 const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
@@ -54,6 +55,16 @@ async function api(url, options = {}) {
   }
   return response.json();
 }
+$('restart-cuda').addEventListener('click', action(async () => {
+  if (!confirm('Restart the GPU inference worker? This unloads the model; the next generation will reload CUDA. Active work must finish or be cancelled first.')) return;
+  const control = $('restart-cuda');
+  control.disabled = true;
+  try {
+    const result = await api('/api/inference/restart', {method: 'POST'});
+    $('health').textContent = result.message;
+    await refresh();
+  } finally { control.disabled = false; }
+}));
 function stopBugVideo() {
   clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false;
   $('bug-video').replaceChildren();
@@ -74,15 +85,21 @@ function openBugVideo() {
     window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
   }, 3000);
 }
+const localPlaybackHost = el('section', {id: 'local-playback-host'});
+$('pane-studio').append($('general-form'), localPlaybackHost);
+const channelControls = $('channel-connection').parentElement;
+const channelControlsHost = channelControls.parentElement;
 function tab(name) {
+  if (name === 'general') name = 'studio';
   if (!runtimeSetup.ready && !['setup', 'config'].includes(name)) name = 'setup';
   window.Locale.apply();
   if (name === 'bugs') openBugVideo(); else stopBugVideo();
-  const general = name === 'general';
+  const general = name === 'studio';
   if (general) selectedChannel = 'playbackMain';
   else if (name === 'channels' && selectedChannel === 'playbackMain') fillChannel('');
   window.Locale.bind($('playback-heading'), general ? 'Local OBS Sources' : 'Twitch & OBS');
-  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'Choose anonymous IRC for message commands, or authorize Twitch for chat, Channel Points, Bits and subscription events.');
+  window.Locale.bind($('playback-description'), general ? 'Queue any generated MP3 here without connecting to Twitch.' : 'IRC chat starts automatically for saved channels. Optionally authorize Bits, Channel Points and subscriptions.');
+  (general ? localPlaybackHost : channelControlsHost).append(channelControls);
   $('channel-form').hidden = general;
   $('channel-dashboard').hidden = general;
   $('general-form').hidden = !general;
@@ -94,7 +111,7 @@ function tab(name) {
   }
   renderChannels();
   if (session) renderChannelState().catch(e => error(e.message));
-  const pane = general ? 'channels' : name;
+  const pane = name;
   document.querySelectorAll('.pane').forEach(p => { p.hidden = p.id !== 'pane-' + pane; });
   document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
 }
@@ -299,7 +316,7 @@ function fillChannel(name) {
   selectedChannel = name;
   const c = state.channels.find(c => c.name === name);
   $('channel-name').value = c?.name || ''; $('channel-transport').value = c?.transport || 'irc';
-  $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode(); $('channel-enabled').checked = c?.enabled || false;
+  $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode();
   $('channel-paused').checked = c?.paused || false; $('channel-delay').value = c?.delay_seconds ?? 5;
   $('channel-cooldown').value = c?.user_cooldown_seconds ?? 15; $('channel-limit').value = c?.max_message_chars ?? 300;
   $('channel-filter').value = c?.filter_level || 'slurs'; $('channel-custom').value = (c?.custom_filters || []).join('\n');
@@ -308,12 +325,12 @@ function fillChannel(name) {
 }
 $('channel-select').addEventListener('change', () => fillChannel($('channel-select').value));
 $('channel-form').addEventListener('submit', action(async event => {
-  event.preventDefault(); const name = $('channel-name').value.trim().toLowerCase(); const commands = {};
+  event.preventDefault(); $('channel-save-status').textContent = ''; const name = $('channel-name').value.trim().toLowerCase(); const commands = {};
   document.querySelectorAll('.command-row').forEach(row => { const key = row.querySelector('input').value.trim().toLowerCase(); if (commands[key]) throw new Error(t('Duplicate command keyword.')); commands[key] = row.querySelector('select').value; });
-  await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: $('channel-enabled').checked, paused: $('channel-paused').checked,
-    transport: $('channel-transport').value, event_rules: readEventRules(), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
+  await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: state.channels.find(c => c.name === name)?.enabled ?? true, paused: $('channel-paused').checked,
+    transport: $('channel-transport').value, event_rules: $('channel-transport').value === 'oauth' ? readEventRules() : (state.channels.find(c => c.name === name)?.event_rules || []), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
     delay_seconds: Number($('channel-delay').value), user_cooldown_seconds: Number($('channel-cooldown').value), max_message_chars: Number($('channel-limit').value)}});
-  selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name);
+  selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name); $('channel-save-status').textContent = t('Channel saved');
 }));
 $('pause-channel').addEventListener('click', action(async () => { if (selectedChannel) { await api(`/api/channels/${selectedChannel}/pause`, {method: 'POST', body: {paused: !latestChannelState?.paused}}); await refresh(); } }));
 function renderChannels() {
@@ -349,7 +366,7 @@ async function renderChannelState() {
   $('chat-events').replaceChildren(...snap.chat.map(c => el('div', {class: 'event-row'}, el('strong', {}, `${c.username} · ${c.accepted ? t('accepted') : t('blocked') + ': ' + t(c.reason)}`), el('p', {}, c.text))));
 }
 $('config-form').addEventListener('submit', action(async event => {
-  event.preventDefault(); const value = {device: $('config-device').value, cpu_threads: Number($('config-threads').value), keep_model_loaded: $('config-resident').checked, hotkey: $('config-hotkey').value, max_queue: Number($('config-queue').value)};
+  event.preventDefault(); const value = {device: $('config-device').value, cpu_threads: Number($('config-threads').value), keep_model_loaded: $('config-resident').checked, hotkey: $('config-hotkey').value, max_queue: Number($('config-queue').value), vram_warning_mib: Number($('config-vram-warning').value)};
   const saved = await api('/api/config', {method: 'PUT', body: value}); config = saved;
   $('hotkey-status').textContent = t(saved.hotkey_status); $('health').textContent = t('Configuration saved. Model will load on the selected device for the next job.');
 }));
@@ -370,6 +387,8 @@ async function refresh() {
 }
 async function resources() {
   const data = await api('/api/resources'), r = data.live, gpu = r.gpus[0];
+  $('gpu-pressure-warning').hidden = !data.gpu_warning;
+  $('gpu-pressure-warning').textContent = data.gpu_warning ? t(data.gpu_warning.message) + ' ' + bytes(data.gpu_warning.free_bytes) + ' / ' + bytes(data.gpu_warning.threshold_bytes) : '';
   $('cpu').textContent = `${r.system_cpu_percent.toFixed(0)}%`;
   $('ram').textContent = data.worker_pid ? bytes(r.process_ram_bytes) : t('Worker unloaded');
   $('system-ram').textContent = `${bytes(r.system_ram_used_bytes)} / ${bytes(r.system_ram_total_bytes)}`;
@@ -386,8 +405,8 @@ async function init() {
       history.replaceState(null, '', location.pathname + location.search);
     }
     session = await api('/api/session'); config = await api('/api/config');
-    $('config-device').value = config.device; $('config-threads').value = config.cpu_threads; $('config-resident').checked = config.keep_model_loaded;
-    $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
+    $('config-device').value = config.device === 'cpu' ? 'cuda' : config.device; $('config-threads').value = config.cpu_threads; $('config-resident').checked = config.keep_model_loaded;
+    $('config-vram-warning').value = config.vram_warning_mib ?? 512; $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
     await runtimeStatus();
@@ -518,6 +537,8 @@ function renderSetup(data) {
   renderOptionalImport(data);
   const wasReady = runtimeSetup.ready;
   runtimeSetup = data;
+  document.querySelector('[data-tab="setup"]').hidden = data.ready && !showSetupTab;
+  if (data.ready && !showSetupTab && !$('pane-setup').hidden) tab('config');
   if (modelSession !== data.started_at) { modelSession = data.started_at; modelDownloaded = 0; }
   if (data.stage === 'models' && data.download?.total_bytes) {
     modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
@@ -602,6 +623,16 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const residency = state.model_residency || {};
+  const active = state.active_job;
+  const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
+  const lastFailure = latest?.status === 'failed' && /CUDA|GPU memory/i.test(latest.error || '') ? latest : null;
+  const currentError = lastFailure && (!active || lastFailure.finished_at > active.created_at);
+  $('cuda-status').textContent = currentError ? 'CUDA error: ' + lastFailure.error :
+    active?.device === 'cuda' ? 'CUDA: active · ' + t(active.stage) :
+    residency.loaded && residency.device === 'cuda' ? 'CUDA: model loaded on GPU · idle' :
+    'CUDA: not checked · no model loaded. GPU utilization alone does not confirm CUDA.';
+
   const model = state.model_residency || {};
   const warm = Boolean(model.loaded);
   $('model-residency').textContent = `${model.model || 'k2-fsa/OmniVoice'} · ${t(warm ? 'Warm · loaded in memory' : 'Cold · not loaded')} · ${model.device || t('N/A')}`;
@@ -630,33 +661,67 @@ function renderGlobalStatus() {
   $('live-generation-progress').value = 0; $('live-generation-timer').textContent = '00:00.0'; $('live-generation-cancel').hidden = true;
 }
 
+function refreshDashboardQueues() {
+  for (const channel of state.channels) {
+    const list = document.querySelector(`[data-channel="${channel.name}"] [data-queue-items]`);
+    if (!list) continue;
+    const items = channel.playback_queue || [];
+    const key = JSON.stringify(items);
+    if (list.dataset.key === key) continue;
+    list.dataset.key = key;
+    list.parentElement.querySelector('summary').textContent = t('Queue') + ' · ' + items.length;
+    list.replaceChildren(...(items.length ? items.map(item => el('div', {class: 'event-row'},
+      el('strong', {}, t(item.status)), el('p', {}, item.text),
+      button('Cancel audio', async () => { await api(`/api/playback/${item.id}/cancel`, {method: 'POST'}); await refresh(); }))) : [el('p', {}, t('Queue is empty'))]));
+  }
+}
+$('config-show-setup').addEventListener('change', () => {
+  showSetupTab = $('config-show-setup').checked;
+  try { localStorage.setItem('pactts-show-setup', String(showSetupTab)); } catch {}
+  renderSetup(runtimeSetup);
+});
+try { showSetupTab = localStorage.getItem('pactts-show-setup') === 'true'; } catch {}
+$('config-show-setup').checked = showSetupTab;
 function renderChannelDashboard() {
-  const key = JSON.stringify([window.Locale.language, state.channels]);
-  if (channelDashboardKey === key) return;
+  const key = JSON.stringify([window.Locale.language, state.channels.map(({playback_queue, ...channel}) => channel), state.player_links]);
+  if (channelDashboardKey === key) { refreshDashboardQueues(); return; }
+  const expanded = new Set([...document.querySelectorAll('[data-channel] details[open][data-queue]')].map(node => node.closest('[data-channel]').dataset.channel));
   channelDashboardKey = key;
   $('channel-list').replaceChildren();
   for (const channel of state.channels) {
     const row = el('div', {class: 'job-row', 'data-channel': channel.name},
-      el('strong', {}, '#' + channel.name + ' · ' + (channel.transport === 'oauth' ? 'OAuth / EventSub' : 'IRC')), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + t(channel.connection_error) : '')),
+      el('strong', {}, '#' + channel.name + ' · IRC · ' + t(channel.enabled ? 'On' : 'Off')), el('p', {}, t(channel.connection) + (channel.connection_error ? ' · ' + t(channel.connection_error) : '')),
+      channel.transport === 'oauth' ? el('p', {}, t('Twitch events') + ': ' + t(channel.event_connection) + (channel.event_connection_error ? ' · ' + t(channel.event_connection_error) : '')) : null,
       channel.transport === 'oauth' ? el('details', {}, el('summary', {}, t('Event subscriptions')), ...channel.event_subscriptions.map(name => el('p', {}, name)), ...Object.entries(channel.event_errors).map(([name, reason]) => el('p', {class: 'error'}, name + ': ' + t(reason))), channel.reward_recovery ? el('p', {class: 'error'}, channel.reward_recovery.error) : null, el('p', {class: 'muted'}, t('Events during connection gaps may be missed. Managed point redemptions are checked for refunds on reconnect.'))) : null,
       el('div', {class: 'row-actions'},
-        button(channel.enabled ? 'Disconnect' : 'Connect', async () => {
+        button(channel.enabled ? 'Turn off' : 'Turn on', async () => {
           await api(`/api/channels/${channel.name}/connection`, {method: 'POST', body: {enabled: !channel.enabled}});
           await refresh(); if (selectedChannel === channel.name) fillChannel(channel.name);
         }),
+        button(channel.paused ? 'Resume playback' : 'Pause playback', async () => {
+          await api(`/api/channels/${channel.name}/pause`, {method: 'POST', body: {paused: !channel.paused}});
+          await refresh();
+        }),
+        el('a', {href: session?.remote_access ? state.player_links?.[channel.name] || `/${channel.name}` : `/${channel.name}`, target: '_blank', rel: 'noopener noreferrer', class: 'download'}, t('Open OBS player')),
         button('Edit channel', () => fillChannel(channel.name)),
+        button(channel.oauth_authorized ? 'Configure Twitch events' : 'Enable Bits, points and subscriptions', () => { fillChannel(channel.name); $('enable-twitch-events').click(); }),
         button('Delete channel', async () => {
           await api(`/api/channels/${channel.name}`, {method: 'DELETE'});
           if (selectedChannel === channel.name) { selectedChannel = ''; }
           await refresh(); fillChannel(selectedChannel);
         }, 'danger small-button')));
+    const queue = el('details', {'data-queue': ''}, el('summary', {}, t('Queue')), el('div', {'data-queue-items': ''}));
+    queue.open = expanded.has(channel.name);
+    row.append(queue);
     $('channel-list').append(row);
   }
+  refreshDashboardQueues();
   if (!state.channels.length) $('channel-list').textContent = t('No saved Twitch channels. Add one below.');
 }
 
 
 const eventNames = {reward: 'Channel Points reward', bits: 'Bits and Power-ups', subscribe: 'New subscription', gift: 'Gift subscriptions', resub: 'Resubscription message', subscription_end: 'Subscription ended', follow: 'New follower', raid: 'Incoming raid', online: 'Stream online', offline: 'Stream offline'};
+const eventTemplates = {reward: '{text}', bits: '{username} used {bits} Bits. {text}', subscribe: 'Welcome {username}', gift: '{username} gifted {total} subscriptions', resub: '{username}: {text}', subscription_end: "{username}'s subscription ended", follow: 'Welcome {username}', raid: '{username} raided with {viewers} viewers', online: 'Stream is online', offline: 'Stream is offline'};
 let twitchAuthChannel = '', twitchAuthPending = false, twitchAuthBusy = false;
 function eventRuleRow(rule = {}) {
   const kind = el('select', {'aria-label': t('Event type')}, ...Object.entries(eventNames).map(([value, name]) => el('option', {value}, t(name))));
@@ -664,10 +729,11 @@ function eventRuleRow(rule = {}) {
   const voice = el('select', {'aria-label': t('Event voice'), 'data-voice': ''});
   const reward = el('input', {'aria-label': t('Reward ID'), placeholder: t('Reward ID'), value: rule.reward_id || ''});
   const minimum = el('input', {type: 'number', min: '1', max: '10000000', 'aria-label': t('Minimum Bits'), value: rule.min_bits || 1});
-  const template = el('textarea', {rows: '2', maxlength: '1000', 'aria-label': t('Event text template')}); template.value = rule.template || '{text}';
+  const template = el('textarea', {rows: '2', maxlength: '1000', 'aria-label': t('Event text template')}); template.value = rule.template || eventTemplates[kind.value];
   const row = el('section', {class: 'event-rule card'}, el('label', {}, t('Event type'), kind), el('label', {}, t('Event voice'), voice), el('label', {}, t('Reward ID'), reward), el('label', {}, t('Minimum Bits'), minimum), el('label', {}, t('Event text template'), template), button('Remove', () => row.remove()));
   const visibility = () => { reward.parentElement.hidden = kind.value !== 'reward'; minimum.parentElement.hidden = kind.value !== 'bits'; };
-  kind.addEventListener('change', visibility); visibility();
+  let previousKind = kind.value;
+  kind.addEventListener('change', () => { if (template.value === eventTemplates[previousKind]) template.value = eventTemplates[kind.value]; previousKind = kind.value; visibility(); }); visibility();
   $('event-rules').append(row); refreshEventVoices(); voice.value = rule.voice_id || '';
 }
 function refreshEventVoices() {
@@ -687,6 +753,8 @@ function readEventRules() {
 }
 function updateTwitchMode() {
   const oauth = $('channel-transport').value === 'oauth';
+  $('enable-twitch-events').hidden = oauth;
+  $('disable-twitch-events').hidden = !oauth;
   $('event-rules-panel').hidden = !oauth;
   $('twitch-oauth-panel').hidden = !oauth || Boolean(session?.remote_access);
   twitchAuthChannel = ''; $('twitch-auth-status').textContent = ''; $('twitch-device').hidden = true; $('twitch-rewards').replaceChildren();
@@ -708,7 +776,8 @@ async function loadTwitchAuth() {
     if (info.authorized && !info.pending) await refresh();
   } finally { twitchAuthBusy = false; }
 }
-$('channel-transport').addEventListener('change', updateTwitchMode);
+$('enable-twitch-events').addEventListener('click', () => { $('channel-transport').value = 'oauth'; updateTwitchMode(); $('twitch-oauth-panel').scrollIntoView({behavior: 'smooth', block: 'start'}); });
+$('disable-twitch-events').addEventListener('click', () => { $('channel-transport').value = 'irc'; updateTwitchMode(); });
 $('add-event-rule').addEventListener('click', () => eventRuleRow());
 $('twitch-authorize').addEventListener('click', action(async () => {
   if (!selectedChannel || !state.channels.some(c => c.name === selectedChannel)) throw new Error(t('Save the channel first.'));
@@ -718,15 +787,33 @@ $('twitch-authorize').addEventListener('click', action(async () => {
 $('twitch-forget').addEventListener('click', action(async () => {
   if (selectedChannel) { await api(`/api/twitch/${selectedChannel}/authorization`, {method: 'DELETE'}); await loadTwitchAuth(); await refresh(); }
 }));
+const rewardLimitFields = [
+  ['global_cooldown_seconds', 'Reward cooldown (seconds) · 0 disables', 604800],
+  ['max_per_stream', 'Redemptions per stream · 0 disables', 2147483647],
+  ['max_per_user_per_stream', 'Redemptions per user per stream · 0 disables', 2147483647]
+];
+function rewardLimitsEditor(reward = {}, disabled = false) {
+  return el('div', {class: 'reward-limits'}, ...rewardLimitFields.map(([key, label, maximum]) =>
+    el('label', {}, t(label), el('input', {type: 'number', min: '0', max: maximum, step: '1', value: reward[key] || 0, 'data-reward-limit': key, 'aria-label': t(label), ...(disabled ? {disabled: ''} : {})}))));
+}
+function readRewardLimits(container) {
+  return Object.fromEntries([...container.querySelectorAll('[data-reward-limit]')].map(input => [input.dataset.rewardLimit, Number(input.value)]));
+}
+$('twitch-new-reward-limits').append(rewardLimitsEditor());
 async function loadTwitchRewards() {
   const channel = selectedChannel; const rewards = await api(`/api/twitch/${channel}/rewards`);
   if (channel !== selectedChannel) return;
-  $('twitch-rewards').replaceChildren(...rewards.map(r => el('div', {class: 'job-row'}, el('strong', {}, `${r.title} · ${r.cost}`), el('p', {class: 'muted'}, `${r.id} · ${t(r.manageable ? 'Automatic fulfillment / refund' : 'Manage in Twitch')}`), button('Use reward', () => eventRuleRow({kind: 'reward', reward_id: r.id})))));
+  $('twitch-rewards').replaceChildren(...rewards.map(r => {
+    const limits = rewardLimitsEditor(r, !r.manageable);
+    return el('div', {class: 'job-row', 'data-reward-id': r.id}, el('strong', {}, `${r.title} · ${r.cost}`), el('p', {class: 'muted'}, `${r.id} · ${t(r.manageable ? 'Automatic fulfillment / refund' : 'Manage in Twitch')}`), limits,
+      r.manageable ? button('Save reward limits', async () => { await api(`/api/twitch/${channel}/rewards/${encodeURIComponent(r.id)}`, {method: 'PATCH', body: readRewardLimits(limits)}); if (channel === selectedChannel) await loadTwitchRewards(); }) : el('p', {}, t('Edit limits for this reward in Twitch.')),
+      button('Use reward', () => eventRuleRow({kind: 'reward', reward_id: r.id})));
+  }));
 }
 $('twitch-load-rewards').addEventListener('click', action(loadTwitchRewards));
 $('twitch-create-reward').addEventListener('click', action(async () => {
   const channel = selectedChannel;
-  const reward = await api(`/api/twitch/${channel}/rewards`, {method: 'POST', body: {title: $('twitch-reward-title').value, cost: Number($('twitch-reward-cost').value)}});
+  const reward = await api(`/api/twitch/${channel}/rewards`, {method: 'POST', body: {title: $('twitch-reward-title').value, cost: Number($('twitch-reward-cost').value), ...readRewardLimits($('twitch-new-reward-limits'))}});
   if (channel !== selectedChannel) return;
   eventRuleRow({kind: 'reward', reward_id: reward.id}); await loadTwitchRewards();
 }));

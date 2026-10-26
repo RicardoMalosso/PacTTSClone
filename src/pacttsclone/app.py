@@ -355,9 +355,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.get("/api/resources")
     def resources():
+        sample = service.resources.sample(service.runner.pid)
+        warning = service.check_gpu_pressure(sample)
         return {
             "hardware": service.resources.hardware(),
-            "live": service.resources.sample(service.runner.pid),
+            "live": sample,
+            "gpu_warning": warning,
             "worker_pid": service.runner.pid,
             "note": "GPU utilization and total VRAM are device-wide; N/A means unavailable.",
         }
@@ -400,6 +403,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         if result is None:
             raise HTTPException(404, "Job not found.")
         return result
+
+    @app.post("/api/inference/restart")
+    def restart_inference():
+        return service.restart_inference_worker()
 
     @app.post("/api/cancel-all")
     def cancel_all():
@@ -548,7 +555,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.post("/api/twitch/{channel}/rewards", status_code=201)
     def twitch_create_reward(channel: str, value: dict, request: Request):
         twitch_channel(channel, request)
-        return studio.events.create_reward(channel, value.get("title"), value.get("cost"))
+        return studio.events.create_reward(channel, value.get("title"), value.get("cost"), value)
+
+    @app.patch("/api/twitch/{channel}/rewards/{reward_id}")
+    def twitch_update_reward(channel: str, reward_id: str, value: dict, request: Request):
+        twitch_channel(channel, request)
+        return studio.events.update_reward_limits(channel, reward_id, value)
 
     @app.get("/api/channels")
     def channels():
