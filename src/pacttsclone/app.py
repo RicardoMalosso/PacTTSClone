@@ -401,6 +401,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(404, "Job not found.")
         return result
 
+    @app.post("/api/inference/restart")
+    def restart_inference():
+        return service.restart_inference_worker()
+
     @app.post("/api/cancel-all")
     def cancel_all():
         runtime_setup.cancel()
