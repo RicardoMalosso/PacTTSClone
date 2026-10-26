@@ -246,8 +246,12 @@ class GenerationService:
                 raise BusyError("Wait for the active generation to finish or cancel it first.")
             old_pid = self.runner.pid
             self.runner.reset()
-            return {"ok": True, "previous_worker_pid": old_pid, "worker_pid": self.runner.pid,
-                    "message": "Inference worker reset. CUDA will initialize on the next generation."}
+            return {
+                "ok": True,
+                "previous_worker_pid": old_pid,
+                "worker_pid": self.runner.pid,
+                "message": "Inference worker reset. CUDA will initialize on the next generation.",
+            }
 
     def cancel_all(self):
         with self._lock:
