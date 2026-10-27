@@ -2,6 +2,7 @@ import asyncio
 import json
 import secrets
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import unquote, urlsplit
@@ -20,6 +21,7 @@ from .service import GenerationService
 from .setup_runtime import RuntimeSetup
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
+from .update_check import check_releases, installed_version, version_key
 
 STATIC = Path(__file__).parent / "static"
 
@@ -248,6 +250,20 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             "device_requested": settings.device,
             "offline": settings.offline,
         }
+
+    @app.post("/api/update/check")
+    def check_update(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Update checks are available only on the host.")
+        current = installed_version()
+        key = version_key(current) if current else None
+        if key is None:
+            raise HTTPException(409, "Installed version cannot be determined.")
+        try:
+            candidate = check_releases(current, include_prereleases=key[3] == 0)
+        except ValueError as exc:
+            raise HTTPException(503, str(exc)) from exc
+        return {"current_version": current, "candidate": asdict(candidate) if candidate else None}
 
     @app.post("/api/jobs", status_code=202)
     def generate(
@@ -650,3 +666,4 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     return app
+

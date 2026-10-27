@@ -605,3 +605,17 @@ Added Chromium regressions for manual clip behavior and YouTube link timing.
 Prepared `0.3.0rc9` draft-only release pipeline and notes; previous RC8 remains
 untouched. Release remains contingent on all Python/Chromium checks and actual
 Windows installer acceptance; no claim of local GPU-inference quality validation.
+
+# Auto-updater work in progress
+
+The update discovery component checks public GitHub release metadata and selects a
+newer published application wheel. This is a read-only foundation: no background
+checks, update UI, payload download, signature verification, installation, restart,
+or rollback is implemented yet. GitHub's asset digest is metadata, not a publisher
+signature. Do not enable automatic installation until the remaining update and
+recovery workflow has been implemented and validated.
+
+Validation in the development workspace: three discovery test functions passed
+under a minimal Python test harness. The full pytest, Ruff, browser and Windows
+installer suites were not available in that workspace and remain required.
+
