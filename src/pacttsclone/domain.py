@@ -13,13 +13,23 @@ class BusyError(UserError):
     pass
 
 
-class GenerationRequest(BaseModel):
+class GenerationSettings(BaseModel):
+    """Persistent defaults for individual voices."""
+
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    speed: float = Field(default=1.0, ge=0.5, le=1.5)
+    duration: float | None = Field(default=None, ge=0.5, le=120)
+    steps: int = Field(default=32, ge=4, le=64)
+    denoise: bool = True
+    guidance_scale: float = Field(default=2.0, ge=0, le=4)
+    preprocess_prompt: bool = True
+    postprocess_output: bool = True
+
+
+class GenerationRequest(GenerationSettings):
     text: str = Field(min_length=1, max_length=2000)
     ref_text: str = Field(default="", max_length=4000)
     language: str = "pt"
-    speed: float = Field(default=1.0, ge=0.5, le=1.5)
-    steps: int = Field(default=32, ge=4, le=64)
     autoqueue_general: bool = False
     requester_name: str = Field(default="", max_length=80)
     requester_id: str = Field(default="", max_length=80)

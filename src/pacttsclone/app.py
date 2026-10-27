@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
 from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
-from .domain import BusyError, Engine, GenerationRequest, UserError
+from .domain import BusyError, Engine, GenerationRequest, GenerationSettings, UserError
 from .engine import dependencies_available
 from .models import AppConfig, ChannelConfig
 from .playback import GENERAL_PLAYER
@@ -480,6 +480,10 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         if result is None:
             raise HTTPException(404, "Voice not found.")
         return result
+
+    @app.put("/api/voices/{voice_id}/generation-settings")
+    def save_voice_generation_settings(voice_id: str, value: GenerationSettings):
+        return studio.voices.set_generation_settings(voice_id, value)
 
     @app.delete("/api/voices/{voice_id}")
     def delete_voice(voice_id: str):

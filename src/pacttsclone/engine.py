@@ -94,13 +94,25 @@ class OmniVoiceEngine:
                 )
                 events[0].record()
             with torch.inference_mode():
+                # A fixed duration overrides speed in OmniVoice.
+                timing = (
+                    {"duration": request.duration}
+                    if request.duration is not None
+                    else {"speed": request.speed}
+                )
                 audio = self.model.generate(
                     text=request.text,
                     language=None if request.language == "auto" else request.language,
                     ref_audio=reference,
                     ref_text=request.ref_text or None,
-                    speed=request.speed,
-                    generation_config=OmniVoiceGenerationConfig(num_step=request.steps),
+                    **timing,
+                    generation_config=OmniVoiceGenerationConfig(
+                        num_step=request.steps,
+                        guidance_scale=request.guidance_scale,
+                        denoise=request.denoise,
+                        preprocess_prompt=request.preprocess_prompt,
+                        postprocess_output=request.postprocess_output,
+                    ),
                 )
             if events:
                 events[1].record()

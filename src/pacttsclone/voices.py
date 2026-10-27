@@ -10,7 +10,7 @@ import soundfile as sf
 from PIL import Image, UnidentifiedImageError
 
 from .config import MAX_UPLOAD_BYTES
-from .domain import GenerationRequest, UserError, Waveform
+from .domain import GenerationRequest, GenerationSettings, UserError, Waveform
 
 BUILTIN_CATALOG = Path(__file__).parent / "assets" / "voices" / "catalog.json"
 CROP_NOTICE = "mp3 was cropped to 30 seconds, will process anyway"
@@ -59,6 +59,7 @@ class Voices:
                         "title": entry["title"],
                         "original_filename": entry["original_filename"],
                         "transcript": "",
+                        "generation_settings": GenerationSettings().model_dump(),
                         "status": "unprepared",
                         "thumbnail_url": None,
                         "error": None,
@@ -142,6 +143,7 @@ class Voices:
                 "title": title,
                 "original_filename": filename.replace("\\", "/").rsplit("/", 1)[-1][:255],
                 "transcript": transcript,
+                "generation_settings": GenerationSettings().model_dump(),
                 "status": "ready" if transcript else "pending",
                 "thumbnail_url": thumb_url,
                 "error": None,
@@ -205,7 +207,16 @@ class Voices:
         voice = self.store.get("voice", voice_id)
         if not voice or voice["status"] != "ready":
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
-        request = request.model_copy(update={"ref_text": voice["transcript"]})
+        # Twitch callers pass text alone; only explicitly supplied fields override
+        # the voice's stored generation defaults. Snapshot before queueing.
+        saved = voice.get("generation_settings") or {}
+        explicit = {
+            key: getattr(request, key)
+            for key in GenerationSettings.model_fields
+            if key in request.model_fields_set
+        }
+        effective = GenerationSettings.model_validate({**saved, **explicit}).model_dump()
+        request = request.model_copy(update={"ref_text": voice["transcript"], **effective})
         with self.service._lock:
             with (self.root / voice_id / "reference.mp3").open("rb") as reference:
                 result = self.service.submit(
@@ -220,6 +231,13 @@ class Voices:
                 )
             self.store.patch("job", result["id"], voice_title=voice["title"])
             return self.service.get(result["id"])
+
+    def set_generation_settings(self, voice_id, settings: GenerationSettings):
+        with self.service._lock:
+            if not self.store.get("voice", voice_id):
+                raise UserError("Voice not found.")
+            # Previously queued generation requests retain their snapshot.
+            return self.store.patch("voice", voice_id, generation_settings=settings.model_dump())
 
     def update(self, voice_id, title, transcript):
         voice = self.store.get("voice", voice_id)
