@@ -400,3 +400,16 @@ personal data is copied with a metadata backup, stable remapped IDs and no silen
 overwrite of current assets. Neither import is mandatory.
 
 [Old-folder examples, safety behavior and limitations](docs/optional-imports.md).
+
+## Per-voice generation settings
+
+Every saved voice has persistent generation defaults in **Voices → Voice generation defaults**:
+speed (0.5–1.5), optional fixed duration in seconds (0.5–120), inference steps (4–64),
+denoise, guidance scale (0–4), prompt preprocessing and output postprocessing.
+Default values match OmniVoice: speed 1.0, automatic duration, 32 steps, denoise on,
+CFG 2.0 and both processing switches on. Duration overrides speed.
+The Local Generate tab loads these defaults and allows **one-job overrides** without
+changing the saved voice. IRC/EventSub generation automatically inherits each voice's
+saved values. All saved voices use one shared OmniVoice checkpoint; tuning does not
+train another model or redownload weights. Existing saved voices use defaults if the
+settings field is absent. Disabling output postprocessing can preserve trailing silence.
