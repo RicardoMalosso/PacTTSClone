@@ -354,6 +354,16 @@ def test_new_api_voice_configuration_and_obs_routes(tmp_path, mp3, engine):
         assert result.status_code == 201
         v = result.json()
         assert client.get("/api/voices").json()[0]["id"] == v["id"]
+        preset_url = f"/api/voices/{v['id']}/generation-settings"
+        saved = client.put(
+            preset_url, json={"steps": 16, "denoise": False, "duration": 8},
+            headers=headers,
+        )
+        assert saved.status_code == 200
+        assert saved.json()["generation_settings"]["steps"] == 16
+        assert client.put(preset_url, json={"steps": 80}, headers=headers).status_code == 422
+        assert client.put(preset_url, json={"unknown": 1}, headers=headers).status_code == 422
+
         assert (
             client.get(f"/api/voices/{v['id']}/reference").headers["content-type"] == "audio/mpeg"
         )

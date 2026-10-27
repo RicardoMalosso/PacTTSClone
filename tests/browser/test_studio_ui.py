@@ -733,3 +733,35 @@ def test_requester_name_persists_identity_and_fixed_status(page, live_server, mp
     assert page.locator('header [data-locale="en"]').count() == 1
     page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
     assert page.locator("#live-generation").bounding_box()["y"] == 0
+
+def test_voice_generation_tuning_presets_and_per_job_override(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    add_ready_voice(page, mp3)
+    open_tab(page, "Voices")
+    card = page.locator(".voice-card").first
+    card.locator(".voice-generation-settings summary").click()
+    card.get_by_label("Speed", exact=True).fill("0.75")
+    card.get_by_label("Inference Steps").fill("14")
+    card.get_by_label("Duration (seconds)").fill("7.5")
+    card.get_by_label("Denoise").uncheck()
+    card.get_by_role("button", name="Save generation defaults").click()
+    wait_until(lambda: app.state.service.store.all("voice")[0].get("generation_settings", {}).get("steps") == 14)
+    page.reload()
+    open_tab(page, "Voices")
+    card = page.locator(".voice-card").first
+    card.locator(".voice-generation-settings summary").click()
+    expect(card.get_by_label("Inference Steps")).to_have_value("14")
+    expect(card.get_by_label("Denoise")).not_to_be_checked()
+    open_tab(page, "Generate")
+    expect(page.locator("#steps")).to_have_value("14")
+    expect(page.locator("#duration")).to_have_value("7.5")
+    page.locator("#steps").fill("22")
+    page.locator("#text").fill("Voice settings smoke test")
+    page.locator("#generate").click()
+    expect(page.locator("#player")).to_be_visible(timeout=15000)
+    jobs = [job for job in app.state.service.history() if job["kind"] == "speech"]
+    assert jobs[0]["request"]["steps"] == 22
+    assert jobs[0]["request"]["denoise"] is False
+    assert jobs[0]["request"]["duration"] == 7.5
+    assert app.state.service.store.all("voice")[0]["generation_settings"]["steps"] == 14

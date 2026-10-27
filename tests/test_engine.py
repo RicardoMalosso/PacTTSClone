@@ -62,7 +62,13 @@ def test_real_adapter_contract_and_lazy_cache(modules):
         ref_audio="reference.wav",
         ref_text="Referência",
         speed=1.1,
-        generation_config={"num_step": 16},
+        generation_config={
+            "num_step": 16,
+            "guidance_scale": 2.0,
+            "denoise": True,
+            "preprocess_prompt": True,
+            "postprocess_output": True,
+        },
     )
 
 
@@ -178,3 +184,22 @@ def test_residency_is_shared_across_voice_changes_and_cleared_on_oom(modules):
         engine.synthesize("voice-a.wav", request)
     assert events[-1] == (False, "cuda")
 
+def test_omnivoice_all_generation_parameters_reach_model(modules):
+    _, model, _ = modules
+    engine = OmniVoiceEngine(Settings())
+    request = GenerationRequest(
+        text="Test parameters", ref_text="Reference.", speed=1.4, duration=7.5,
+        steps=8, denoise=False, guidance_scale=3.1,
+        preprocess_prompt=False, postprocess_output=False,
+    )
+    engine.synthesize("reference.wav", request)
+    kwargs = model.generate.call_args.kwargs
+    assert kwargs["duration"] == 7.5
+    assert "speed" not in kwargs
+    assert kwargs["generation_config"] == {
+        "num_step": 8,
+        "guidance_scale": 3.1,
+        "denoise": False,
+        "preprocess_prompt": False,
+        "postprocess_output": False,
+    }
