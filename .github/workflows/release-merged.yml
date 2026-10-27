@@ -1,4 +1,4 @@
-name: Publish validated RC8
+name: Prepare validated RC9 draft
 on:
   pull_request:
     types: [closed]
@@ -6,27 +6,13 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: release-rc8
+  group: release-rc9
   cancel-in-progress: false
 jobs:
   installer:
-    if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'publish-release')
+    if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'prepare-release')
     uses: ./.github/workflows/installer.yml
     with:
       publish_draft: true
-  publish:
-    needs: installer
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish only the accepted release from this merged commit
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          tag='v0.3.0-rc.8'
-          target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
-          draft=$(gh release view "$tag" --json isDraft --jq .isDraft)
-          test "$target" = "$GITHUB_SHA"
-          test "$draft" = 'true'
-          gh release edit "$tag" --draft=false --prerelease
+  # The installer workflow creates a new draft release on main after all gates.
+  # Leave it unpublished so the owner can verify the artifacts before publishing.

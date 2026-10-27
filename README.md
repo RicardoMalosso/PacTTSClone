@@ -413,3 +413,17 @@ changing the saved voice. IRC/EventSub generation automatically inherits each vo
 saved values. All saved voices use one shared OmniVoice checkpoint; tuning does not
 train another model or redownload weights. Existing saved voices use defaults if the
 settings field is absent. Disabling output postprocessing can preserve trailing silence.
+
+## RC9 interface and countermeasure controls
+
+**Configuration → Deploy countermeasures** opens the original bundled, looping
+jingling-keys WebM with the same two-second loading animation used during
+Initial Setup. It plays locally in the browser and can be closed and reopened;
+opening it manually does not change Initial Setup progress or prompt state.
+In **Report a bug**, the optional **Watch on YouTube** link stays hidden until
+two seconds after the video-ready tab becomes visible, and resets on exit/reentry.
+The player still requests autoplay 200 milliseconds after opening.
+
+RC9 packaging runs the existing Windows installer acceptance after the tested
+PR is merged with the `prepare-release` label. It creates a distinct RC9
+draft prerelease and never overwrites or auto-publishes previous release assets.

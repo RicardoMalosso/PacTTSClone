@@ -594,3 +594,14 @@ presets. Effective parameters persist in generation request history.
 Automated adapter/backend/Chromium regression coverage added. GPU quality
 and latency, actual inference, Windows installer acceptance and release
 verification remain **unverified for this change** pending CI and host tests.
+
+## RC9 configuration and bug-guide polish — 2026-10-27
+
+Manual Configure → Deploy countermeasures launches the exact looping
+jingling-keys clip with its existing two-second loading UI and close behavior;
+it does not mutate initial setup state. Bug-guide direct YouTube link is delayed
+two seconds from the ready-gated tab becoming visible and cancelled on exit.
+Added Chromium regressions for manual clip behavior and YouTube link timing.
+Prepared `0.3.0rc9` draft-only release pipeline and notes; previous RC8 remains
+untouched. Release remains contingent on all Python/Chromium checks and actual
+Windows installer acceptance; no claim of local GPU-inference quality validation.

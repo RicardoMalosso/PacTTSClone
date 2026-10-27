@@ -270,3 +270,13 @@ natively. A single OmniVoice model is shared by all saved voices, so persist
 parameter defaults on the saved voice records, not separate per-voice model
 weights. IRC/EventSub inherit the saved defaults; Studio submits overrides
 per job. Do not restart a warm model or re-prepare a voice on parameter changes.
+
+## RC9 release preparation — 2026-10-27
+
+Keep the bundled original jingling-keys WebM and its single shared modal:
+Configuration gains an explicit manual control, independent of Initial Setup's
+one-time countermeasure offer. Keep autoplay readiness gating for the bug guide,
+but defer its optional YouTube link until 2 s after the pane opens.
+Version increment is RC9, not an overwrite of RC8. Change the merge-time
+release gate to `prepare-release` with draft-only output. Do not publish
+automatically, and do not bypass full Windows installer acceptance.

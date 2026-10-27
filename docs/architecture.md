@@ -278,3 +278,20 @@ generation. Twitch events and IRC automatically inherit saved defaults. The
 Local Studio loads saved values on voice selection and sends per-job overrides.
 Duration supersedes speed in the OmniVoice adapter. Queued jobs do not change
 when the voice defaults are edited; no model reload or training is required.
+
+## RC9 manual clip and deferred YouTube link — 2026-10-27
+
+The saved jingling-keys WebM remains served from the packaged static directory.
+Configuration launches the exact same countermeasure dialog and two-second
+loading sequence as Initial Setup. This route does not call the backend one-time
+offer endpoint or alter setup state. The modal video loops with audio until closed;
+closing pauses it and rewinds. The Report a bug pane only appears once YouTube's
+iframe reports readiness and schedules video playback 200 ms later. The direct
+YouTube link stays hidden until the bug pane has been visible for 2000 ms; leaving
+the pane clears its timer, and reentering restarts it. Both timeout and autoplay
+behavior remain subject to browser policy.
+
+Release preparation: a merged, same-repo PR labeled `prepare-release`
+runs the complete test and Windows installer acceptance workflow, then creates
+a uniquely tagged RC9 **draft** on main. No automatic publication; prior RC8
+assets remain immutable. The installer is unsigned.

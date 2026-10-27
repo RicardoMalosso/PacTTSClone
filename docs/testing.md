@@ -441,3 +441,15 @@ The adapter unit tests use mocked OmniVoice to check each setting reaches
 reloads and submits a per-job override with the effective parameters in job history.
 These tests **do not verify** actual CUDA memory, runtime, or perceptual quality;
 run a Windows/NVIDIA smoke test before releasing.
+
+## RC9 browser and installer release gate — 2026-10-27
+
+Added a Configuration manual jingling-keys acceptance test asserting the bundled
+video appears after the original two-second animation, loops with sound and
+rewinds/pauses when closed; reopening must work without altering setup prompts.
+Extended the ready-gated bug-guide Chromium test to assert the optional direct
+YouTube link is hidden until 2000 ms after tab activation, then visible; leaving
+the pane hides it and cancels pending timers. Existing 200 ms autoplay remains.
+Test against `main` only after merging a fully green PR; merge-time workflow
+`Prepare validated RC9 draft` repeats full tests and Windows installer acceptance,
+and creates an RC9 draft without publishing automatically.
