@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from pacttsclone.config import Settings
-from pacttsclone.domain import GenerationRequest, UserError
+from pacttsclone.domain import GenerationRequest, GenerationSettings, UserError
 from pacttsclone.service import GenerationService
 from pacttsclone.studio import Studio
 
@@ -111,3 +111,53 @@ def test_builtin_thumbnails_seed_existing_voices_and_preserve_custom_images(
         assert target.read_bytes() == saved
     finally:
         studio.close()
+
+def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine, mp3, monkeypatch):
+    monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", None)
+    settings = Settings(data_dir=tmp_path / "data")
+    service = GenerationService(settings, engine)
+    studio = Studio(service)
+    try:
+        with mp3.open("rb") as reference:
+            voice = studio.voices.create(reference, "Test", "reference.mp3", "Exact transcript.")
+        defaults = GenerationSettings(
+            speed=0.7, duration=6.0, steps=12, denoise=False, guidance_scale=1.5,
+            preprocess_prompt=False, postprocess_output=False,
+        )
+        studio.voices.set_generation_settings(voice["id"], defaults)
+        job = studio.voices.generate(
+            voice["id"], GenerationRequest(text="From Twitch"), channel="foo"
+        )
+        finished = wait_job(service, job["id"])
+        assert finished["status"] == "succeeded"
+        for key, value in defaults.model_dump().items():
+            assert finished["request"][key] == value
+        overridden = studio.voices.generate(
+            voice["id"], GenerationRequest(text="Manual", speed=1.2, duration=None)
+        )
+        assert overridden["request"]["speed"] == 1.2
+        assert overridden["request"]["duration"] is None
+        assert overridden["request"]["steps"] == 12
+    finally:
+        studio.close()
+
+    resumed = GenerationService(settings, engine)
+    studio = Studio(resumed)
+    try:
+        stored = studio.store.get("voice", voice["id"])
+        assert stored["generation_settings"] == defaults.model_dump()
+        new_job = studio.voices.generate(voice["id"], GenerationRequest(text="Again"))
+        assert new_job["request"]["steps"] == 12
+    finally:
+        studio.close()
+
+
+@pytest.mark.parametrize("values", [
+    {"speed": 1.8}, {"duration": 0.1}, {"steps": 0}, {"guidance_scale": 5.0},
+    {"unexpected": "not accepted"}, {"duration": float("nan")},
+])
+def test_invalid_generation_settings_rejected(values):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        GenerationSettings(**values)

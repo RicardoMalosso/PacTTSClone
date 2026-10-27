@@ -431,3 +431,25 @@ execution and the updated reinstall assertions remain pending Windows CI.
 Bundled owner-supplied public Client ID 93mkh0su05k4ouzlkdk9jtu55f9ak2; the normal UI no longer asks for keys or registration. Backend defaults to the bundled ID while retaining developer environment overrides and existing account IDs. Twitch's real device endpoint accepted this ID (200), and secret-free token polling returned authorization_pending. No broadcaster account was authorized.
 Bug-video player uses the official YouTube IFrame API readiness event, opens its tab only when ready, and requests playback 200 ms later. Navigation/panic cancels it; a 20-second loading timeout offers a direct video link.
 Local core 184 passed; browser/release checks tracked in Actions. Actual consent and browser autoplay restrictions remain separate acceptance items.
+
+## Per-voice generation parameter regression — 2026-10-27
+
+The generation-settings tests cover validation, persistence across server recreation,
+propagation into Twitch-like jobs, explicit per-job overrides and duration precedence.
+The adapter unit tests use mocked OmniVoice to check each setting reaches
+`OmniVoiceGenerationConfig` or `generate`. Chromium coverage saves defaults,
+reloads and submits a per-job override with the effective parameters in job history.
+These tests **do not verify** actual CUDA memory, runtime, or perceptual quality;
+run a Windows/NVIDIA smoke test before releasing.
+
+## RC9 browser and installer release gate — 2026-10-27
+
+Added a Configuration manual jingling-keys acceptance test asserting the bundled
+video appears after the original two-second animation, loops with sound and
+rewinds/pauses when closed; reopening must work without altering setup prompts.
+Extended the ready-gated bug-guide Chromium test to assert the optional direct
+YouTube link is hidden until 2000 ms after tab activation, then visible; leaving
+the pane hides it and cancels pending timers. Existing 200 ms autoplay remains.
+Test against `main` only after merging a fully green PR; merge-time workflow
+`Prepare validated RC9 draft` repeats full tests and Windows installer acceptance,
+and creates an RC9 draft without publishing automatically.

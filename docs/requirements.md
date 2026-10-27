@@ -152,3 +152,22 @@ and voice/chat/history tabs remain gated by verified setup readiness. See
 [optional import contract](optional-imports.md) for compatibility checks, backups,
 conflict handling, host-only endpoints, cancellation and validation. This supersedes
 earlier wording that locked every tab except Initial Setup.
+
+## Per-voice OmniVoice tuning — 2026-10-27
+
+Each saved voice persists the seven native generation settings, including
+duration, which overrides speed. IRC/EventSub requests use stored presets.
+The Local Studio can override them without mutating the voice profile.
+Presets can be restored to OmniVoice defaults. Legacy voices load defaults
+without a database migration. Reject invalid parameters server-side and
+preserve the effective settings in every queued generation's request record.
+
+## RC9 maintenance controls — 2026-10-27
+
+Configuration must provide a manual, repeatable button that opens the original
+jingling-keys dialog, with 2-second loading animation, audible looping clip and
+close-to-stop; no setup state changes. The direct YouTube link in Report a bug
+becomes visible only two seconds after the ready-gated tab opens, resets upon
+navigation, and does not delay the 200 ms autoplay request. RC9 packaging must
+produce a separate **draft** after green full tests and actual Windows acceptance,
+not overwrite RC8 or auto-publish unvalidated assets.

@@ -583,3 +583,25 @@ execution and the updated reinstall assertions remain pending Windows CI.
 Bundled owner-supplied public Client ID 93mkh0su05k4ouzlkdk9jtu55f9ak2; the normal UI no longer asks for keys or registration. Backend defaults to the bundled ID while retaining developer environment overrides and existing account IDs. Twitch's real device endpoint accepted this ID (200), and secret-free token polling returned authorization_pending. No broadcaster account was authorized.
 Bug-video player uses the official YouTube IFrame API readiness event, opens its tab only when ready, and requests playback 200 ms later. Navigation/panic cancels it; a 20-second loading timeout offers a direct video link.
 Local core 184 passed; browser/release checks tracked in Actions. Actual consent and browser autoplay restrictions remain separate acceptance items.
+
+## Voice generation tuning — implementation checkpoint 2026-10-27
+
+Implemented saved per-voice generation defaults and API for OmniVoice speed,
+optional duration, inference steps, denoise, CFG, reference preprocessing and
+output postprocessing. Voices exposes editable defaults and restore-to-defaults;
+Local Studio provides per-job overrides. Twitch requests inherit each voice's
+presets. Effective parameters persist in generation request history.
+Automated adapter/backend/Chromium regression coverage added. GPU quality
+and latency, actual inference, Windows installer acceptance and release
+verification remain **unverified for this change** pending CI and host tests.
+
+## RC9 configuration and bug-guide polish — 2026-10-27
+
+Manual Configure → Deploy countermeasures launches the exact looping
+jingling-keys clip with its existing two-second loading UI and close behavior;
+it does not mutate initial setup state. Bug-guide direct YouTube link is delayed
+two seconds from the ready-gated tab becoming visible and cancelled on exit.
+Added Chromium regressions for manual clip behavior and YouTube link timing.
+Prepared `0.3.0rc9` draft-only release pipeline and notes; previous RC8 remains
+untouched. Release remains contingent on all Python/Chromium checks and actual
+Windows installer acceptance; no claim of local GPU-inference quality validation.
