@@ -6,6 +6,7 @@
     "Voice generation defaults": "Padrões de geração desta voz",
     "These defaults apply to Twitch commands and new manual generations.": "Estes padrões valem para comandos da Twitch e novas gerações manuais.",
     "Save generation defaults": "Salvar padrões de geração",
+    "Restore OmniVoice defaults": "Restaurar padrões do OmniVoice",
     "Duration (seconds)": "Duração (segundos)",
     "Inference Steps": "Passos de inferência",
     "Guidance Scale (CFG)": "Escala de orientação (CFG)",

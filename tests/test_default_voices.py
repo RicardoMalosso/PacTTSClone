@@ -125,7 +125,9 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
             preprocess_prompt=False, postprocess_output=False,
         )
         studio.voices.set_generation_settings(voice["id"], defaults)
-        job = studio.voices.generate(voice["id"], GenerationRequest(text="From Twitch"), channel="foo")
+        job = studio.voices.generate(
+            voice["id"], GenerationRequest(text="From Twitch"), channel="foo"
+        )
         finished = wait_job(service, job["id"])
         assert finished["status"] == "succeeded"
         for key, value in defaults.model_dump().items():
@@ -144,7 +146,8 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
     try:
         stored = studio.store.get("voice", voice["id"])
         assert stored["generation_settings"] == defaults.model_dump()
-        assert studio.voices.generate(voice["id"], GenerationRequest(text="Again"))["request"]["steps"] == 12
+        new_job = studio.voices.generate(voice["id"], GenerationRequest(text="Again"))
+        assert new_job["request"]["steps"] == 12
     finally:
         studio.close()
 

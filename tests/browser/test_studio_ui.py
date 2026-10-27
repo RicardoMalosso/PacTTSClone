@@ -746,7 +746,11 @@ def test_voice_generation_tuning_presets_and_per_job_override(page, live_server,
     card.get_by_label("Duration (seconds)").fill("7.5")
     card.get_by_label("Denoise").uncheck()
     card.get_by_role("button", name="Save generation defaults").click()
-    wait_until(lambda: app.state.service.store.all("voice")[0].get("generation_settings", {}).get("steps") == 14)
+    wait_until(
+        lambda: app.state.service.store.all("voice")[0]
+        .get("generation_settings", {})
+        .get("steps") == 14
+    )
     page.reload()
     open_tab(page, "Voices")
     card = page.locator(".voice-card").first

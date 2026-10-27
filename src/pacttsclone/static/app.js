@@ -325,6 +325,10 @@ function createVoiceSettingsEditor(voice) {
     el('summary', {}, t('Voice generation defaults')),
     el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
     container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
+    button('Restore OmniVoice defaults', () => {
+      applySettingsValues(editor, defaultGenerationSettings);
+      editor.closest('.voice-card').dataset.settingsDirty = 'true';
+    }),
     button('Save generation defaults', async () => {
       await api(`/api/voices/${voice.id}/generation-settings`, {method: 'PUT', body: readGenerationSettings(editor)});
       editor.closest('.voice-card').dataset.settingsDirty = 'false';

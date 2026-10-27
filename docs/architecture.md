@@ -267,3 +267,14 @@ earlier wording that locked every tab except Initial Setup.
 Twitch connectivity: IRC remains the chat receiver for every active channel. An
 optional independent EventSub receiver handles authorized events only. Channel
 on/off controls both receivers; authorization changes restart only EventSub.
+
+## Per-voice generation settings — 2026-10-27
+
+A saved voice contains one validated `GenerationSettings` document with speed,
+optional duration, inference steps, denoise, CFG and two processing toggles.
+`Voices.generate` merges saved settings with only the request fields explicitly
+provided by the caller, snapshots the effective values into the job, and queues
+generation. Twitch events and IRC automatically inherit saved defaults. The
+Local Studio loads saved values on voice selection and sends per-job overrides.
+Duration supersedes speed in the OmniVoice adapter. Queued jobs do not change
+when the voice defaults are edited; no model reload or training is required.
