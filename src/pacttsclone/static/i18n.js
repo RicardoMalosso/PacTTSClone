@@ -270,7 +270,7 @@
     'Exact transcript (optional)': 'Transcrição exata (opcional)', 'Save voice': 'Salvar voz',
     'Read public Twitch chat. Commands queue local speech; this does not verify Bits or channel-point purchases.': 'Lê o chat público da Twitch. Comandos geram falas localmente; isso não verifica compras com Bits ou pontos do canal.',
     'Channel configuration': 'Configuração do canal', 'Existing channel': 'Canal existente', 'Create a channel': 'Criar um canal',
-    'Channel login': 'Nome de usuário do canal', 'Connect and monitor chat': 'Conectar e acompanhar o chat',
+    'Channel name': 'Nome do canal', 'Connect and monitor chat': 'Conectar e acompanhar o chat',
     'Pause playback': 'Pausar reprodução', 'Delay before each audio (seconds)': 'Espera antes de cada áudio (segundos)',
     'User cooldown (seconds)': 'Intervalo por usuário (segundos)', 'Message limit': 'Limite de caracteres',
     'Word filter': 'Filtro de palavras', 'Always-on slur blocklist only (default)': 'Somente lista de ofensas discriminatórias, sempre ativa (padrão)',
