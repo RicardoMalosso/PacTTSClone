@@ -583,3 +583,5 @@ execution and the updated reinstall assertions remain pending Windows CI.
 Bundled owner-supplied public Client ID 93mkh0su05k4ouzlkdk9jtu55f9ak2; the normal UI no longer asks for keys or registration. Backend defaults to the bundled ID while retaining developer environment overrides and existing account IDs. Twitch's real device endpoint accepted this ID (200), and secret-free token polling returned authorization_pending. No broadcaster account was authorized.
 Bug-video player uses the official YouTube IFrame API readiness event, opens its tab only when ready, and requests playback 200 ms later. Navigation/panic cancels it; a 20-second loading timeout offers a direct video link.
 Local core 184 passed; browser/release checks tracked in Actions. Actual consent and browser autoplay restrictions remain separate acceptance items.
+
+Channel naming: the Twitch field now reads “Channel name” / “Nome do canal” to avoid suggesting password collection. This is a label-only change; channel identifiers and authorization remain unchanged. Validation: Ruff passed.
