@@ -152,3 +152,12 @@ and voice/chat/history tabs remain gated by verified setup readiness. See
 [optional import contract](optional-imports.md) for compatibility checks, backups,
 conflict handling, host-only endpoints, cancellation and validation. This supersedes
 earlier wording that locked every tab except Initial Setup.
+
+## Per-voice OmniVoice tuning — 2026-10-27
+
+Each saved voice persists the seven native generation settings, including
+duration, which overrides speed. IRC/EventSub requests use stored presets.
+The Local Studio can override them without mutating the voice profile.
+Presets can be restored to OmniVoice defaults. Legacy voices load defaults
+without a database migration. Reject invalid parameters server-side and
+preserve the effective settings in every queued generation's request record.

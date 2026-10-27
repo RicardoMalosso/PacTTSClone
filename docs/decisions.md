@@ -260,3 +260,13 @@ and voice/chat/history tabs remain gated by verified setup readiness. See
 [optional import contract](optional-imports.md) for compatibility checks, backups,
 conflict handling, host-only endpoints, cancellation and validation. This supersedes
 earlier wording that locked every tab except Initial Setup.
+
+## Per-voice OmniVoice parameter scope — 2026-10-27
+
+The official OmniVoice demo exposes speed, fixed duration, num_step, denoise,
+CFG, preprocess_prompt and postprocess_output. PacTTSClone already had speed
+and step-count inputs; extend the request model/adapter to pass all seven
+natively. A single OmniVoice model is shared by all saved voices, so persist
+parameter defaults on the saved voice records, not separate per-voice model
+weights. IRC/EventSub inherit the saved defaults; Studio submits overrides
+per job. Do not restart a warm model or re-prepare a voice on parameter changes.
