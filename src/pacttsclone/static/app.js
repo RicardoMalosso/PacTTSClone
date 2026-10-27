@@ -9,7 +9,7 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--status-ba
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
-let bugVideoTimer = null, bugVideoOpen = false;
+let bugVideoTimer = null, bugLinkTimer = null, bugVideoOpen = false;
 let completedJob = null;
 let currentJob = null, busy = false, lastMonitor = null, lastMonitorAt = 0;
 let voicesKey = '', historyKey = '', channelKey = '', channelLinksKey = '', channelDashboardKey = '', latestChannelState = null, panicRevision = null, suppressAutoplay = false;
@@ -68,7 +68,9 @@ $('restart-cuda').addEventListener('click', action(async () => {
 let bugPlayer = null, bugPlayerReady = false, youtubeApiPromise = null, bugVideoRequest = 0;
 function stopBugVideo() {
   bugVideoRequest++;
-  clearTimeout(bugVideoTimer); bugVideoTimer = null; bugVideoOpen = false; bugPlayerReady = false;
+  clearTimeout(bugVideoTimer); bugVideoTimer = null;
+  clearTimeout(bugLinkTimer); bugLinkTimer = null; $('bug-youtube-link').hidden = true;
+  bugVideoOpen = false; bugPlayerReady = false;
   if (bugPlayer) { bugPlayer.destroy(); bugPlayer = null; }
   $('bug-video').replaceChildren();
   document.querySelector('[data-tab="bugs"]').removeAttribute('aria-busy');
@@ -109,6 +111,14 @@ async function openBugVideo() {
           event.target.getIframe().title = t('Bug reporting guide');
           document.querySelector('[data-tab="bugs"]').removeAttribute('aria-busy');
           tab('bugs');
+          // The direct YouTube link appears two seconds after this pane opens.
+          $('bug-youtube-link').hidden = true;
+          clearTimeout(bugLinkTimer);
+          bugLinkTimer = setTimeout(() => {
+            if (bugVideoOpen && request === bugVideoRequest && !$('pane-bugs').hidden) {
+              $('bug-youtube-link').hidden = false;
+            }
+          }, 2000);
           window.Locale.bind($('bug-video-status'), 'If autoplay is blocked, press play in the video.');
           bugVideoTimer = setTimeout(() => {
             if (bugVideoOpen && request === bugVideoRequest) event.target.playVideo();
@@ -636,8 +646,8 @@ function refreshCountermeasurePrompt() {
 function closeCountermeasures() { $('countermeasure-modal').hidden = true; const video = $('countermeasure-video'); video.pause(); video.currentTime = 0; }
 $('setup-too-long-no').addEventListener('click', claimCountermeasures);
 $('setup-too-long-close').addEventListener('click', claimCountermeasures);
-$('setup-too-long-yes').addEventListener('click', async () => {
-  claimCountermeasures();
+async function showCountermeasures() {
+  if (!$('countermeasure-modal').hidden) return;
   $('countermeasure-modal').hidden = false;
   $('countermeasure-loading').hidden = false;
   const video = $('countermeasure-video');
@@ -656,7 +666,12 @@ $('setup-too-long-yes').addEventListener('click', async () => {
   $('countermeasure-loading').hidden = true;
   video.hidden = false;
   try { await video.play(); } catch (e) { console.warn('Jingling keys playback needs user interaction:', e); }
+}
+$('setup-too-long-yes').addEventListener('click', () => {
+  claimCountermeasures();
+  showCountermeasures();
 });
+$('config-countermeasures').addEventListener('click', showCountermeasures);
 $('countermeasure-close').addEventListener('click', closeCountermeasures);
 
 function renderSetup(data) {

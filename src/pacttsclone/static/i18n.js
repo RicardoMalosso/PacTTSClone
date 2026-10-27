@@ -1,6 +1,9 @@
 'use strict';
 (() => {
   const pt = {
+    "Countermeasures": "Contramedidas",
+    "Open the jingling-keys animation manually, even when setup is complete.": "Abra manualmente a animação das chaves, mesmo depois da configuração inicial.",
+    "Deploy countermeasures": "Acionar contramedidas",
     "Generation settings · per-job overrides": "Configurações de geração · ajustes por geração",
     "Defaults are saved per voice in Voices; edits here affect only this generation.": "Os padrões são salvos em cada voz na aba Vozes; alterações aqui afetam só esta geração.",
     "Voice generation defaults": "Padrões de geração desta voz",

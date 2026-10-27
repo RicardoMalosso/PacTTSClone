@@ -414,6 +414,7 @@ def test_bug_video_ready_before_tab_and_200ms_autoplay(page, live_server):
     page.clock.install()
     page.evaluate("window.readyBugPlayer()")
     expect(page.locator("#pane-bugs")).to_be_visible()
+    expect(page.locator("#bug-youtube-link")).to_be_hidden()
     page.clock.pause_at(datetime.now(UTC) + timedelta(seconds=1))
     # The clock may advance to pause_at, so reset the play counter and verify
     # cancellation on a fresh ready event using the controlled clock below.
@@ -429,11 +430,18 @@ def test_bug_video_ready_before_tab_and_200ms_autoplay(page, live_server):
     )
     page.clock.run_for(199)
     assert page.evaluate("window.videoPlays") == 0
+    expect(page.locator("#bug-youtube-link")).to_be_hidden()
     page.clock.run_for(1)
     assert page.evaluate("window.videoPlays") == 1
+    page.clock.run_for(1799)
+    expect(page.locator("#bug-youtube-link")).to_be_hidden()
+    page.clock.run_for(1)
+    expect(page.locator("#bug-youtube-link")).to_be_visible()
     page.locator('[data-tab="studio"]').click()
+    expect(page.locator("#bug-youtube-link")).to_be_hidden()
     page.locator('[data-tab="bugs"]').click()
     page.evaluate("window.readyBugPlayer()")
+    expect(page.locator("#bug-youtube-link")).to_be_hidden()
     page.locator('[data-tab="studio"]').click()
     page.clock.run_for(500)
     assert page.evaluate("window.videoPlays") == 1

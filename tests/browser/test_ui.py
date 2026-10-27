@@ -243,3 +243,28 @@ def test_initial_setup_countermeasures_prompt_once(page, live_server):
     assert video.evaluate("(v) => v.paused && v.currentTime === 0")
     page.reload()
     expect(page.locator("#setup-too-long")).to_be_hidden()
+
+def test_config_can_open_and_close_jingling_keys_without_setup_prompt(page, live_server):
+    url, app = live_server
+    page.goto(url)
+    expect(page.locator("#generate")).to_be_enabled()
+    page.locator('[data-tab="config"]').click()
+    assert app.state.runtime_setup.snapshot().get("countermeasures_offered") is not True
+    page.locator("#config-countermeasures").click()
+    expect(page.locator("#countermeasure-loading")).to_be_visible()
+    expect(page.locator("#countermeasure-video")).to_be_visible(timeout=5000)
+    video = page.locator("#countermeasure-video")
+    expect(video).to_have_attribute("loop", "")
+    expect(video).to_have_attribute("src", "/static/jingling-keys.webm")
+    page.wait_for_function(
+        "document.querySelector('#countermeasure-video')?.currentTime > 0",
+        timeout=10000,
+    )
+    assert video.evaluate("(v) => !v.paused && !v.muted && v.volume > 0")
+    page.locator("#countermeasure-close").click()
+    expect(page.locator("#countermeasure-modal")).to_be_hidden()
+    assert video.evaluate("(v) => v.paused && v.currentTime === 0")
+    page.locator("#config-countermeasures").click()
+    expect(page.locator("#countermeasure-video")).to_be_visible(timeout=5000)
+    page.locator("#countermeasure-close").click()
+    assert app.state.runtime_setup.snapshot().get("countermeasures_offered") is not True
