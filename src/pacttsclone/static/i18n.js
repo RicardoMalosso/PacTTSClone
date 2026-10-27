@@ -1,6 +1,19 @@
 'use strict';
 (() => {
   const pt = {
+    "Generation settings · per-job overrides": "Configurações de geração · ajustes por geração",
+    "Defaults are saved per voice in Voices; edits here affect only this generation.": "Os padrões são salvos em cada voz na aba Vozes; alterações aqui afetam só esta geração.",
+    "Voice generation defaults": "Padrões de geração desta voz",
+    "These defaults apply to Twitch commands and new manual generations.": "Estes padrões valem para comandos da Twitch e novas gerações manuais.",
+    "Save generation defaults": "Salvar padrões de geração",
+    "Duration (seconds)": "Duração (segundos)",
+    "Inference Steps": "Passos de inferência",
+    "Guidance Scale (CFG)": "Escala de orientação (CFG)",
+    "Denoise": "Remover ruído",
+    "Preprocess Prompt": "Pré-processar amostra",
+    "Postprocess Output": "Pós-processar áudio",
+    "Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.": "A duração prevalece sobre a velocidade. Desativar o pós-processamento evita cortar silêncios finais.",
+    "Enter a valid generation setting.": "Informe um valor válido para a geração.",
     "Save the channel first, then connect the matching broadcaster account. No developer registration, Client ID or client secret is needed.": "Salve o canal e conecte a conta correspondente. Não é necessário cadastro de desenvolvedor, Client ID ou client secret.",
     "The tab opens when the video player is ready.": "A aba abre quando o player de vídeo estiver pronto.",
     "Loading bug reporting video…": "Carregando guia para relatar problemas…",

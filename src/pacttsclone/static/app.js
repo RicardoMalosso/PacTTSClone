@@ -242,6 +242,47 @@ async function watch(id) {
     await sleep(500);
   }
 }
+const defaultGenerationSettings = Object.freeze({speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
+const generationFields = [
+  ['speed', 'Speed', 'number', '0.5', '1.5', '0.05'],
+  ['duration', 'Duration (seconds)', 'number', '0.5', '120', '0.1'],
+  ['steps', 'Inference Steps', 'number', '4', '64', '1'],
+  ['guidance_scale', 'Guidance Scale (CFG)', 'number', '0', '4', '0.1'],
+  ['denoise', 'Denoise', 'checkbox'],
+  ['preprocess_prompt', 'Preprocess Prompt', 'checkbox'],
+  ['postprocess_output', 'Postprocess Output', 'checkbox']
+];
+function voiceGenerationSettings(voice) { return {...defaultGenerationSettings, ...(voice?.generation_settings || {})}; }
+function settingsControls(container) {
+  return Object.fromEntries(generationFields.map(([key]) => [key, container.querySelector(`[data-setting="${key}"]`)]));
+}
+function readGenerationSettings(container) {
+  const controls = settingsControls(container);
+  return Object.fromEntries(generationFields.map(([key, , type]) => {
+    const input = controls[key];
+    if (type === 'checkbox') return [key, input.checked];
+    if (key === 'duration' && input.value.trim() === '') return [key, null];
+    if (input.value.trim() === '') throw new Error(t('Enter a valid generation setting.'));
+    return [key, Number(input.value)];
+  }));
+}
+function applySettingsValues(container, values) {
+  const controls = settingsControls(container);
+  for (const [key, , type] of generationFields) {
+    if (type === 'checkbox') controls[key].checked = Boolean(values[key]);
+    else controls[key].value = values[key] ?? '';
+  }
+}
+let appliedStudioPreset = '';
+function applyStudioVoiceDefaults() {
+  const voice = state.voices.find(v => v.id === $('voice-select').value);
+  const snapshot = voiceGenerationSettings(voice);
+  const identity = (voice?.id || '') + JSON.stringify(snapshot);
+  if (identity === appliedStudioPreset) return;
+  appliedStudioPreset = identity;
+  applySettingsValues($('generate-form'), snapshot);
+}
+$('voice-select').addEventListener('change', applyStudioVoiceDefaults);
 $('generate-form').addEventListener('submit', action(async event => {
   event.preventDefault(); if (busy) return;
   busy = true; $('generate').disabled = true; clearResult(); currentJob = null; suppressAutoplay = false;
@@ -249,7 +290,7 @@ $('generate-form').addEventListener('submit', action(async event => {
     const voice = $('voice-select').value;
     if (!$('requester-name').value.trim()) { $('requester-name').focus(); throw new Error(t('Enter a requester name.')); }
     if (!voice) throw new Error(t('Choose a saved voice in Voices first.'));
-    const job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, speed: Number($('speed').value), steps: Number($('steps').value), autoqueue_general: $('autoqueue').checked, requester_name: $('requester-name').value.trim(), requester_id: requesterId}});
+    const job = await api(`/api/voices/${voice}/generate`, {method: 'POST', body: {text: $('text').value, language: $('language').value, ...readGenerationSettings($('generate-form')), autoqueue_general: $('autoqueue').checked, requester_name: $('requester-name').value.trim(), requester_id: requesterId}});
     currentJob = job.id; await watch(job.id);
   } finally { busy = false; $('generate').disabled = !runtimeSetup.ready; }
 }));
@@ -270,6 +311,29 @@ $('voice-form').addEventListener('submit', action(async event => {
   try { const voice = await api('/api/voices', {method: 'POST', body: new FormData(event.target)}); event.target.reset(); $('voice-upload-note').textContent = voice.warning ? t(voice.warning) : ''; $('voice-upload-note').hidden = !voice.warning; await refresh(); }
   finally { submit.disabled = false; }
 }));
+function createVoiceSettingsEditor(voice) {
+  const values = voiceGenerationSettings(voice);
+  const container = el('div', {class: 'settings voice-setting-fields'});
+  for (const [key, label, type, min, max, step] of generationFields) {
+    const input = el('input', {type, 'data-setting': key, 'aria-label': t(label), ...(type === 'number' ? {min, max, step, value: values[key] ?? ''} : {checked: values[key] ? '' : null})});
+    const labelNode = type === 'checkbox'
+      ? el('label', {class: 'check'}, input, ' ', t(label))
+      : el('label', {}, t(label), input);
+    container.append(labelNode);
+  }
+  const editor = el('details', {class: 'voice-generation-settings'},
+    el('summary', {}, t('Voice generation defaults')),
+    el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
+    container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
+    button('Save generation defaults', async () => {
+      await api(`/api/voices/${voice.id}/generation-settings`, {method: 'PUT', body: readGenerationSettings(editor)});
+      editor.closest('.voice-card').dataset.settingsDirty = 'false';
+      await refresh();
+    })
+  );
+  editor.querySelectorAll('[data-setting]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
+  return editor;
+}
 function renderVoices() {
   const key = JSON.stringify([state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
   const selected = $('voice-select').value;
@@ -277,6 +341,15 @@ function renderVoices() {
   for (const v of state.voices.filter(v => v.status === 'ready')) $('voice-select').append(el('option', {value: v.id}, v.title));
   $('voice-select').value = selected; $('voice-select').dispatchEvent(new Event('change'));
   const drafts = new Map([...document.querySelectorAll('.voice-card')].filter(card => card.dataset.dirty === 'true').map(card => [card.dataset.voiceId, {title: card.querySelector('input[data-field="title"]').value, transcript: card.querySelector('textarea').value}]));
+  const editorDrafts = new Map([...document.querySelectorAll('.voice-card')].map(card => {
+    const editor = card.querySelector('.voice-generation-settings');
+    if (!editor) return [card.dataset.voiceId, null];
+    const dirty = card.dataset.settingsDirty === 'true';
+    return [card.dataset.voiceId, {open: editor.open, dirty, values: dirty ? Object.fromEntries(generationFields.map(([key, , type]) => {
+      const input = editor.querySelector(`[data-setting="${key}"]`);
+      return [key, type === 'checkbox' ? input.checked : input.value];
+    })) : null}];
+  }));
   $('voices-list').replaceChildren();
   for (const v of state.voices) {
     const preparing = v.status === 'pending';
@@ -292,11 +365,21 @@ function renderVoices() {
       preparing ? el('div', {class: 'preparation-note', role: 'status'}, el('strong', {}, t('Preparing for first use…')), el('progress', {max: '1'}), el('p', {}, `${t(prep?.stage || 'queued')} · ${t('Model files are already verified. Loading and transcription run locally. You can cancel and retry.')} `), button('Cancel preparation', async () => { await api(`/api/jobs/${v.preparation_job_id}/cancel`, {method: 'POST'}); await refresh(); }, 'danger small-button')) : null,
       v.error ? el('p', {class: 'error'}, v.error) : null, el('label', {}, t('Title'), title), el('label', {}, t('Saved reference transcript'), transcript),
       el('audio', {controls: '', src: `/api/voices/${v.id}/reference`, preload: 'none'}),
+      createVoiceSettingsEditor(v),
       el('div', {class: 'row-actions'}, button('Save edits', async () => { await api(`/api/voices/${v.id}`, {method: 'PUT', body: {title: title.value, transcript: transcript.value}}); card.dataset.dirty = 'false'; await refresh(); }),
         v.status !== 'ready' && v.status !== 'pending' ? button(v.status === 'unprepared' ? 'Prepare for first use' : 'Retry preparation', async () => { await api(`/api/voices/${v.id}/prepare`, {method: 'POST'}); await refresh(); }) : null,
         button('Delete voice', async () => { if (confirm(t('Delete saved voice {name}?', {name: v.title}))) { await api(`/api/voices/${v.id}`, {method: 'DELETE'}); await refresh(); } }, 'danger small-button')));
     const draft = drafts.get(v.id);
     if (draft && !preparing) { title.value = draft.title; transcript.value = draft.transcript; card.dataset.dirty = 'true'; }
+    const editorDraft = editorDrafts.get(v.id);
+    if (editorDraft) {
+      const editor = card.querySelector('.voice-generation-settings');
+      editor.open = editorDraft.open;
+      if (editorDraft.dirty) {
+        applySettingsValues(editor, editorDraft.values);
+        card.dataset.settingsDirty = 'true';
+      }
+    }
     for (const field of [title, transcript]) field.addEventListener('input', () => { card.dataset.dirty = 'true'; });
     card.querySelector('.row-actions button').disabled = preparing;
     $('voices-list').append(card);
