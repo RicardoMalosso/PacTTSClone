@@ -605,3 +605,21 @@ Added Chromium regressions for manual clip behavior and YouTube link timing.
 Prepared `0.3.0rc9` draft-only release pipeline and notes; previous RC8 remains
 untouched. Release remains contingent on all Python/Chromium checks and actual
 Windows installer acceptance; no claim of local GPU-inference quality validation.
+
+
+## RC10 Automatic speech language — 2026-10-28
+
+Language is now a validated saved voice setting (Automatic/PT/EN), inherited by
+IRC commands and EventSub rules. New and legacy voices without a saved language,
+and legacy multipart requests, default to Automatic. Local loads each voice's
+language and permits a one-job override; obsolete browser-only language preferences
+are ignored. Restore defaults selects Automatic. Versions advance to 0.3.0rc10,
+including the previously stale runtime __version__.
+
+Local validation: 203 core tests and 35 Chromium tests passed; Ruff, Python
+compilation, JavaScript syntax and workflow YAML parsing passed. Expanded the
+Chromium preset regression to cover restoring Automatic; its focused recheck is
+recorded with the PR. Tests use fake inference, not a physical NVIDIA quality or
+performance measurement. Cross-platform CI and actual Windows installer acceptance
+must pass before owner-authorized RC10 publication. Uploaded release asset sizes,
+SHA-256 digests and target commit are checked before the draft becomes public.

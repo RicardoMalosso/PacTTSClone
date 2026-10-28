@@ -280,3 +280,20 @@ but defer its optional YouTube link until 2 s after the pane opens.
 Version increment is RC9, not an overwrite of RC8. Change the merge-time
 release gate to `prepare-release` with draft-only output. Do not publish
 automatically, and do not bypass full Windows installer acceptance.
+
+
+## RC10 speech language defaults — 2026-10-28
+
+Speech language belongs to the saved voice generation settings: Automatic (`auto`),
+Português (`pt`) or English (`en`). Automatic is the default for new voices, legacy
+voices with missing settings/language, JSON requests and legacy multipart uploads.
+IRC and EventSub inherit the selected voice language. Local loads that same default
+and allows a one-job override, without changing the voice. Old browser-only language
+preferences no longer override saved defaults. Restore defaults selects Automatic.
+Interface locale remains independent. Automatic passes `language=None` to OmniVoice.
+Existing queued jobs keep their request snapshots; no voice re-preparation is needed.
+
+RC10 publication is explicitly authorized by the owner. The publish-release merge
+label runs the complete suite and Windows installer acceptance, creates a separate
+RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
+publishes it as a prerelease. Previous release assets are never replaced.

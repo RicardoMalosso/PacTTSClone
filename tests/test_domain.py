@@ -8,7 +8,7 @@ def test_normalizes_fields():
     request = GenerationRequest(text="  Olá.  ", ref_text="  Referência. ")
     assert request.text == "Olá."
     assert request.ref_text == "Referência."
-    assert request.language == "pt"
+    assert request.language == "auto"
 
 
 @pytest.mark.parametrize(

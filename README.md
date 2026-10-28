@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.6.exe` in the [RC6 prerelease](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v0.3.0-rc.6). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+`PacTTSClone-Setup-0.3.0-rc.10.exe` in the [RC10 prerelease](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v0.3.0-rc.10). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -404,9 +404,13 @@ overwrite of current assets. Neither import is mandatory.
 ## Per-voice generation settings
 
 Every saved voice has persistent generation defaults in **Voices → Voice generation defaults**:
-speed (0.5–1.5), optional fixed duration in seconds (0.5–120), inference steps (4–64),
+**speech language (Automatic, Português or English)**, speed (0.5–1.5), optional fixed duration in seconds (0.5–120), inference steps (4–64),
 denoise, guidance scale (0–4), prompt preprocessing and output postprocessing.
-Default values match OmniVoice: speed 1.0, automatic duration, 32 steps, denoise on,
+Speech language defaults to Automatic for new and existing voices without a saved
+language; Twitch commands and events inherit it. Local language edits affect only
+that generation, and selecting a voice loads its saved language. Old browser-only
+language preferences no longer override voice defaults. Interface flags remain separate.
+Other default values match OmniVoice: speed 1.0, automatic duration, 32 steps, denoise on,
 CFG 2.0 and both processing switches on. Duration overrides speed.
 The Local Generate tab loads these defaults and allows **one-job overrides** without
 changing the saved voice. IRC/EventSub generation automatically inherits each voice's

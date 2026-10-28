@@ -38,11 +38,14 @@ def modules(monkeypatch):
     return torch, model, factory
 
 
-def test_real_adapter_contract_and_lazy_cache(modules):
+@pytest.mark.parametrize("language, expected", [("auto", None), ("pt", "pt"), ("en", "en")])
+def test_real_adapter_contract_and_lazy_cache(modules, language, expected):
     _, model, factory = modules
     engine = OmniVoiceEngine(Settings())
     assert factory.call_count == 0
-    request = GenerationRequest(text="Olá", ref_text="Referência", speed=1.1, steps=16)
+    request = GenerationRequest(
+        text="Olá", ref_text="Referência", language=language, speed=1.1, steps=16
+    )
     for _ in range(2):
         waveform = engine.synthesize("reference.wav", request)
         assert waveform.sample_rate == 24000
@@ -58,7 +61,7 @@ def test_real_adapter_contract_and_lazy_cache(modules):
     model.load_asr_model.assert_not_called()
     model.generate.assert_called_with(
         text="Olá",
-        language="pt",
+        language=expected,
         ref_audio="reference.wav",
         ref_text="Referência",
         speed=1.1,

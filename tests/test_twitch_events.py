@@ -736,3 +736,13 @@ def test_reward_limits_creation_update_and_disable(event_studio):
             studio.events.reward_limits({"global_cooldown_seconds": bad})
     with pytest.raises(UserError, match="Only rewards"):
         studio.events.update_reward_limits("streamer", "unknown", limits)
+
+
+@pytest.mark.parametrize("saved", [None, {"steps": 16}, {"language": "en"}, {"language": "pt"}])
+def test_event_language_uses_voice_default_or_automatic(event_studio, saved):
+    _, studio, _, voice = event_studio
+    studio.store.patch("voice", voice["id"], generation_settings=saved)
+    studio.events.receive("streamer", EVENT_TYPES["reward"], redemption(), metadata())
+    job = studio.service.history()[0]
+    assert job["request"]["language"] == (saved or {}).get("language", "auto")
+    assert wait_job(studio.service, job["id"])["status"] == "succeeded"

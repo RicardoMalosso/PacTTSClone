@@ -121,7 +121,7 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         with mp3.open("rb") as reference:
             voice = studio.voices.create(reference, "Test", "reference.mp3", "Exact transcript.")
         defaults = GenerationSettings(
-            speed=0.7, duration=6.0, steps=12, denoise=False, guidance_scale=1.5,
+            language="en", speed=0.7, duration=6.0, steps=12, denoise=False, guidance_scale=1.5,
             preprocess_prompt=False, postprocess_output=False,
         )
         studio.voices.set_generation_settings(voice["id"], defaults)
@@ -133,8 +133,9 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         for key, value in defaults.model_dump().items():
             assert finished["request"][key] == value
         overridden = studio.voices.generate(
-            voice["id"], GenerationRequest(text="Manual", speed=1.2, duration=None)
+            voice["id"], GenerationRequest(text="Manual", language="pt", speed=1.2, duration=None)
         )
+        assert overridden["request"]["language"] == "pt"
         assert overridden["request"]["speed"] == 1.2
         assert overridden["request"]["duration"] is None
         assert overridden["request"]["steps"] == 12
@@ -148,13 +149,14 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         assert stored["generation_settings"] == defaults.model_dump()
         new_job = studio.voices.generate(voice["id"], GenerationRequest(text="Again"))
         assert new_job["request"]["steps"] == 12
+        assert new_job["request"]["language"] == "en"
     finally:
         studio.close()
 
 
 @pytest.mark.parametrize("values", [
     {"speed": 1.8}, {"duration": 0.1}, {"steps": 0}, {"guidance_scale": 5.0},
-    {"unexpected": "not accepted"}, {"duration": float("nan")},
+    {"language": "invalid"}, {"unexpected": "not accepted"}, {"duration": float("nan")},
 ])
 def test_invalid_generation_settings_rejected(values):
     from pydantic import ValidationError

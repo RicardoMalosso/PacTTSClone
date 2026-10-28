@@ -255,7 +255,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         reference: Annotated[UploadFile, File()],
         text: str = Form(...),
         ref_text: str = Form(""),
-        language: str = Form("pt"),
+        language: str = Form("auto"),
         speed: float = Form(1.0),
         steps: int = Form(32),
         autoqueue_general: bool = Form(False),

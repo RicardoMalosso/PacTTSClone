@@ -66,9 +66,8 @@ machine-readable diagnostic keys do not. Canadian/Brazilian flags are inline SVG
 
 ### Studio preferences and command drafts
 
-Reapply the selected interface locale when activating a tab. Persist generation
-speech language separately in `pactts-speech-language`; interface translation must
-not change the requested speech language. Refresh existing command voice dropdowns
+Reapply the selected interface locale when activating a tab. Load generation speech language from each saved voice; Local overrides apply only
+to the submitted job. Interface translation must not change speech language. Refresh existing command voice dropdowns
 when ready voice IDs/titles or locale change, preserving valid selections and
 command text. Pending voices become selectable only after preparation succeeds.
 The studio uses a Gruvbox Dark palette with responsive recording-desk panels.
@@ -295,3 +294,20 @@ Release preparation: a merged, same-repo PR labeled `prepare-release`
 runs the complete test and Windows installer acceptance workflow, then creates
 a uniquely tagged RC9 **draft** on main. No automatic publication; prior RC8
 assets remain immutable. The installer is unsigned.
+
+
+## RC10 speech language defaults — 2026-10-28
+
+Speech language belongs to the saved voice generation settings: Automatic (`auto`),
+Português (`pt`) or English (`en`). Automatic is the default for new voices, legacy
+voices with missing settings/language, JSON requests and legacy multipart uploads.
+IRC and EventSub inherit the selected voice language. Local loads that same default
+and allows a one-job override, without changing the voice. Old browser-only language
+preferences no longer override saved defaults. Restore defaults selects Automatic.
+Interface locale remains independent. Automatic passes `language=None` to OmniVoice.
+Existing queued jobs keep their request snapshots; no voice re-preparation is needed.
+
+RC10 publication is explicitly authorized by the owner. The publish-release merge
+label runs the complete suite and Windows installer acceptance, creates a separate
+RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
+publishes it as a prerelease. Previous release assets are never replaced.
