@@ -1,4 +1,4 @@
-name: Prepare validated RC9 draft
+name: Publish validated RC10
 on:
   pull_request:
     types: [closed]
@@ -6,13 +6,12 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: release-rc9
+  group: release-rc10
   cancel-in-progress: false
 jobs:
   installer:
-    if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'prepare-release')
+    if: github.event.pull_request.merged && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'publish-release')
     uses: ./.github/workflows/installer.yml
     with:
-      publish_draft: true
-  # The installer workflow creates a new draft release on main after all gates.
-  # Leave it unpublished so the owner can verify the artifacts before publishing.
+      publish_release: true
+  # Publication follows full tests, Windows acceptance and uploaded asset verification.

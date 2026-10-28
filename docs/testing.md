@@ -453,3 +453,16 @@ the pane hides it and cancels pending timers. Existing 200 ms autoplay remains.
 Test against `main` only after merging a fully green PR; merge-time workflow
 `Prepare validated RC9 draft` repeats full tests and Windows installer acceptance,
 and creates an RC9 draft without publishing automatically.
+
+
+## RC10 language regression coverage — 2026-10-28
+
+Coverage checks Automatic defaults in request models and multipart uploads, legacy
+voice settings missing language, saved PT/EN inheritance for real command/EventSub
+handlers with fake inference, settings validation/persistence and Local overrides.
+The adapter verifies auto → None and explicit pt/en forwarding. Chromium verifies
+the saved voice language selector, reload, Local inheritance/override, restoration
+to Automatic and ignoring obsolete browser-only language preferences.
+The RC10 owner-authorized publication workflow retains full cross-platform tests
+and Windows installer acceptance, then verifies target and uploaded asset digests
+before publishing a separate prerelease. No physical GPU quality claim is made.

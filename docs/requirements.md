@@ -4,7 +4,7 @@ Current scope supersedes v1 exclusions. Detailed rationale: v2-design.md.
 
 | ID | Acceptance |
 |---|---|
-| R1 | MP3 reference, 1–30 s, <=20 MiB; Portuguese default; text <=2000 chars; valid local 48 kHz /192 kbps MP3. |
+| R1 | MP3 reference, 1–30 s, <=20 MiB; Automatic speech-language default; text <=2000 chars; valid local 48 kHz /192 kbps MP3. |
 | R2 | Live wall timer, per-stage indeterminate/completed progress and measured CPU/RAM/GPU data where available. Never invent download ETA or exact GPU compute seconds. |
 | R3 | Structured generation.jsonl and downloadable per-job report: hardware, selected device, wall/worker CPU times, per-stage sampled RAM/CUDA allocation peaks, outcome. |
 | R4 | Configuration: Automatic/NVIDIA CUDA/CPU, CPU threads, resident model toggle, queue bound and global playback shortcut. No restart needed for settings; generation must be idle. |
@@ -171,3 +171,20 @@ becomes visible only two seconds after the ready-gated tab opens, resets upon
 navigation, and does not delay the 200 ms autoplay request. RC9 packaging must
 produce a separate **draft** after green full tests and actual Windows acceptance,
 not overwrite RC8 or auto-publish unvalidated assets.
+
+
+## RC10 speech language defaults — 2026-10-28
+
+Speech language belongs to the saved voice generation settings: Automatic (`auto`),
+Português (`pt`) or English (`en`). Automatic is the default for new voices, legacy
+voices with missing settings/language, JSON requests and legacy multipart uploads.
+IRC and EventSub inherit the selected voice language. Local loads that same default
+and allows a one-job override, without changing the voice. Old browser-only language
+preferences no longer override saved defaults. Restore defaults selects Automatic.
+Interface locale remains independent. Automatic passes `language=None` to OmniVoice.
+Existing queued jobs keep their request snapshots; no voice re-preparation is needed.
+
+RC10 publication is explicitly authorized by the owner. The publish-release merge
+label runs the complete suite and Windows installer acceptance, creates a separate
+RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
+publishes it as a prerelease. Previous release assets are never replaced.

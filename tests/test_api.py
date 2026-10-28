@@ -35,6 +35,7 @@ def submit(client, mp3, **changes):
 def test_full_api_pipeline(client, app, mp3):
     result = submit(client, mp3)
     assert result.status_code == 202
+    assert result.json()["request"]["language"] == "auto"
     job_id = result.json()["id"]
     done = wait_job(app.state.service, job_id)
     assert done["status"] == "succeeded"

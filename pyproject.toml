@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pacttsclone"
-version = "0.3.0rc9"
+version = "0.3.0rc10"
 description = "Local OmniVoice voice cloning to MP3"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"

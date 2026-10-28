@@ -356,11 +356,16 @@ def test_new_api_voice_configuration_and_obs_routes(tmp_path, mp3, engine):
         assert client.get("/api/voices").json()[0]["id"] == v["id"]
         preset_url = f"/api/voices/{v['id']}/generation-settings"
         saved = client.put(
-            preset_url, json={"steps": 16, "denoise": False, "duration": 8},
+            preset_url, json={"language": "en", "steps": 16, "denoise": False, "duration": 8},
             headers=headers,
         )
         assert saved.status_code == 200
         assert saved.json()["generation_settings"]["steps"] == 16
+        assert saved.json()["generation_settings"]["language"] == "en"
+        assert (
+            client.put(preset_url, json={"language": "invalid"}, headers=headers).status_code
+            == 422
+        )
         assert client.put(preset_url, json={"steps": 80}, headers=headers).status_code == 422
         assert client.put(preset_url, json={"unknown": 1}, headers=headers).status_code == 422
 
@@ -769,3 +774,13 @@ def test_long_voice_upload_crops_and_thumbnail_can_be_replaced(tmp_path, engine,
             app.state.service.store.get("voice", voice["id"])["transcript"]
             == "First thirty seconds."
         )
+
+
+@pytest.mark.parametrize("saved", [None, {"steps": 16}, {"language": "en"}, {"language": "pt"}])
+def test_twitch_language_uses_voice_default_or_automatic(studio, mp3, saved):
+    v = voice(studio, mp3)
+    studio.store.patch("voice", v["id"], generation_settings=saved)
+    channel(studio, v["id"], user_cooldown_seconds=0)
+    job = studio.receive("testchannel", "viewer", "!lula Hello there")
+    assert job["request"]["language"] == (saved or {}).get("language", "auto")
+    assert wait_job(studio.service, job["id"])["status"] == "succeeded"

@@ -17,6 +17,7 @@ class GenerationSettings(BaseModel):
     """Persistent defaults for individual voices."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    language: str = "auto"
     speed: float = Field(default=1.0, ge=0.5, le=1.5)
     duration: float | None = Field(default=None, ge=0.5, le=120)
     steps: int = Field(default=32, ge=4, le=64)
@@ -25,11 +26,17 @@ class GenerationSettings(BaseModel):
     preprocess_prompt: bool = True
     postprocess_output: bool = True
 
+    @field_validator("language")
+    @classmethod
+    def valid_language(cls, value: str) -> str:
+        if value not in {"pt", "en", "auto"}:
+            raise ValueError("Idioma deve ser pt, en ou auto.")
+        return value
+
 
 class GenerationRequest(GenerationSettings):
     text: str = Field(min_length=1, max_length=2000)
     ref_text: str = Field(default="", max_length=4000)
-    language: str = "pt"
     autoqueue_general: bool = False
     requester_name: str = Field(default="", max_length=80)
     requester_id: str = Field(default="", max_length=80)
@@ -38,13 +45,6 @@ class GenerationRequest(GenerationSettings):
     @classmethod
     def strip_text(cls, value: str) -> str:
         return value.strip() if isinstance(value, str) else value
-
-    @field_validator("language")
-    @classmethod
-    def valid_language(cls, value: str) -> str:
-        if value not in {"pt", "en", "auto"}:
-            raise ValueError("Idioma deve ser pt, en ou auto.")
-        return value
 
 
 @dataclass
