@@ -675,3 +675,14 @@ Owner requested the Discord release. Versioned application/runtime/installer as
 RC11 and updated the existing gated publication workflow and release notes.
 Publication requires full cross-platform checks, Windows installer acceptance
 and asset digest verification; previous RC10 assets remain unchanged.
+
+## RC11 accepted installer publication recovery — 2026-10-29
+
+Release run 40971665005 passed every Windows/Linux Python 3.11/3.12 and Chromium
+job, plus actual Windows wizard, CPU/model setup, launcher, reinstall and uninstall
+acceptance. It built/uploaded four RC11 files and created draft 428493183 at
+24196cbe86a730e1c036e456b77eee298e51ee23. Publication alone failed because the
+release-by-tag API returned 404 for the draft. Resolve drafts through the releases
+collection and publish by numeric ID. A scoped recovery verifies the original
+acceptance steps, artifact checksums, release target and all asset digests before
+publishing that same draft. No inference/GPU or live Discord quality claim is added.

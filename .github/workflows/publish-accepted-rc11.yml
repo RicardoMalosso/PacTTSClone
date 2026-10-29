@@ -1,0 +1,33 @@
+name: Publish accepted RC11 draft
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-accepted-rc11.yml
+      - scripts/publish-accepted-rc11.py
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: release-rc11
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: PacTTSClone-Windows-setup
+          run-id: 40971665005
+          github-token: ${{ github.token }}
+          path: accepted-rc11
+      - name: Verify acceptance and assets, then publish existing draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/publish-accepted-rc11.py accepted-rc11
