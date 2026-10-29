@@ -8,6 +8,7 @@ const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
+let discordSnapshot = null, discordBusy = false, discordVoiceKey = '';
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
 let bugVideoTimer = null, bugLinkTimer = null, bugVideoOpen = false;
 let completedJob = null;
@@ -190,7 +191,7 @@ function clearResult() {
 function renderMonitor(job) {
   lastMonitor = job; lastMonitorAt = performance.now();
   const voice = state.voices.find(v => v.id === job.voice_id);
-  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : job.origin === 'cloudflare' ? null : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
+  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : job.origin === 'cloudflare' ? null : job.origin === 'discord' ? t('Discord request') : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
   $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
   $('live-generation').hidden = false;
   $('status').textContent = job.error || (job.status === 'succeeded' ? (job.kind === 'transcribe' ? t('Voice preparation ready') : t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds})) : `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`);
@@ -522,7 +523,7 @@ async function refresh() {
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
-  renderVoices(); renderJobs(); renderHistory(); renderChannels();
+  renderVoices(); renderJobs(); renderHistory(); renderChannels(); renderDiscordVoices();
   $('hotkey-status').textContent = t(state.hotkey_status);
   await renderChannelState();
 }
@@ -537,6 +538,82 @@ async function resources() {
   $('gpu').textContent = gpu?.utilization_percent == null ? t('N/A') : `${gpu.utilization_percent}%`;
   $('hardware-description').textContent = JSON.stringify(data.hardware, null, 2);
 }
+function renderDiscordStatus() {
+  if (!discordSnapshot) return;
+  $('discord-token-status').textContent = t(discordSnapshot.token_saved ? 'Bot token saved locally' : 'No bot token saved');
+  $('discord-status').textContent = `Discord · ${t(discordSnapshot.status)}`;
+  $('discord-error').hidden = !discordSnapshot.error;
+  $('discord-error').textContent = t(discordSnapshot.error || '');
+  $('discord-invite').hidden = !discordSnapshot.invite_url;
+  if (discordSnapshot.invite_url) $('discord-invite').href = discordSnapshot.invite_url;
+  $('discord-forget').disabled = discordBusy || !discordSnapshot.token_saved;
+}
+function renderDiscordVoices(selected = $('discord-voice').value) {
+  if (!discordSnapshot) return;
+  const ready = state.voices.filter(v => v.status === 'ready');
+  const key = JSON.stringify([window.Locale.language, ready.map(v => [v.id, v.title])]);
+  if (key === discordVoiceKey) return;
+  discordVoiceKey = key;
+  const select = $('discord-voice');
+  select.replaceChildren(el('option', {value: ''}, t('Choose a voice in /tts')), ...ready.map(v => el('option', {value: v.id}, v.title)));
+  if (selected && !ready.some(v => v.id === selected)) select.append(el('option', {value: selected}, t('Saved voice is unavailable')));
+  select.value = selected;
+}
+async function loadDiscord(fill = false) {
+  $('discord-form').hidden = Boolean(session?.remote_access);
+  if (session?.remote_access || discordBusy) return;
+  discordSnapshot = await api('/api/discord');
+  if (fill) {
+    $('discord-enabled').checked = discordSnapshot.enabled;
+    $('discord-guild').value = discordSnapshot.guild_id;
+    $('discord-channels').value = discordSnapshot.channel_ids.join('\n');
+    $('discord-cooldown').value = discordSnapshot.user_cooldown_seconds;
+    $('discord-max-chars').value = discordSnapshot.max_message_chars;
+    $('discord-filter').value = discordSnapshot.filter_level;
+    $('discord-custom').value = discordSnapshot.custom_filters.join('\n');
+    discordVoiceKey = ''; renderDiscordVoices(discordSnapshot.default_voice_id);
+  }
+  renderDiscordStatus();
+}
+async function discordAction(fn) {
+  if (discordBusy) return;
+  discordBusy = true;
+  for (const node of $('discord-form').querySelectorAll('button')) node.disabled = true;
+  try { discordSnapshot = await fn(); renderDiscordStatus(); }
+  catch (e) { $('discord-error').hidden = false; $('discord-error').textContent = t(e.message); }
+  finally {
+    discordBusy = false;
+    for (const node of $('discord-form').querySelectorAll('button')) node.disabled = false;
+    $('discord-forget').disabled = !discordSnapshot?.token_saved;
+  }
+}
+$('discord-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  await discordAction(async () => {
+    const token = $('discord-token').value.trim();
+    if (token) {
+      try { await api('/api/discord/token', {method: 'PUT', body: {token}}); }
+      finally { $('discord-token').value = ''; }
+    }
+    const lines = id => $(id).value.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+    return api('/api/discord/config', {method: 'PUT', body: {
+      enabled: $('discord-enabled').checked, guild_id: $('discord-guild').value.trim(),
+      channel_ids: lines('discord-channels'), default_voice_id: $('discord-voice').value,
+      user_cooldown_seconds: Number($('discord-cooldown').value), max_message_chars: Number($('discord-max-chars').value),
+      filter_level: $('discord-filter').value, custom_filters: lines('discord-custom'),
+    }});
+  });
+});
+$('discord-disconnect').addEventListener('click', () => discordAction(async () => {
+  const {enabled, guild_id, channel_ids, default_voice_id, user_cooldown_seconds, max_message_chars, filter_level, custom_filters} = discordSnapshot;
+  const result = await api('/api/discord/config', {method: 'PUT', body: {enabled: false, guild_id, channel_ids, default_voice_id, user_cooldown_seconds, max_message_chars, filter_level, custom_filters}});
+  $('discord-enabled').checked = false; return result;
+}));
+$('discord-forget').addEventListener('click', () => discordAction(async () => {
+  const result = await api('/api/discord/token', {method: 'DELETE'});
+  $('discord-token').value = ''; $('discord-enabled').checked = false; return result;
+}));
+window.addEventListener('localechange', () => { renderDiscordStatus(); discordVoiceKey = ''; renderDiscordVoices(); });
 async function init() {
   try {
     const shareKey = new URLSearchParams(location.hash.slice(1)).get('admin');
@@ -548,6 +625,7 @@ async function init() {
     session = await api('/api/session'); config = await api('/api/config');
     $('config-device').value = config.device === 'cpu' ? 'cuda' : config.device; $('config-threads').value = config.cpu_threads; $('config-resident').checked = config.keep_model_loaded;
     $('config-vram-warning').value = config.vram_warning_mib ?? 512; $('config-hotkey').value = config.hotkey; $('config-queue').value = config.max_queue;
+    await loadDiscord(true);
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
     await runtimeStatus();
@@ -572,7 +650,7 @@ async function init() {
     }
     $('generate').disabled = !runtimeSetup.ready;
     const loop = async () => { try { if (!setupEventsConnected) await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
-    const monitor = async () => { try { await resources(); await tunnelStatus(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
+    const monitor = async () => { try { await resources(); await tunnelStatus(); await loadDiscord(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
 window.addEventListener('localechange', () => {

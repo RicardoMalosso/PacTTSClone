@@ -1,4 +1,4 @@
-name: Publish validated RC10
+name: Publish validated RC11
 on:
   pull_request:
     types: [closed]
@@ -6,7 +6,7 @@ permissions:
   contents: write
   actions: read
 concurrency:
-  group: release-rc10
+  group: release-rc11
   cancel-in-progress: false
 jobs:
   installer:

@@ -2,6 +2,7 @@ import threading
 import time
 import uuid
 
+from .discord_integration import DiscordIntegration
 from .domain import GenerationRequest, UserError
 from .hotkey import GlobalHotkey
 from .models import AppConfig, ChannelConfig
@@ -36,10 +37,12 @@ class Studio:
         self.client_modes = {}
         self.accounts = TwitchAccounts(service.settings.data_dir, self.authorization_changed)
         self.events = TwitchActions(self)
+        self.discord = DiscordIntegration(service, self.voices)
 
     def start(self):
         self.started = True
         self.hotkey.configure(self.service.config.hotkey)
+        self.discord.start()
         if self.service.setup_ready():
             for channel in self.store.all("channel"):
                 self.connect(channel)
@@ -280,6 +283,7 @@ class Studio:
         return result
 
     def cancel_all(self):
+        self.discord.configure(self.discord.config.model_copy(update={"enabled": False}))
         with self.chat_lock:
             channels = self.store.all("channel")
             for channel in channels:
@@ -292,6 +296,7 @@ class Studio:
 
     def close(self):
         self.started = False
+        self.discord.stop()
         self.accounts.close()
         for client in [*self.clients.values(), *self.event_clients.values()]:
             client.close()

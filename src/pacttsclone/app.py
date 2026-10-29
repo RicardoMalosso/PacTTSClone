@@ -14,7 +14,7 @@ from pydantic import ValidationError
 from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, Engine, GenerationRequest, GenerationSettings, UserError
 from .engine import dependencies_available
-from .models import AppConfig, ChannelConfig
+from .models import AppConfig, ChannelConfig, DiscordConfig
 from .playback import GENERAL_PLAYER
 from .service import GenerationService
 from .setup_runtime import RuntimeSetup
@@ -352,6 +352,36 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.put("/api/config")
     def configure(value: AppConfig):
         return studio.configure(value)
+
+    def discord_owner(request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Discord configuration is host-only.")
+
+    @app.get("/api/discord")
+    def discord_status(request: Request):
+        discord_owner(request)
+        return JSONResponse(studio.discord.snapshot(), headers={"Cache-Control": "no-store"})
+
+    @app.put("/api/discord/config")
+    def discord_config(value: DiscordConfig, request: Request):
+        discord_owner(request)
+        return studio.discord.configure(value)
+
+    @app.put("/api/discord/token")
+    async def discord_token(request: Request):
+        discord_owner(request)
+        try:
+            value = await request.json()
+        except ValueError:
+            raise UserError("Supply only a Discord bot token.") from None
+        if not isinstance(value, dict) or set(value) != {"token"}:
+            raise UserError("Supply only a Discord bot token.")
+        return await asyncio.to_thread(studio.discord.save_token, value["token"])
+
+    @app.delete("/api/discord/token")
+    def discord_forget(request: Request):
+        discord_owner(request)
+        return studio.discord.forget_token()
 
     @app.get("/api/resources")
     def resources():

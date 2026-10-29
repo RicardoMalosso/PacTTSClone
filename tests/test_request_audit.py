@@ -76,6 +76,7 @@ def test_polling_access_filter_keeps_errors_and_generation_requests():
         )
 
     assert not filter_.filter(record("/api/state", 200))
+    assert not filter_.filter(record("/api/discord", 200))
     assert not filter_.filter(record("/api/channels/playbackMain/player/tick", 200))
     assert filter_.filter(record("/api/session", 403))
     assert filter_.filter(record("/api/jobs", 202))

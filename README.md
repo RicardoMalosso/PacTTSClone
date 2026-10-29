@@ -197,6 +197,21 @@ The basic PT/EN word filter cannot enforce every Twitch policy or detect all
 obfuscation/context. Custom blocked phrases are checked before generation. Each
 channel has its own settings; the mandatory basic slur list cannot be disabled.
 
+## Discord integration
+
+Available in RC11 and later. The RC10 installer does not include Discord integration.
+
+Open **Configuration → Discord integration** to save your own bot token locally,
+enter your Discord server ID, choose a ready default voice and enable the bot.
+Use the generated invite link to add it to that server. `/tts` generates an MP3
+on your PC and posts it in Discord; `/voices` lists ready voices. Saved voice
+language and generation settings apply automatically. PacTTSClone must stay open.
+
+Token controls are host-only; Windows protects the saved token with DPAPI.
+Optional channel restrictions, filters and cooldowns protect the shared queue.
+No public endpoint or privileged Discord intents are needed. See
+[Discord setup, permissions and limits](docs/discord.md) for the complete setup.
+
 ## General OBS player / testing
 
 Use **http://127.0.0.1:7860/playbackMain** as an OBS Browser Source without Twitch.

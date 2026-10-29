@@ -466,3 +466,21 @@ to Automatic and ignoring obsolete browser-only language preferences.
 The RC10 owner-authorized publication workflow retains full cross-platform tests
 and Windows installer acceptance, then verifies target and uploaded asset digests
 before publishing a separate prerelease. No physical GPU quality claim is made.
+
+## Discord integration validation — 2026-10-28
+
+`tests/test_discord.py` covers local credential persistence/removal, DPAPI dispatch
+with a simulated protector, malformed-secret redaction, host/tunnel/CSRF
+boundaries, setup gating, default-voice inheritance, Discord identity, moderation,
+cooldown/deduplication, server/channel/DM rejection, command registration and
+first-install invitation, deferred MP3 upload, attachment limits, interaction
+timeout, disconnect/cancel-all and sanitized connection failures. Gateway/API
+operations and inference are simulated; FFmpeg output is real. Chromium checks
+password clearing, settings/reload/draft preservation, invitation/disconnect,
+local-token removal, PT-BR labels, mobile overflow and hidden remote settings.
+Live Discord and actual Windows DPAPI/GPU acceptance remain separate.
+
+Follow-up regressions cover Gateway resume status (including a late resume after
+stop), cancellation during threaded submission and while waiting for generation,
+and a failed Discord upload retaining the completed local MP3. All run against
+simulated Discord; cancellation tests control thread timing explicitly.

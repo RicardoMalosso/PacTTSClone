@@ -18,6 +18,7 @@ class PollingAccessFilter(logging.Filter):
                 "/api/state",
                 "/api/resources",
                 "/api/tunnel",
+                "/api/discord",
                 "/api/setup",
                 "/api/session",
             } or path.endswith("/player/tick")

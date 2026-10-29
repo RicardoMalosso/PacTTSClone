@@ -297,3 +297,16 @@ RC10 publication is explicitly authorized by the owner. The publish-release merg
 label runs the complete suite and Windows installer acceptance, creates a separate
 RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
 publishes it as a prerelease. Previous release assets are never replaced.
+
+## Discord local ownership — 2026-10-28
+
+The user authorized an installation-specific bot token stored locally. Each
+installation uses its own dedicated Discord application; no developer bot token
+is distributed. Reuse existing DPAPI protection and a separate 0600 credential
+file, and expose only a saved/not-saved flag to the browser. A dedicated
+discord.py Gateway client handles heartbeat/reconnect/protocol details; no new
+handwritten Discord transport, tunnel or public interaction endpoint. Start with
+guild-only slash commands returning MP3 attachments, sharing the existing local
+queue and saved voice defaults. Voice-channel audio and automatic output
+forwarding are excluded from this first increment. This explicit request permits
+Discord posting while preserving Twitch's no-chat-posting behavior.
