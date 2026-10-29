@@ -623,3 +623,55 @@ recorded with the PR. Tests use fake inference, not a physical NVIDIA quality or
 performance measurement. Cross-platform CI and actual Windows installer acceptance
 must pass before owner-authorized RC10 publication. Uploaded release asset sizes,
 SHA-256 digests and target commit are checked before the draft becomes public.
+
+## Local Discord integration — 2026-10-28
+
+Added opt-in Configuration controls for a locally saved bot token, one server,
+optional channel restrictions, default voice, filters, text limits and cooldowns.
+Windows uses existing user-bound DPAPI; other systems use a 0600 credential file.
+Host-only APIs never return the token; shared admins cannot read/change settings.
+The installer dependency list includes discord.py and its runtime import check.
+
+A dedicated Gateway client registers `/tts` and `/voices` without privileged
+intents or a public endpoint. Speech shares the existing local worker and saved
+voice language/settings, with Discord-origin audit records and no implicit OBS
+queueing. First login produces an invite link; guild join syncs commands.
+Disconnect/reconfigure/remove/cancel-all/shutdown cancel undelivered work;
+interaction timeouts cancel generation and upload failures retain local MP3s.
+
+Validation: 238 core tests passed; Ruff, Python compilation, JavaScript syntax,
+diff checks and wheel build passed. The built wheel contains the Discord modules
+and dependency metadata. Credential/API/Gateway tests use simulated Discord and
+fake inference with real FFmpeg MP3 output; DPAPI dispatch is simulated locally.
+Actual Discord authorization/delivery, Windows DPAPI, a new Windows installer
+and GPU performance remain unverified for this change. Existing published RC10
+assets are unchanged; this source change is not a release.
+
+Chromium: all 36 tests passed in the final full run. Desktop and 390 px mobile
+Discord settings were visually inspected. One earlier existing requester-name
+initialization test timed out, then passed both a focused recheck and the full
+rerun. New coverage includes token clearing/removal, settings persistence,
+connection controls, PT-BR labels, draft preservation and hidden remote controls.
+
+## Discord continuation — 2026-10-29
+
+Recovered the existing implementation on current RC10 main and reviewed its
+lifecycle. Fixed Gateway resume leaving the UI at reconnecting, and cancelled
+command delivery leaving generation orphaned when threaded submission completes
+after cancellation. Shutdown drains command cleanup before closing the client;
+failed uploads still retain completed audio in local History.
+
+Validation: 242 backend tests and all 36 Chromium tests passed. The 39 Discord
+tests include controlled cancellation races, resume status and failed-upload
+retention. Ruff, Python compilation, JavaScript syntax, diff checks and wheel
+build passed; wheel modules and discord.py dependency metadata were verified.
+Discord/API and inference remain simulated, with real FFmpeg output. Live bot
+delivery, physical GPU behavior and a new Windows installer remain unverified.
+This is source implementation work, not a new release or replacement RC10 asset.
+
+## RC11 release preparation — 2026-10-29
+
+Owner requested the Discord release. Versioned application/runtime/installer as
+RC11 and updated the existing gated publication workflow and release notes.
+Publication requires full cross-platform checks, Windows installer acceptance
+and asset digest verification; previous RC10 assets remain unchanged.

@@ -107,7 +107,7 @@ class GenerationService:
         with (self.logs / "requests.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps({"event": event, **record}, ensure_ascii=False) + "\n")
 
-    def reject_request(self, text, reason, *, channel, username, voice_id=None):
+    def reject_request(self, text, reason, *, channel, username, voice_id=None, identity=None):
         with self._lock:
             record = {
                 "id": uuid.uuid4().hex,
@@ -122,7 +122,7 @@ class GenerationService:
                 "voice_id": voice_id,
                 "username": username,
                 "output_url": None,
-                **self.identity("twitch", username, source=channel),
+                **(identity or self.identity("twitch", username, source=channel)),
             }
             self._audit("blocked", record)
 

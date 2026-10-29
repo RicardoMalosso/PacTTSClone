@@ -188,3 +188,15 @@ RC10 publication is explicitly authorized by the owner. The publish-release merg
 label runs the complete suite and Windows installer acceptance, creates a separate
 RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
 publishes it as a prerelease. Previous release assets are never replaced.
+
+## Local Discord integration — 2026-10-28
+
+The owner explicitly requested local bot-token configuration and Discord
+integration. This adds opt-in Discord MP3 posting to the earlier no-chat-posting
+scope; Twitch stays read-only. Host-only settings persist one bot token with
+Windows DPAPI/0600 protection, enabled state, one permitted server, optional
+channel IDs, default ready voice, filters, text limit and cooldown. `/tts` and
+`/voices` use Gateway slash commands without privileged intents or a public
+endpoint. Generation stays isolated in the existing worker and inherits saved
+voice settings. Disconnect/remove/cancel-all/shutdown close the connection and
+cancel undelivered generation. See [Discord contract](discord.md).

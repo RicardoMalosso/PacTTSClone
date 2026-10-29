@@ -126,3 +126,10 @@ and voice/chat/history tabs remain gated by verified setup readiness. See
 [optional import contract](optional-imports.md) for compatibility checks, backups,
 conflict handling, host-only endpoints, cancellation and validation. This supersedes
 earlier wording that locked every tab except Initial Setup.
+
+## Added Discord scope — 2026-10-28
+
+The user's local-token integration request adds a dedicated opt-in Discord bot
+with `/tts` MP3 replies and `/voices`, local inference, protected host-only token
+settings and server/channel restrictions. This supersedes the no-posting
+exclusion only for Discord. See [discord.md](discord.md).

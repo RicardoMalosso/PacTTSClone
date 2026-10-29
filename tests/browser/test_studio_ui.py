@@ -704,6 +704,9 @@ def test_shared_admin_voices_history_scoped_obs_and_revocation(browser, live_ser
         page.wait_for_timeout(1200)
         assert not any("/player/tick" in u for u in requests[before:])
         assert not any("/api/setup" in u or "/api/tunnel" in u for u in requests)
+        open_tab(page, "Configuration")
+        expect(page.locator("#discord-form")).to_be_hidden()
+        assert not any("/api/discord" in u for u in requests)
     finally:
         for context in contexts:
             context.unroute_all(behavior="ignoreErrors")

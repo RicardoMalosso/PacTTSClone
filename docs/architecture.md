@@ -311,3 +311,21 @@ RC10 publication is explicitly authorized by the owner. The publish-release merg
 label runs the complete suite and Windows installer acceptance, creates a separate
 RC10 draft, verifies its target and uploaded asset sizes/SHA-256 digests, then
 publishes it as a prerelease. Previous release assets are never replaced.
+
+## Discord adapter — 2026-10-28
+
+Studio owns DiscordIntegration, with its own bounded-lifecycle asyncio/Gateway
+thread using discord.py. DiscordBot registers guild-only `/tts` and `/voices`,
+defers generation interactions and polls the existing GenerationService for a
+terminal result before uploading its MP3. It receives only the Guilds intent;
+message-content/member/presence intents are unnecessary. Saved voice defaults,
+request auditing and cancellation remain shared with Local/Twitch. Discord jobs
+carry an explicit origin, never a Twitch playback destination. Credentials stay
+outside SQLite; host-only APIs and tunnel ACLs prevent shared administration from
+reading or altering them. Settings are available before model setup; connection
+waits for readiness. No hosted service/public route is added. See [discord.md](discord.md).
+
+Discord lifecycle follow-up (2026-10-29): shield asynchronous queue submission
+so cancellation retains the allocated job ID and cancels unfinished generation.
+Client close drains command tasks before closing the Gateway. A resumed session
+restores connected status through `on_resumed`, without depending on `on_ready`.
