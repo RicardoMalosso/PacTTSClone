@@ -123,3 +123,17 @@ def test_long_reference_is_cropped_to_exactly_thirty_seconds(long_mp3, tmp_path)
     assert AudioPipeline(Settings()).decode(long_mp3, destination) is True
     assert sf.info(destination).duration == 30
     assert AudioPipeline(Settings()).decode(long_mp3, destination) is True
+
+
+@pytest.mark.parametrize('volume,gain', [(0, 0), (50, 0.5), (100, 1), (200, 2)])
+def test_output_volume_changes_encoded_signal(tmp_path, volume, gain):
+    rate = 24000
+    samples = (0.1 * np.sin(2 * np.pi * 440 * np.arange(rate) / rate)).astype(np.float32)
+    pipeline = AudioPipeline(Settings(data_dir=tmp_path))
+    output = tmp_path / 'volume.mp3'
+    pipeline.encode(Waveform(samples, rate), tmp_path, output, volume=volume)
+    decoded, _ = sf.read(output)
+    rms = np.sqrt(np.mean(decoded ** 2))
+    expected = np.sqrt(np.mean(samples ** 2)) * gain
+    assert rms == pytest.approx(expected, rel=0.08, abs=0.0001)
+    assert np.max(np.abs(samples)) <= 0.101  # Reference/model buffer is not mutated.

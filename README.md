@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-0.3.0-rc.10.exe` in the [RC10 prerelease](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v0.3.0-rc.10). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+`PacTTSClone-Setup-2.0.0.exe` in the [v2 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.0.0). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -61,12 +61,10 @@ Next disabled. Use **Open setup log**, Back to retry, or Cancel to exit. Install
 failure does not require restarting Windows. An early failure may save
 `setup-error.log` at the root if `data/logs/setup.log` could not be created.
 
-Upgrade: stop the app with Ctrl+C, run the newer installer and keep the same data
-folder. Existing voices, audio and settings are preserved. Previous custom/legacy data
-locations remain selected; setup does not silently move or delete that data. Uninstall removes the
-application/runtime and leaves the data folder intact. Open **Uninstall PacTTSClone**
-from the Start Menu or application folder, or use Windows Installed Apps; delete that folder
-manually only if you also want to remove your recordings and models.
+Upgrade from an older version: stop the app and install v2 once using the same
+installation/data folders. Later compatible application releases download automatically;
+close and reopen the app to activate. Existing voices, audio, models and settings
+are preserved. Uninstall retains the data directory.
 
 Large caches use the chosen data drive; the setup executable and Windows may still
 create small temporary files or installer metadata on the system drive. Setup does
@@ -86,11 +84,13 @@ in offline mode. Startup performs a lightweight existence/size check; rerunning
 Initial Setup performs the full hashes again. It does not promise zero HTTP
 requests for package version/index checks.
 
-An updater is **not implemented**. For now, stop the app and run a newer installer
-with the same data folder. A future update feature should check a versioned release
-manifest, stage and verify the new application, preserve data, stop the old process,
-and offer rollback. Private release authentication and unsigned Windows binaries
-must be handled before unattended updating is offered.
+Installer installations automatically check GitHub releases at startup and every six
+hours. A verified application wheel downloads without the installer; close the app
+and reopen it to activate. Configuration → Application updates shows progress/errors
+and offers a manual check. Models, CUDA and user data stay in place. Stable versions
+ignore release candidates; RC installations follow newer RCs and stable releases.
+The first version containing this updater must be installed once. Source checkouts
+continue to use Git. See [update protocol and recovery](docs/auto-updates.md).
 
 FFmpeg publishes source, not Windows executables. RC5 uses the Windows Essentials
 build from [Gyan Doshi](https://www.gyan.dev/ffmpeg/builds/), a distributor linked
@@ -197,20 +197,19 @@ The basic PT/EN word filter cannot enforce every Twitch policy or detect all
 obfuscation/context. Custom blocked phrases are checked before generation. Each
 channel has its own settings; the mandatory basic slur list cannot be disabled.
 
-## Discord integration
+## Discord webhook integration
 
-Available in RC11 and later. The RC10 installer does not include Discord integration.
+Open **Configuration → Discord integration → How to configure Discord** for
+button-by-button setup. In Discord: **Server Settings → Integrations → Webhooks →
+New Webhook**, choose the destination channel, then **Copy Webhook URL**. Paste it
+into PacTTSClone, save and use **Send test message**. Select local and/or Twitch
+outputs, optionally filter Twitch channels and voice IDs, enable and save.
 
-Open **Configuration → Discord integration** to save your own bot token locally,
-enter your Discord server ID, choose a ready default voice and enable the bot.
-Use the generated invite link to add it to that server. `/tts` generates an MP3
-on your PC and posts it in Discord; `/voices` lists ready voices. Saved voice
-language and generation settings apply automatically. PacTTSClone must stay open.
-
-Token controls are host-only; Windows protects the saved token with DPAPI.
-Optional channel restrictions, filters and cooldowns protect the shared queue.
-No public endpoint or privileged Discord intents are needed. See
-[Discord setup, permissions and limits](docs/discord.md) for the complete setup.
+Only newly completed speech is mirrored. A webhook posts MP3s; it cannot read
+Discord messages or accept `!lula` or `/tts` commands. The old bot/token integration
+is removed, including legacy saved bot credentials. URLs stay local, protected by
+DPAPI on Windows, and are never exposed to shared administrators or imports.
+Upload failures are visible; audio remains in History. See [Discord webhooks](docs/discord.md).
 
 ## General OBS player / testing
 
@@ -446,3 +445,12 @@ The player still requests autoplay 200 milliseconds after opening.
 RC9 packaging runs the existing Windows installer acceptance after the tested
 PR is merged with the `prepare-release` label. It creates a distinct RC9
 draft prerelease and never overwrites or auto-publishes previous release assets.
+
+### Voice settings help
+
+Open **Voices → Voice generation defaults** to change a voice, then click
+**Save generation defaults**. Hover over a control or its label for an explanation in English
+or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
+50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
+Boosting too much can distort loud peaks. Local generation can override saved
+settings for one request; existing recordings keep their original volume.

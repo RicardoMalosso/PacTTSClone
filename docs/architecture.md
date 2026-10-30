@@ -329,3 +329,12 @@ Discord lifecycle follow-up (2026-10-29): shield asynchronous queue submission
 so cancellation retains the allocated job ID and cancels unfinished generation.
 Client close drains command tasks before closing the Gateway. A resumed session
 restores connected status through `on_resumed`, without depending on `on_ready`.
+
+## Per-voice output volume
+
+GenerationSettings includes `volume` (0–300 percent, default 100). Saved voice
+presets inherit it for local and integration requests; local jobs may override it.
+The worker applies linear amplitude gain after synthesis and before MP3 encoding,
+using the same output path for every consumer. The reference and model input are
+unchanged. Samples are clipped to the existing PCM range; extreme boosts may
+distort peaks. Previously generated MP3s are not reprocessed.

@@ -159,38 +159,16 @@ class ChannelConfig(BaseModel):
 
 
 class DiscordConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    model_config = ConfigDict(extra="forbid")
     enabled: bool = False
-    guild_id: str = ""
-    channel_ids: list[str] = Field(default_factory=list, max_length=50)
-    default_voice_id: str = Field(default="", max_length=100)
-    user_cooldown_seconds: float = Field(default=15, ge=0, le=600)
-    max_message_chars: int = Field(default=300, ge=1, le=2000)
-    filter_level: str = "slurs"
-    custom_filters: list[str] = Field(default_factory=list, max_length=200)
+    include_local: bool = True
+    include_twitch: bool = False
+    channels: list[str] = Field(default_factory=list, max_length=100)
+    voice_ids: list[str] = Field(default_factory=list, max_length=100)
 
-    @field_validator("guild_id")
+    @field_validator("channels", "voice_ids")
     @classmethod
-    def guild_valid(cls, value):
-        if value and (not re.fullmatch(r"[1-9][0-9]{0,19}", value) or not int(value) < 2**64):
-            raise ValueError("Enter a Discord server ID, not its name or invite link.")
-        return value
-
-    @field_validator("channel_ids")
-    @classmethod
-    def channels_valid(cls, values):
-        for value in values:
-            if not value:
-                raise ValueError("Enter Discord channel IDs.")
-            cls.guild_valid(value)
-        return list(dict.fromkeys(values))
-
-    @field_validator("filter_level")
-    @classmethod
-    def filter_valid(cls, value):
-        return ChannelConfig.filter_valid(value)
-
-    @field_validator("custom_filters")
-    @classmethod
-    def filters_valid(cls, values):
-        return ChannelConfig.filters_valid(values)
+    def clean_filters(cls, values):
+        if any(not value or len(value) > 100 for value in values):
+            raise ValueError("Use nonempty channel names or voice IDs, up to 100 characters each.")
+        return list(dict.fromkeys(value.strip() for value in values))

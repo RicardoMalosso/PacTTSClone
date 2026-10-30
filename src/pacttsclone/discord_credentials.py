@@ -1,4 +1,4 @@
-"""Local bot credential, kept outside SQLite, imports, API snapshots and logs."""
+"""Local webhook credential, kept outside SQLite, imports, API snapshots and logs."""
 
 import base64
 import json
@@ -8,9 +8,9 @@ from .domain import UserError
 from .twitch_oauth import _protect
 
 
-class DiscordCredential:
+class DiscordWebhookCredential:
     def __init__(self, data_dir):
-        self.path = data_dir / "credentials" / "discord.json"
+        self.path = data_dir / "credentials" / "discord-webhook.json"
         self.path.parent.mkdir(mode=0o700, exist_ok=True)
         self.token = ""
         self.error = None
@@ -25,16 +25,16 @@ class DiscordCredential:
         except FileNotFoundError:
             pass
         except (OSError, ValueError, KeyError, TypeError):
-            self.error = "Saved Discord token could not be read. Save it again."
+            self.error = "Saved Discord webhook could not be read. Save it again."
 
     def save(self, token):
-        # Never reflect even malformed credentials through validation errors.
-        if (
-            not isinstance(token, str)
-            or not 20 <= len(token.strip()) <= 256
-            or any(c.isspace() for c in token.strip())
+        import re
+
+        # Restrict the authority/path; credentials must never reach arbitrary hosts.
+        if not isinstance(token, str) or not re.fullmatch(
+            r"https://discord\.com/api/webhooks/[0-9]{1,20}/[A-Za-z0-9_-]{20,200}", token.strip()
         ):
-            raise UserError("Enter a Discord bot token, without the Bot prefix.")
+            raise UserError("Paste a Discord webhook URL copied from Server Settings.")
         token = token.strip()
         data = token.encode()
         mode = "dpapi" if os.name == "nt" else "permissions"
@@ -49,7 +49,7 @@ class DiscordCredential:
                 temporary.chmod(0o600)
             temporary.replace(self.path)
         except OSError:
-            raise UserError("Could not save the Discord token locally.") from None
+            raise UserError("Could not save the Discord webhook locally.") from None
         finally:
             temporary.unlink(missing_ok=True)
         self.token, self.error = token, None
@@ -58,5 +58,5 @@ class DiscordCredential:
         try:
             self.path.unlink(missing_ok=True)
         except OSError:
-            raise UserError("Could not remove the saved Discord token.") from None
+            raise UserError("Could not remove the saved Discord webhook.") from None
         self.token, self.error = "", None

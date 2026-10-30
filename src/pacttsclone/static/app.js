@@ -8,7 +8,7 @@ const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 let session, state = {jobs: [], voices: [], channels: []}, config;
-let discordSnapshot = null, discordBusy = false, discordVoiceKey = '';
+let discordSnapshot = null, discordBusy = false;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
 let bugVideoTimer = null, bugLinkTimer = null, bugVideoOpen = false;
 let completedJob = null;
@@ -251,9 +251,10 @@ async function watch(id) {
     await sleep(500);
   }
 }
-const defaultGenerationSettings = Object.freeze({language: 'auto', speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
+const defaultGenerationSettings = Object.freeze({language: 'auto', volume: 100, speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
 const generationFields = [
   ['language', 'Language', 'select'],
+  ['volume', 'Output volume (%)', 'number', '0', '300', '5'],
   ['speed', 'Speed', 'number', '0.5', '1.5', '0.05'],
   ['duration', 'Duration (seconds)', 'number', '0.5', '120', '0.1'],
   ['steps', 'Inference Steps', 'number', '4', '64', '1'],
@@ -262,6 +263,26 @@ const generationFields = [
   ['preprocess_prompt', 'Preprocess Prompt', 'checkbox'],
   ['postprocess_output', 'Postprocess Output', 'checkbox']
 ];
+const generationHelp = {
+  "language": "Automatic lets the model choose the speech language. Select Portuguese or English to force it; this does not translate the text.",
+  "volume": "100% keeps the original level; 50% halves the signal amplitude; 200% doubles it. 0% mutes. Large boosts can distort loud peaks. Applies to new MP3s, including OBS and Discord playback; existing files stay unchanged.",
+  "speed": "1.0 is normal; below 1 is slower; above 1 is faster. Ignored when Duration is set.",
+  "duration": "Leave blank for natural timing controlled by Speed. A number requests a fixed length in seconds and overrides Speed; extreme lengths may sound unnatural.",
+  "steps": "Number of generation steps. Default 32; fewer steps are faster, more steps take longer. More steps do not guarantee better audio.",
+  "guidance_scale": "How strongly generation follows the conditioning (text and reference voice). Default 2.0. Higher is not always better; start with the default.",
+  "denoise": "Enables the model’s audio denoising. Usually leave enabled; compare with it off if the voice sounds processed.",
+  "preprocess_prompt": "Trims silence from the reference audio and adds ending punctuation to its transcript when needed. Does not edit your saved reference file.",
+  "postprocess_output": "Removes long silences from generated speech. Disable if you want to retain those pauses."
+};
+for (const [key, explanation] of Object.entries(generationHelp)) {
+  const input = $('generate-form').querySelector(`[data-setting="${key}"]`);
+  if (input) {
+    input.closest('label').classList.add('generation-setting');
+    input.title = t(explanation);
+    input.setAttribute('aria-description', t(explanation));
+    input.closest('label').title = t(explanation);
+  }
+}
 function voiceGenerationSettings(voice) { return {...defaultGenerationSettings, ...(voice?.generation_settings || {})}; }
 function settingsControls(container) {
   return Object.fromEntries(generationFields.map(([key]) => [key, container.querySelector(`[data-setting="${key}"]`)]));
@@ -334,6 +355,10 @@ function createVoiceSettingsEditor(voice) {
     const labelNode = type === 'checkbox'
       ? el('label', {class: 'check'}, input, ' ', t(label))
       : el('label', {}, t(label), input);
+    labelNode.classList.add('generation-setting');
+    labelNode.title = t(generationHelp[key]);
+    input.title = t(generationHelp[key]);
+    input.setAttribute('aria-description', t(generationHelp[key]));
     container.append(labelNode);
   }
   const editor = el('details', {class: 'voice-generation-settings'},
@@ -523,7 +548,7 @@ async function refresh() {
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
-  renderVoices(); renderJobs(); renderHistory(); renderChannels(); renderDiscordVoices();
+  renderVoices(); renderJobs(); renderHistory(); renderChannels();
   $('hotkey-status').textContent = t(state.hotkey_status);
   await renderChannelState();
 }
@@ -540,24 +565,11 @@ async function resources() {
 }
 function renderDiscordStatus() {
   if (!discordSnapshot) return;
-  $('discord-token-status').textContent = t(discordSnapshot.token_saved ? 'Bot token saved locally' : 'No bot token saved');
+  $('discord-token-status').textContent = t(discordSnapshot.webhook_saved ? 'Webhook saved locally' : 'No webhook saved');
   $('discord-status').textContent = `Discord · ${t(discordSnapshot.status)}`;
   $('discord-error').hidden = !discordSnapshot.error;
   $('discord-error').textContent = t(discordSnapshot.error || '');
-  $('discord-invite').hidden = !discordSnapshot.invite_url;
-  if (discordSnapshot.invite_url) $('discord-invite').href = discordSnapshot.invite_url;
-  $('discord-forget').disabled = discordBusy || !discordSnapshot.token_saved;
-}
-function renderDiscordVoices(selected = $('discord-voice').value) {
-  if (!discordSnapshot) return;
-  const ready = state.voices.filter(v => v.status === 'ready');
-  const key = JSON.stringify([window.Locale.language, ready.map(v => [v.id, v.title])]);
-  if (key === discordVoiceKey) return;
-  discordVoiceKey = key;
-  const select = $('discord-voice');
-  select.replaceChildren(el('option', {value: ''}, t('Choose a voice in /tts')), ...ready.map(v => el('option', {value: v.id}, v.title)));
-  if (selected && !ready.some(v => v.id === selected)) select.append(el('option', {value: selected}, t('Saved voice is unavailable')));
-  select.value = selected;
+  $('discord-forget').disabled = discordBusy || !discordSnapshot.webhook_saved;
 }
 async function loadDiscord(fill = false) {
   $('discord-form').hidden = Boolean(session?.remote_access);
@@ -565,13 +577,10 @@ async function loadDiscord(fill = false) {
   discordSnapshot = await api('/api/discord');
   if (fill) {
     $('discord-enabled').checked = discordSnapshot.enabled;
-    $('discord-guild').value = discordSnapshot.guild_id;
-    $('discord-channels').value = discordSnapshot.channel_ids.join('\n');
-    $('discord-cooldown').value = discordSnapshot.user_cooldown_seconds;
-    $('discord-max-chars').value = discordSnapshot.max_message_chars;
-    $('discord-filter').value = discordSnapshot.filter_level;
-    $('discord-custom').value = discordSnapshot.custom_filters.join('\n');
-    discordVoiceKey = ''; renderDiscordVoices(discordSnapshot.default_voice_id);
+    $('discord-local').checked = discordSnapshot.include_local;
+    $('discord-twitch').checked = discordSnapshot.include_twitch;
+    $('discord-channels').value = discordSnapshot.channels.join('\n');
+    $('discord-voices').value = discordSnapshot.voice_ids.join('\n');
   }
   renderDiscordStatus();
 }
@@ -584,36 +593,36 @@ async function discordAction(fn) {
   finally {
     discordBusy = false;
     for (const node of $('discord-form').querySelectorAll('button')) node.disabled = false;
-    $('discord-forget').disabled = !discordSnapshot?.token_saved;
+    $('discord-forget').disabled = !discordSnapshot?.webhook_saved;
   }
 }
 $('discord-form').addEventListener('submit', async event => {
   event.preventDefault();
   await discordAction(async () => {
-    const token = $('discord-token').value.trim();
-    if (token) {
-      try { await api('/api/discord/token', {method: 'PUT', body: {token}}); }
-      finally { $('discord-token').value = ''; }
+    const url = $('discord-webhook').value.trim();
+    if (url) {
+      try { await api('/api/discord/webhook', {method: 'PUT', body: {url}}); }
+      finally { $('discord-webhook').value = ''; }
     }
     const lines = id => $(id).value.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
     return api('/api/discord/config', {method: 'PUT', body: {
-      enabled: $('discord-enabled').checked, guild_id: $('discord-guild').value.trim(),
-      channel_ids: lines('discord-channels'), default_voice_id: $('discord-voice').value,
-      user_cooldown_seconds: Number($('discord-cooldown').value), max_message_chars: Number($('discord-max-chars').value),
-      filter_level: $('discord-filter').value, custom_filters: lines('discord-custom'),
+      enabled: $('discord-enabled').checked, include_local: $('discord-local').checked,
+      include_twitch: $('discord-twitch').checked, channels: lines('discord-channels'),
+      voice_ids: lines('discord-voices'),
     }});
   });
 });
+$('discord-test').addEventListener('click', () => discordAction(() => api('/api/discord/test', {method: 'POST'})));
 $('discord-disconnect').addEventListener('click', () => discordAction(async () => {
-  const {enabled, guild_id, channel_ids, default_voice_id, user_cooldown_seconds, max_message_chars, filter_level, custom_filters} = discordSnapshot;
-  const result = await api('/api/discord/config', {method: 'PUT', body: {enabled: false, guild_id, channel_ids, default_voice_id, user_cooldown_seconds, max_message_chars, filter_level, custom_filters}});
+  const {enabled, include_local, include_twitch, channels, voice_ids} = discordSnapshot;
+  const result = await api('/api/discord/config', {method: 'PUT', body: {enabled: false, include_local, include_twitch, channels, voice_ids}});
   $('discord-enabled').checked = false; return result;
 }));
 $('discord-forget').addEventListener('click', () => discordAction(async () => {
-  const result = await api('/api/discord/token', {method: 'DELETE'});
-  $('discord-token').value = ''; $('discord-enabled').checked = false; return result;
+  const result = await api('/api/discord/webhook', {method: 'DELETE'});
+  $('discord-webhook').value = ''; $('discord-enabled').checked = false; return result;
 }));
-window.addEventListener('localechange', () => { renderDiscordStatus(); discordVoiceKey = ''; renderDiscordVoices(); });
+window.addEventListener('localechange', renderDiscordStatus);
 async function init() {
   try {
     const shareKey = new URLSearchParams(location.hash.slice(1)).get('admin');
@@ -1117,3 +1126,15 @@ function renderOptionalImport(data) {
   }
   $('optional-import-result').replaceChildren(...notes.map(note => el('p', {class: 'muted'}, note)));
 }
+
+async function refreshUpdates(check = false) {
+  $('updates-card').hidden = Boolean(session?.remote_access);
+  if (!session || session.remote_access) return;
+  try {
+    const value = await api('/api/updates' + (check ? '/check' : ''), check ? {method: 'POST'} : {});
+    $('update-status').textContent = `${value.version} · ${t(value.status)}${value.next_version ? ' · ' + value.next_version : ''}${value.error ? ' · ' + value.error : ''}`;
+  } catch (_) { /* Host-only controls are unavailable to shared administrators. */ }
+}
+$('update-check').onclick = () => refreshUpdates(true);
+setInterval(() => refreshUpdates(), 30000);
+refreshUpdates();

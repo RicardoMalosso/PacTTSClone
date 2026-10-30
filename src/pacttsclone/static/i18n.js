@@ -1,6 +1,51 @@
 'use strict';
 (() => {
   const pt = {
+    "Automatically post selected generated MP3s to a Discord channel. Webhooks cannot read messages or accept TTS commands.": "Publique automaticamente MP3s gerados selecionados em um canal do Discord. Webhooks não leem mensagens nem recebem comandos de TTS.",
+    "How to configure Discord": "Como configurar o Discord",
+    "In Discord, open Server Settings → Integrations → Webhooks.": "No Discord, abra Configurações do servidor → Integrações → Webhooks.",
+    "Click New Webhook, choose the destination channel, then Copy Webhook URL.": "Clique em Novo webhook, escolha o canal e depois Copiar URL do webhook.",
+    "Paste the URL below and save it. Click Send test message to check delivery.": "Cole a URL abaixo e salve. Clique em Enviar mensagem de teste para verificar a entrega.",
+    "Select which outputs to mirror, enable the integration, and save.": "Selecione quais saídas espelhar, ative a integração e salve.",
+    "Manage Webhooks permission is required. Keep the URL private: it allows posting to the channel.": "É necessária a permissão Gerenciar webhooks. Mantenha a URL privada: ela permite publicar no canal.",
+    "Webhook URL": "URL do webhook",
+    "Leave blank to keep the saved webhook. Stored locally, protected with Windows DPAPI on Windows; never returned to the browser.": "Deixe vazio para manter o webhook salvo. Armazenado localmente, protegido com DPAPI no Windows; nunca retornado ao navegador.",
+    "Mirror local generations": "Espelhar gerações locais",
+    "Mirror Twitch generations": "Espelhar gerações da Twitch",
+    "Twitch channel names · one per line; blank includes all enabled channels": "Nomes de canais Twitch · um por linha; vazio inclui todos os canais habilitados",
+    "Voice IDs · one per line; blank includes all voices": "IDs de vozes · um por linha; vazio inclui todas as vozes",
+    "Only newly completed speech is uploaded. Existing history, reference audio, failed and cancelled jobs are never uploaded. Uploads are limited to 10 MiB. A request already sending may finish after disabling.": "Somente novas falas concluídas são enviadas. Histórico existente, referências, falhas e cancelamentos nunca são enviados. Limite de 10 MiB. Um envio em andamento pode terminar após desativar.",
+    "Save Discord settings": "Salvar configurações do Discord",
+    "Send test message": "Enviar mensagem de teste",
+    "Disable Discord": "Desativar Discord",
+    "Remove saved webhook": "Remover webhook salvo",
+    "Webhook saved locally": "Webhook salvo localmente",
+    "No webhook saved": "Nenhum webhook salvo",
+    "enabled": "Ativado",
+    "disabled": "Desativado",
+    "test_sent": "Mensagem de teste enviada",
+    "sent": "Enviado",
+    "sending": "Enviando",
+
+    "Application updates": "Atualizações do aplicativo",
+    "Check for updates": "Verificar atualizações",
+    "New releases download automatically every six hours. Close PacTTSClone and open it again to apply an update. Models, CUDA packages, voices and settings are preserved.": "Novas versões são baixadas automaticamente a cada seis horas. Feche e abra o PacTTSClone para aplicar a atualização. Modelos, pacotes CUDA, vozes e configurações são preservados.",
+    "restart_required": "Atualização pronta; feche e abra o aplicativo",
+    "source_install": "Instalação pelo código-fonte; atualize pelo Git",
+    "up_to_date": "Atualizado",
+    "checking": "Verificando",
+    "downloading": "Baixando",
+    "Output volume (%)": "Volume de saída (%)",
+    "Automatic lets the model choose the speech language. Select Portuguese or English to force it; this does not translate the text.": "Automático deixa o modelo escolher o idioma da fala. Selecione português ou inglês para fixá-lo; isso não traduz o texto.",
+    "100% keeps the original level; 50% halves the signal amplitude; 200% doubles it. 0% mutes. Large boosts can distort loud peaks. Applies to new MP3s, including OBS and Discord playback; existing files stay unchanged.": "100% mantém o nível original; 50% reduz a amplitude pela metade; 200% dobra. 0% silencia. Aumentos altos podem distorcer picos. Vale para novos MP3s, incluindo reprodução no OBS e Discord; arquivos existentes não mudam.",
+    "1.0 is normal; below 1 is slower; above 1 is faster. Ignored when Duration is set.": "1.0 é normal; abaixo de 1 é mais lento; acima de 1 é mais rápido. Ignorado quando a Duração está preenchida.",
+    "Leave blank for natural timing controlled by Speed. A number requests a fixed length in seconds and overrides Speed; extreme lengths may sound unnatural.": "Deixe vazio para duração natural controlada pela Velocidade. Um número solicita duração fixa em segundos e substitui a Velocidade; valores extremos podem soar artificiais.",
+    "Number of generation steps. Default 32; fewer steps are faster, more steps take longer. More steps do not guarantee better audio.": "Número de etapas de geração. Padrão 32; menos etapas são mais rápidas, mais etapas demoram mais. Mais etapas não garantem áudio melhor.",
+    "How strongly generation follows the conditioning (text and reference voice). Default 2.0. Higher is not always better; start with the default.": "Intensidade com que a geração segue o condicionamento (texto e voz de referência). Padrão 2.0. Maior nem sempre é melhor; comece pelo padrão.",
+    "Enables the model’s audio denoising. Usually leave enabled; compare with it off if the voice sounds processed.": "Ativa a redução de ruído do modelo. Geralmente deixe ativado; compare desativado se a voz parecer processada.",
+    "Trims silence from the reference audio and adds ending punctuation to its transcript when needed. Does not edit your saved reference file.": "Remove silêncio da referência e adiciona pontuação final à transcrição quando necessário. Não altera o arquivo de referência salvo.",
+    "Removes long silences from generated speech. Disable if you want to retain those pauses.": "Remove silêncios longos da fala gerada. Desative para manter essas pausas.",
+
     "Discord integration": "Integração com Discord",
     "Maximum message characters": "Limite de caracteres por mensagem",
     "Run your own Discord bot on this PC. Speech is generated locally and the MP3 is uploaded to Discord.": "Execute seu próprio bot do Discord neste PC. A fala é gerada localmente e o MP3 é enviado ao Discord.",
@@ -420,8 +465,8 @@
       const node = walker.currentNode, key = node.nodeValue.trim();
       if (!['SCRIPT', 'STYLE'].includes(node.parentElement?.tagName) && Object.hasOwn(pt, key)) captured.push([node, node.nodeValue, key]);
     }
-    for (const node of document.querySelectorAll('[placeholder],[aria-label]')) {
-      for (const attr of ['placeholder', 'aria-label']) {
+    for (const node of document.querySelectorAll('[placeholder],[aria-label],[title],[aria-description]')) {
+      for (const attr of ['placeholder', 'aria-label', 'title', 'aria-description']) {
         const key = node.getAttribute(attr); if (Object.hasOwn(pt, key)) attributes.push([node, attr, key]);
       }
     }

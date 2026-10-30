@@ -1,242 +1,208 @@
-"""Host-owned Discord lifecycle and moderated access to the existing local worker."""
+"""Output-only Discord webhooks. No Gateway client or incoming commands."""
 
-import asyncio
+import http.client
+import json
+import queue
 import threading
-import time
 import uuid
+from urllib.parse import urlsplit
 
-from .discord_credentials import DiscordCredential
-from .domain import GenerationRequest, UserError
+from .discord_credentials import DiscordWebhookCredential
+from .domain import UserError
 from .models import DiscordConfig
-from .moderation import blocked_reason
+
+MAX_FILE = 10 * 1024 * 1024
+
+
+def send_webhook(url, path=None):
+    boundary = "pactts" + uuid.uuid4().hex
+    payload = json.dumps(
+        {
+            "content": "PacTTSClone audio" if path else "PacTTSClone webhook connected.",
+            "allowed_mentions": {"parse": []},
+        }
+    )
+    body = (
+        f'--{boundary}\r\nContent-Disposition: form-data; name="payload_json"'
+        f"\r\nContent-Type: application/json\r\n\r\n{payload}\r\n"
+    ).encode()
+    if path:
+        if not path.is_file() or not 0 < path.stat().st_size <= MAX_FILE:
+            raise UserError(
+                "Discord upload requires an MP3 smaller than 10 MiB. Audio stays in History."
+            )
+        body += (
+            f'--{boundary}\r\nContent-Disposition: form-data; name="files[0]"; '
+            'filename="speech.mp3"\r\nContent-Type: audio/mpeg\r\n\r\n'
+        ).encode()
+        body += path.read_bytes() + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    # Fixed host, no redirects, and no URL-bearing exception/log messages.
+    connection = http.client.HTTPSConnection("discord.com", timeout=20)
+    try:
+        connection.request(
+            "POST",
+            urlsplit(url).path + "?wait=true",
+            body,
+            {
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "PacTTSClone/2",
+            },
+        )
+        response = connection.getresponse()
+        response.read(65536)
+        if response.status == 429:
+            raise UserError(
+                "Discord rate limit reached. Audio stays in History; no automatic retry."
+            )
+        if response.status in {401, 403, 404}:
+            raise UserError("Discord rejected the webhook. Check its URL and channel permissions.")
+        if not 200 <= response.status < 300:
+            raise UserError("Discord upload failed. Audio stays in History; check the connection.")
+    except UserError:
+        raise
+    except Exception:
+        raise UserError(
+            "Discord connection failed. Check the connection and webhook URL."
+        ) from None
+    finally:
+        connection.close()
 
 
 class DiscordIntegration:
-    def __init__(self, service, voices, bot_factory=None):
-        self.service, self.store, self.voices = service, service.store, voices
-        saved = self.store.get("discord", "config") or {}
-        self.config = DiscordConfig.model_validate(saved)
-        self.credential = DiscordCredential(service.settings.data_dir)
-        self.bot_factory = bot_factory
-        self.control_lock = threading.RLock()
+    def __init__(self, service, voices):
+        self.service, self.store = service, service.store
+        # Old bot credentials/config are not compatible and never automatically enabled.
+        old = service.settings.data_dir / "credentials" / "discord.json"
+        old.unlink(missing_ok=True)
+        self.store.delete("discord", "config")
+        self.config = DiscordConfig.model_validate(
+            self.store.get("discord_webhook", "config") or {}
+        )
+        self.credential = DiscordWebhookCredential(service.settings.data_dir)
+        self.sender = send_webhook
         self.lock = threading.RLock()
-        self.thread = self.loop = self.bot = None
-        self.stopping = True
-        self.status, self.error, self.application_id = "disconnected", None, None
-        self.cooldowns, self.seen, self.pending = {}, {}, set()
+        self.queue = queue.Queue(50)
+        self.stopping = threading.Event()
+        self.thread = None
+        self.revision = 0
+        self.status, self.error = "idle", None
+        for item in self.store.all("discord_delivery", 100000):
+            if item["status"] in {"queued", "sending"}:
+                self.store.patch("discord_delivery", item["id"], status="interrupted")
 
     def snapshot(self):
         with self.lock:
-            invite = None
-            if self.application_id:
-                # View Channel, Send Messages, Attach Files, Send Messages in Threads.
-                invite = (
-                    "https://discord.com/oauth2/authorize"
-                    f"?client_id={self.application_id}&scope=bot%20applications.commands"
-                    f"&permissions=274877942784&guild_id={self.config.guild_id}"
-                    "&disable_guild_select=true"
-                )
             return {
                 **self.config.model_dump(),
-                "token_saved": bool(self.credential.token),
+                "webhook_saved": bool(self.credential.token),
                 "status": self.status,
                 "error": self.error or self.credential.error,
-                "application_id": self.application_id,
-                "invite_url": invite,
             }
 
     def configure(self, config):
-        with self.control_lock:
-            if config.enabled and (not config.guild_id or not self.credential.token):
-                raise UserError("Save a bot token and enter a Discord server ID before enabling.")
-            if config.enabled and config.default_voice_id:
-                voice = self.store.get("voice", config.default_voice_id)
-                if not voice or voice["status"] != "ready":
-                    raise UserError("Choose a ready saved voice for Discord.")
-            self.stop()
-            with self.lock:
-                self.store.put("discord", "config", config.model_dump())
-                self.config = config
-            self.start()
+        with self.lock:
+            if config.enabled and not self.credential.token:
+                raise UserError("Save a Discord webhook URL before enabling.")
+            self.revision += 1
+            self.config = config
+            self.store.put("discord_webhook", "config", config.model_dump())
+            self.status, self.error = "enabled" if config.enabled else "disabled", None
             return self.snapshot()
 
-    def save_token(self, token):
-        with self.control_lock:
-            self.credential.save(token)
-            self.stop()
-            self.application_id = None
-            self.start()
+    def save_webhook(self, url):
+        with self.lock:
+            self.credential.save(url)
+            self.revision += 1
             return self.snapshot()
 
-    def forget_token(self):
-        with self.control_lock:
-            self.stop()
+    def forget_webhook(self):
+        with self.lock:
             self.credential.forget()
-            with self.lock:
-                self.config = self.config.model_copy(update={"enabled": False})
-                self.store.put("discord", "config", self.config.model_dump())
-                self.application_id = None
+            self.configure(self.config.model_copy(update={"enabled": False}))
             return self.snapshot()
+
+    def test(self):
+        with self.lock:
+            url = self.credential.token
+        if not url:
+            raise UserError("Save a Discord webhook URL first.")
+        try:
+            self.sender(url)
+        except UserError as exc:
+            with self.lock:
+                self.status, self.error = "failed", str(exc)
+            raise
+        with self.lock:
+            self.status, self.error = "test_sent", None
+        return self.snapshot()
 
     def start(self):
-        with self.control_lock, self.lock:
+        with self.lock:
             if self.thread and self.thread.is_alive():
                 return
-            if not self.config.enabled or not self.credential.token:
-                return
-            if not self.service.setup_ready():
-                self.status = "Waiting for setup"
-                return
-            self.stopping, self.status, self.error = False, "connecting", None
-            self.thread = threading.Thread(target=self._run, daemon=True, name="discord-bot")
+            self.stopping.clear()
+            self.thread = threading.Thread(target=self._run, daemon=True, name="discord-webhook")
             self.thread.start()
 
-    def _run(self):
-        try:
-            asyncio.run(self._session())
-        except Exception:
-            # SDK exceptions may contain interaction URLs/tokens. Never forward them.
-            with self.lock:
-                if not self.stopping:
-                    self.status = "error"
-                    self.error = "Discord connection failed. Check the bot token and connection."
-        finally:
-            self._cancel_pending()
-            with self.lock:
-                self.stopping = True
-                self.loop = self.bot = None
-
-    async def _session(self):
-        from .discord_bot import DiscordBot
-
-        bot = (self.bot_factory or DiscordBot)(self)
+    def enqueue(self, job):
         with self.lock:
-            self.loop, self.bot = asyncio.get_running_loop(), bot
-            if self.stopping:
+            config = self.config
+            if (
+                not config.enabled
+                or not self.credential.token
+                or job.get("kind") != "speech"
+                or job.get("status") != "succeeded"
+            ):
                 return
-            token = self.credential.token
-        async with bot:
-            await bot.start(token, reconnect=True)
+            channel = job.get("channel")
+            if channel:
+                if not config.include_twitch or (
+                    config.channels and channel not in config.channels
+                ):
+                    return
+            elif not config.include_local:
+                return
+            if config.voice_ids and job.get("voice_id") not in config.voice_ids:
+                return
+            if self.store.get("discord_delivery", job["id"]):
+                return
+            entry = {"id": job["id"], "status": "queued"}
+            self.store.put("discord_delivery", job["id"], entry)
+            try:
+                self.queue.put_nowait((job["id"], self.revision))
+            except queue.Full:
+                self.store.patch("discord_delivery", job["id"], status="failed", error="Queue full")
+                self.status, self.error = (
+                    "failed",
+                    "Discord delivery queue full. Audio stays in History.",
+                )
 
-    def connected(self, application_id):
-        with self.lock:
-            self.application_id = str(application_id)
-            if not self.stopping:
-                self.status, self.error = "connected", None
-
-    def _cancel_pending(self):
-        with self.lock:
-            pending = list(self.pending)
-            self.pending.clear()
-        for job_id in pending:
-            job = self.service.get(job_id)
-            if job and job["status"] in {"queued", "running"}:
-                self.service.cancel(job_id)
+    def _run(self):
+        while not self.stopping.is_set():
+            try:
+                job_id, revision = self.queue.get(timeout=0.2)
+            except queue.Empty:
+                continue
+            with self.lock:
+                if revision != self.revision or not self.config.enabled:
+                    self.store.patch("discord_delivery", job_id, status="cancelled")
+                    continue
+                url = self.credential.token
+                self.status, self.error = "sending", None
+                self.store.patch("discord_delivery", job_id, status="sending")
+            try:
+                self.sender(url, self.service.output_path(job_id))
+                with self.lock:
+                    self.store.patch("discord_delivery", job_id, status="sent")
+                    self.status, self.error = "sent", None
+            except Exception as exc:
+                error = str(exc) if isinstance(exc, UserError) else "Discord upload failed."
+                with self.lock:
+                    self.store.patch("discord_delivery", job_id, status="failed", error=error)
+                    self.status, self.error = "failed", error
 
     def stop(self):
-        with self.control_lock:
-            with self.lock:
-                self.stopping, self.status = True, "disconnected"
-                self.error = None
-                loop, bot, thread = self.loop, self.bot, self.thread
-            self._cancel_pending()
-            if loop and bot and loop.is_running():
-                asyncio.run_coroutine_threadsafe(bot.close(), loop)
-            if thread and thread is not threading.current_thread():
-                thread.join(5)
-                if thread.is_alive():
-                    raise UserError("Discord is still disconnecting. Retry in a few seconds.")
-
-    def check_access(self, guild_id, channel_id):
-        with self.lock:
-            if self.stopping or not self.config.enabled:
-                raise UserError("Discord integration is disconnected.")
-            if str(guild_id) != self.config.guild_id:
-                raise UserError("This Discord server is not enabled in PacTTSClone.")
-            if self.config.channel_ids and str(channel_id) not in self.config.channel_ids:
-                raise UserError("This Discord channel is not enabled in PacTTSClone.")
-
-    def ready_voices(self, guild_id, channel_id):
-        self.check_access(guild_id, channel_id)
-        return [v for v in self.store.all("voice") if v["status"] == "ready"]
-
-    def submit(self, *, guild_id, channel_id, user_id, username, interaction_id, text, voice_id=""):
-        with self.lock:
-            self.check_access(guild_id, channel_id)
-            config = self.config
-            voice_id = voice_id or config.default_voice_id
-            text = text.strip()
-            identity = self.service.identity(
-                "discord",
-                username,
-                uuid.uuid5(uuid.NAMESPACE_URL, f"discord:user:{user_id}").hex,
-                source=f"{guild_id}:{channel_id}",
-            )
-            now = time.monotonic()
-            # Bound memory; the window also covers Discord's interaction lifetime.
-            self.seen = {k: v for k, v in self.seen.items() if now - v < 900}
-            self.cooldowns = {k: v for k, v in self.cooldowns.items() if now - v < 600}
-            if str(interaction_id) in self.seen:
-                raise UserError("This Discord request has already been handled.")
-            if len(self.seen) >= 5000:
-                raise UserError("Too many Discord requests. Try again later.")
-            self.seen[str(interaction_id)] = now
-            reason = None
-            if not text or len(text) > config.max_message_chars:
-                reason = "empty or overlong message"
-            if not reason:
-                reason = blocked_reason(text, config.filter_level, config.custom_filters)
-            if not reason and now - self.cooldowns.get(str(user_id), -1000) < (
-                config.user_cooldown_seconds
-            ):
-                reason = "user cooldown"
-            if not reason and not voice_id:
-                reason = "Choose a voice in /tts or save a default voice in Configuration."
-            if not reason and len(self.pending) >= self.service.config.max_queue:
-                reason = "Discord delivery queue is full. Try again later."
-            if reason:
-                self.service.reject_request(
-                    text,
-                    reason,
-                    channel=None,
-                    username=username,
-                    voice_id=voice_id,
-                    identity=identity,
-                )
-                raise UserError(reason)
-            try:
-                job = self.voices.generate(
-                    voice_id,
-                    GenerationRequest(text=text),
-                    username=username,
-                    identity=identity,
-                )
-            except UserError as exc:
-                self.service.reject_request(
-                    text,
-                    str(exc),
-                    channel=None,
-                    username=username,
-                    voice_id=voice_id,
-                    identity=identity,
-                )
-                raise
-            # No interaction token or webhook URL is persisted in job/audit data.
-            self.store.patch(
-                "job",
-                job["id"],
-                discord_guild_id=str(guild_id),
-                discord_channel_id=str(channel_id),
-            )
-            self.pending.add(job["id"])
-            self.cooldowns[str(user_id)] = now
-            return job
-
-    def finished(self, job_id):
-        # A cancelled/failed delivery must not orphan queued GPU work. Successful
-        # files remain in History even when their Discord upload fails.
-        job = self.service.get(job_id)
-        if job and job["status"] in {"queued", "running"}:
-            self.service.cancel(job_id)
-        with self.lock:
-            self.pending.discard(job_id)
+        self.stopping.set()
+        if self.thread:
+            self.thread.join(25)

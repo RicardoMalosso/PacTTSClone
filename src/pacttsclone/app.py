@@ -20,6 +20,7 @@ from .service import GenerationService
 from .setup_runtime import RuntimeSetup
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
+from .updater import Updater
 
 STATIC = Path(__file__).parent / "static"
 
@@ -125,14 +126,17 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     tunnel = Tunnel(service)
     runtime_setup = RuntimeSetup(service)
     runtime_setup.on_ready = studio.start
+    updater = Updater()
     token = secrets.token_urlsafe(32)
 
     @asynccontextmanager
     async def lifespan(app):
         studio.start()
+        updater.start()
         try:
             yield
         finally:
+            updater.close()
             runtime_setup.close()
             tunnel.close()
             studio.close()
@@ -345,6 +349,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         tunnel.close()
         return tunnel.snapshot()
 
+    @app.get("/api/updates")
+    def updates(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Updates are host-only.")
+        return dict(updater.state)
+
+    @app.post("/api/updates/check")
+    def check_updates(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Updates are host-only.")
+        return updater.check()
+
     @app.get("/api/config")
     def configuration():
         return {**service.config.model_dump(), "hotkey_status": studio.hotkey.status}
@@ -367,21 +383,26 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         discord_owner(request)
         return studio.discord.configure(value)
 
-    @app.put("/api/discord/token")
-    async def discord_token(request: Request):
+    @app.put("/api/discord/webhook")
+    async def discord_webhook(request: Request):
         discord_owner(request)
         try:
             value = await request.json()
         except ValueError:
-            raise UserError("Supply only a Discord bot token.") from None
-        if not isinstance(value, dict) or set(value) != {"token"}:
-            raise UserError("Supply only a Discord bot token.")
-        return await asyncio.to_thread(studio.discord.save_token, value["token"])
+            raise UserError("Supply only a Discord webhook URL.") from None
+        if not isinstance(value, dict) or set(value) != {"url"}:
+            raise UserError("Supply only a Discord webhook URL.")
+        return await asyncio.to_thread(studio.discord.save_webhook, value["url"])
 
-    @app.delete("/api/discord/token")
+    @app.delete("/api/discord/webhook")
     def discord_forget(request: Request):
         discord_owner(request)
-        return studio.discord.forget_token()
+        return studio.discord.forget_webhook()
+
+    @app.post("/api/discord/test")
+    def discord_test(request: Request):
+        discord_owner(request)
+        return studio.discord.test()
 
     @app.get("/api/resources")
     def resources():

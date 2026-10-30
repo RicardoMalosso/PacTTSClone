@@ -686,3 +686,53 @@ release-by-tag API returned 404 for the draft. Resolve drafts through the releas
 collection and publish by numeric ID. A scoped recovery verifies the original
 acceptance steps, artifact checksums, release target and all asset digests before
 publishing that same draft. No inference/GPU or live Discord quality claim is added.
+
+## Application auto-updates — 2026-10-30
+
+RC12 adds automatic public GitHub release checks at startup/every six hours,
+verified application-wheel downloads, isolated import/dependency preflight and
+atomic next-launch activation. Configuration exposes host-only status/manual
+checks and PT-BR help. Models, CUDA and personal data are preserved. Source
+installs use Git. Release workflow derives package/tag/installer identity instead
+of hardcoding RC11; published assets remain immutable.
+
+Validation: 256 core tests, all 36 existing Chromium tests and the new update UI
+Chromium test passed. Ruff, JavaScript syntax, Python compilation, wheel build
+and diff checks passed. Downloads/release metadata and activation are simulated
+in deterministic tests; no actual Windows update lifecycle or new installer
+acceptance has been run locally. Dependency migrations require setup repair;
+rollback and first-install requirements are documented in auto-updates.md.
+## Voice output volume and control explanations — 2026-10-30
+
+Added saved per-voice output volume, 0–300 percent (100 unchanged, 0 mute),
+inherited by integration jobs and overridable per local generation. The worker
+applies gain before MP3 encoding so playback and uploaded files share the level.
+Existing audio/reference files remain unchanged. Excessive boost clips peaks.
+Every voice/local generation setting now has explanatory EN/PT-BR help.
+
+Validation: 245 core tests passed, plus all 30 focused audio/preset tests after
+adding four real FFmpeg volume checks (mute/attenuate/unity/boost). Preset tests
+cover persistence, inheritance, override and invalid values. Ruff, Python
+compilation, JavaScript syntax and diff checks passed. Browser validation is
+recorded with the PR. Real GPU generation and Windows acceptance are not claimed.
+
+Voice control explanations now appear as mouseover hints on labels and inputs,
+with accessible descriptions and locale updates for EN/PT-BR.
+
+## v2.0.0 release preparation — 2026-10-30
+
+Combined updater and voice-volume/mouseover PRs. Replaced the old Discord bot
+with an output-only webhook, source/channel/voice filtering, a test button,
+step-by-step EN/PT-BR help, a bounded delivery queue and visible sanitized errors.
+Legacy bot credentials/config and SDK are removed; no incoming Discord commands.
+Versioned package/runtime/installer as 2.0.0, tag v2.0.0. Stable publication uses
+release notes and latest-release designation. Existing AppId/data paths stay intact.
+
+Local validation: 235 core tests passed, plus a focused 14-test updater recheck
+after correcting interpreter-specific activation paths. Real installed-wheel
+activation, next-interpreter version selection and rollback passed with a local
+release fixture; no network download or Windows execution is claimed for that
+check. Windows installer acceptance now executes the same lifecycle check.
+Ruff, JavaScript syntax, compilation, workflow YAML, wheel build and diff checks
+passed. Browser and actual Windows acceptance results are tracked in the release PR.
+Live Discord/GPU validation remains separate from controlled transport/inference tests.

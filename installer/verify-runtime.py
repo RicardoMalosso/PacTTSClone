@@ -3,7 +3,6 @@
 import argparse
 import subprocess
 
-import discord  # noqa: F401
 import fastapi  # noqa: F401
 import soundfile  # noqa: F401
 
