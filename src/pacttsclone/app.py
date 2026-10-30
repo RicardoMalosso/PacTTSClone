@@ -20,6 +20,7 @@ from .service import GenerationService
 from .setup_runtime import RuntimeSetup
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
+from .updater import Updater
 
 STATIC = Path(__file__).parent / "static"
 
@@ -125,14 +126,17 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     tunnel = Tunnel(service)
     runtime_setup = RuntimeSetup(service)
     runtime_setup.on_ready = studio.start
+    updater = Updater()
     token = secrets.token_urlsafe(32)
 
     @asynccontextmanager
     async def lifespan(app):
         studio.start()
+        updater.start()
         try:
             yield
         finally:
+            updater.close()
             runtime_setup.close()
             tunnel.close()
             studio.close()
@@ -344,6 +348,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def stop_tunnel():
         tunnel.close()
         return tunnel.snapshot()
+
+    @app.get("/api/updates")
+    def updates(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Updates are host-only.")
+        return dict(updater.state)
+
+    @app.post("/api/updates/check")
+    def check_updates(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Updates are host-only.")
+        return updater.check()
 
     @app.get("/api/config")
     def configuration():

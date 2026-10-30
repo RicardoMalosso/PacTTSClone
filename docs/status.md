@@ -686,3 +686,19 @@ release-by-tag API returned 404 for the draft. Resolve drafts through the releas
 collection and publish by numeric ID. A scoped recovery verifies the original
 acceptance steps, artifact checksums, release target and all asset digests before
 publishing that same draft. No inference/GPU or live Discord quality claim is added.
+
+## Application auto-updates — 2026-10-30
+
+RC12 adds automatic public GitHub release checks at startup/every six hours,
+verified application-wheel downloads, isolated import/dependency preflight and
+atomic next-launch activation. Configuration exposes host-only status/manual
+checks and PT-BR help. Models, CUDA and personal data are preserved. Source
+installs use Git. Release workflow derives package/tag/installer identity instead
+of hardcoding RC11; published assets remain immutable.
+
+Validation: 256 core tests, all 36 existing Chromium tests and the new update UI
+Chromium test passed. Ruff, JavaScript syntax, Python compilation, wheel build
+and diff checks passed. Downloads/release metadata and activation are simulated
+in deterministic tests; no actual Windows update lifecycle or new installer
+acceptance has been run locally. Dependency migrations require setup repair;
+rollback and first-install requirements are documented in auto-updates.md.

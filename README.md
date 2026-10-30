@@ -86,11 +86,13 @@ in offline mode. Startup performs a lightweight existence/size check; rerunning
 Initial Setup performs the full hashes again. It does not promise zero HTTP
 requests for package version/index checks.
 
-An updater is **not implemented**. For now, stop the app and run a newer installer
-with the same data folder. A future update feature should check a versioned release
-manifest, stage and verify the new application, preserve data, stop the old process,
-and offer rollback. Private release authentication and unsigned Windows binaries
-must be handled before unattended updating is offered.
+Installer installations automatically check GitHub releases at startup and every six
+hours. A verified application wheel downloads without the installer; close the app
+and reopen it to activate. Configuration → Application updates shows progress/errors
+and offers a manual check. Models, CUDA and user data stay in place. Stable versions
+ignore release candidates; RC installations follow newer RCs and stable releases.
+The first version containing this updater must be installed once. Source checkouts
+continue to use Git. See [update protocol and recovery](docs/auto-updates.md).
 
 FFmpeg publishes source, not Windows executables. RC5 uses the Windows Essentials
 build from [Gyan Doshi](https://www.gyan.dev/ffmpeg/builds/), a distributor linked

@@ -1117,3 +1117,15 @@ function renderOptionalImport(data) {
   }
   $('optional-import-result').replaceChildren(...notes.map(note => el('p', {class: 'muted'}, note)));
 }
+
+async function refreshUpdates(check = false) {
+  $('updates-card').hidden = Boolean(session?.remote_access);
+  if (!session || session.remote_access) return;
+  try {
+    const value = await api('/api/updates' + (check ? '/check' : ''), check ? {method: 'POST'} : {});
+    $('update-status').textContent = `${value.version} · ${t(value.status)}${value.next_version ? ' · ' + value.next_version : ''}${value.error ? ' · ' + value.error : ''}`;
+  } catch (_) { /* Host-only controls are unavailable to shared administrators. */ }
+}
+$('update-check').onclick = () => refreshUpdates(true);
+setInterval(() => refreshUpdates(), 30000);
+refreshUpdates();

@@ -1,6 +1,15 @@
 'use strict';
 (() => {
   const pt = {
+    "Application updates": "Atualizações do aplicativo",
+    "Check for updates": "Verificar atualizações",
+    "New releases download automatically every six hours. Close PacTTSClone and open it again to apply an update. Models, CUDA packages, voices and settings are preserved.": "Novas versões são baixadas automaticamente a cada seis horas. Feche e abra o PacTTSClone para aplicar a atualização. Modelos, pacotes CUDA, vozes e configurações são preservados.",
+    "restart_required": "Atualização pronta; feche e abra o aplicativo",
+    "source_install": "Instalação pelo código-fonte; atualize pelo Git",
+    "up_to_date": "Atualizado",
+    "checking": "Verificando",
+    "downloading": "Baixando",
+
     "Discord integration": "Integração com Discord",
     "Maximum message characters": "Limite de caracteres por mensagem",
     "Run your own Discord bot on this PC. Speech is generated locally and the MP3 is uploaded to Discord.": "Execute seu próprio bot do Discord neste PC. A fala é gerada localmente e o MP3 é enviado ao Discord.",

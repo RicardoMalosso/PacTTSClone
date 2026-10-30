@@ -1,4 +1,6 @@
-#define AppVersion "0.3.0-rc.11"
+#ifndef AppVersion
+#define AppVersion "0.3.0-rc.12"
+#endif
 [Setup]
 AppId={{7FF568CE-33A3-40B1-A7C0-15AA76F1DB84}
 AppName=PacTTSClone
