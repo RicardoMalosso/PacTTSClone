@@ -129,8 +129,10 @@ jobs:
         shell: pwsh
         run: |
           $tag = 'v0.3.0-rc.11'
-          $release = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$tag" | ConvertFrom-Json
+          $matches = @(gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json) | Where-Object tag_name -eq $tag
           if ($LASTEXITCODE -ne 0) { throw 'Could not verify draft release.' }
+          if (@($matches).Count -ne 1) { throw 'Expected exactly one release for this tag.' }
+          $release = $matches
           if (!$release.draft -or !$release.prerelease -or $release.target_commitish -ne $env:GITHUB_SHA) { throw 'Unexpected release target or state.' }
           $files = @(Get-ChildItem dist/*.exe,dist/*.whl,dist/*.zip,dist/SHA256SUMS.txt)
           if ($release.assets.Count -ne $files.Count) { throw 'Unexpected release assets.' }
@@ -139,5 +141,5 @@ jobs:
             $digest = 'sha256:' + (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower()
             if ($asset.Count -ne 1 -or $asset[0].size -ne $file.Length -or $asset[0].digest -ne $digest) { throw "Asset integrity mismatch: $($file.Name)" }
           }
-          gh release edit $tag --draft=false --prerelease --latest=false
+          gh api --method PATCH "repos/$env:GITHUB_REPOSITORY/releases/$($release.id)" -F draft=false -F prerelease=true -f make_latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Could not publish accepted RC11.' }
