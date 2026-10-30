@@ -165,7 +165,7 @@ def execute_task(engine, settings, task, emit):
                 report.stage("inference", "test/cpu")
             waveform = engine.synthesize(str(reference), request)
             report.stage("encode")
-            pipeline.encode(waveform, workspace, Path(task["output"]))
+            pipeline.encode(waveform, workspace, Path(task["output"]), volume=request.volume)
         return {
             "type": "result",
             "ok": True,

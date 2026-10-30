@@ -95,7 +95,9 @@ class AudioPipeline:
             raise UserError("A referência está silenciosa. Escolha um trecho com fala audível.")
         return cropped
 
-    def encode(self, waveform: Waveform, workspace: Path, destination: Path) -> None:
+    def encode(
+        self, waveform: Waveform, workspace: Path, destination: Path, volume: float = 100
+    ) -> None:
         values = np.asarray(waveform.samples, dtype=np.float32)
         if (
             values.ndim != 1
@@ -105,6 +107,9 @@ class AudioPipeline:
             or values.size > waveform.sample_rate * 600
         ):
             raise UserError("O modelo retornou áudio inválido ou maior que 10 minutos.")
+        if not np.isfinite(volume) or not 0 <= volume <= 300:
+            raise UserError("Volume must be between 0 and 300 percent.")
+        values = values * (volume / 100)
         pcm = workspace / "generated.wav"
         sf.write(pcm, np.clip(values, -1, 1), waveform.sample_rate, subtype="PCM_16")
         # Encode beside the final file, then atomically publish after success.

@@ -251,9 +251,10 @@ async function watch(id) {
     await sleep(500);
   }
 }
-const defaultGenerationSettings = Object.freeze({language: 'auto', speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
+const defaultGenerationSettings = Object.freeze({language: 'auto', volume: 100, speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
 const generationFields = [
   ['language', 'Language', 'select'],
+  ['volume', 'Output volume (%)', 'number', '0', '300', '5'],
   ['speed', 'Speed', 'number', '0.5', '1.5', '0.05'],
   ['duration', 'Duration (seconds)', 'number', '0.5', '120', '0.1'],
   ['steps', 'Inference Steps', 'number', '4', '64', '1'],
@@ -262,6 +263,24 @@ const generationFields = [
   ['preprocess_prompt', 'Preprocess Prompt', 'checkbox'],
   ['postprocess_output', 'Postprocess Output', 'checkbox']
 ];
+const generationHelp = {
+  "language": "Automatic lets the model choose the speech language. Select Portuguese or English to force it; this does not translate the text.",
+  "volume": "100% keeps the original level; 50% halves the signal amplitude; 200% doubles it. 0% mutes. Large boosts can distort loud peaks. Applies to new MP3s, including OBS and Discord playback; existing files stay unchanged.",
+  "speed": "1.0 is normal; below 1 is slower; above 1 is faster. Ignored when Duration is set.",
+  "duration": "Leave blank for natural timing controlled by Speed. A number requests a fixed length in seconds and overrides Speed; extreme lengths may sound unnatural.",
+  "steps": "Number of generation steps. Default 32; fewer steps are faster, more steps take longer. More steps do not guarantee better audio.",
+  "guidance_scale": "How strongly generation follows the conditioning (text and reference voice). Default 2.0. Higher is not always better; start with the default.",
+  "denoise": "Enables the model’s audio denoising. Usually leave enabled; compare with it off if the voice sounds processed.",
+  "preprocess_prompt": "Trims silence from the reference audio and adds ending punctuation to its transcript when needed. Does not edit your saved reference file.",
+  "postprocess_output": "Removes long silences from generated speech. Disable if you want to retain those pauses."
+};
+for (const [key, explanation] of Object.entries(generationHelp)) {
+  const input = $('generate-form').querySelector(`[data-setting="${key}"]`);
+  if (input) {
+    input.closest('label').classList.add('generation-setting');
+    input.closest('label').append(el('small', {class: 'muted'}, t(explanation)));
+  }
+}
 function voiceGenerationSettings(voice) { return {...defaultGenerationSettings, ...(voice?.generation_settings || {})}; }
 function settingsControls(container) {
   return Object.fromEntries(generationFields.map(([key]) => [key, container.querySelector(`[data-setting="${key}"]`)]));
@@ -334,6 +353,8 @@ function createVoiceSettingsEditor(voice) {
     const labelNode = type === 'checkbox'
       ? el('label', {class: 'check'}, input, ' ', t(label))
       : el('label', {}, t(label), input);
+    labelNode.classList.add('generation-setting');
+    labelNode.append(el('small', {class: 'muted'}, t(generationHelp[key])));
     container.append(labelNode);
   }
   const editor = el('details', {class: 'voice-generation-settings'},

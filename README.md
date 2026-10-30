@@ -446,3 +446,12 @@ The player still requests autoplay 200 milliseconds after opening.
 RC9 packaging runs the existing Windows installer acceptance after the tested
 PR is merged with the `prepare-release` label. It creates a distinct RC9
 draft prerelease and never overwrites or auto-publishes previous release assets.
+
+### Voice settings help
+
+Open **Voices → Voice generation defaults** to change a voice, then click
+**Save generation defaults**. Each control includes an explanation in English
+or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
+50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
+Boosting too much can distort loud peaks. Local generation can override saved
+settings for one request; existing recordings keep their original volume.

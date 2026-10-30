@@ -686,3 +686,17 @@ release-by-tag API returned 404 for the draft. Resolve drafts through the releas
 collection and publish by numeric ID. A scoped recovery verifies the original
 acceptance steps, artifact checksums, release target and all asset digests before
 publishing that same draft. No inference/GPU or live Discord quality claim is added.
+
+## Voice output volume and control explanations — 2026-10-30
+
+Added saved per-voice output volume, 0–300 percent (100 unchanged, 0 mute),
+inherited by integration jobs and overridable per local generation. The worker
+applies gain before MP3 encoding so playback and uploaded files share the level.
+Existing audio/reference files remain unchanged. Excessive boost clips peaks.
+Every voice/local generation setting now has explanatory EN/PT-BR help.
+
+Validation: 245 core tests passed, plus all 30 focused audio/preset tests after
+adding four real FFmpeg volume checks (mute/attenuate/unity/boost). Preset tests
+cover persistence, inheritance, override and invalid values. Ruff, Python
+compilation, JavaScript syntax and diff checks passed. Browser validation is
+recorded with the PR. Real GPU generation and Windows acceptance are not claimed.
