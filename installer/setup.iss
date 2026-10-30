@@ -1,10 +1,12 @@
-#define AppVersion "0.3.0-rc.11"
+#ifndef AppVersion
+#define AppVersion "2.0.0"
+#endif
 [Setup]
 AppId={{7FF568CE-33A3-40B1-A7C0-15AA76F1DB84}
 AppName=PacTTSClone
 AppVersion={#AppVersion}
 AppVerName=PacTTSClone {#AppVersion}
-VersionInfoVersion=0.3.0.9
+VersionInfoVersion=2.0.0.0
 DefaultDirName={localappdata}\Programs\PacTTSClone
 DefaultGroupName=PacTTSClone
 PrivilegesRequired=lowest
@@ -51,6 +53,7 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\app\environments"
 Type: filesandordirs; Name: "{app}\app\runtime"
+Type: filesandordirs; Name: "{app}\app\updates"
 Type: files; Name: "{app}\app\active.json"
 Type: files; Name: "{app}\app\active.json.new"
 

@@ -253,6 +253,7 @@ class Studio:
 
     def completed(self, job):
         self.voices.completed(job)
+        self.discord.enqueue(job)
         if job.get("channel") and job["kind"] == "speech" and job["status"] == "succeeded":
             try:
                 self.playback.enqueue(job)

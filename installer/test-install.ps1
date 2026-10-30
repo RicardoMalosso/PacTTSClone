@@ -67,6 +67,10 @@ try {
 } finally {
     & taskkill.exe /PID $server.Id /T /F | Out-Null
 }
+$env:PACTTS_APP_ROOT = $app
+$wheel = @(Get-ChildItem (Join-Path $PSScriptRoot '../dist') -Filter 'pacttsclone-*.whl')[0].FullName
+& $config.python (Join-Path $PSScriptRoot 'test-update.py') $wheel $app
+if ($LASTEXITCODE -ne 0) { throw 'Installed updater activation/rollback acceptance failed.' }
 $marker = Join-Path $data 'keep-user-audio.txt'
 Set-Content $marker 'Preserve user data'
 $previousPython = $config.python

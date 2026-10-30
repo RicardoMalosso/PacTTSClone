@@ -18,6 +18,7 @@ class GenerationSettings(BaseModel):
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
     language: str = "auto"
+    volume: float = Field(default=100.0, ge=0, le=300)
     speed: float = Field(default=1.0, ge=0.5, le=1.5)
     duration: float | None = Field(default=None, ge=0.5, le=120)
     steps: int = Field(default=32, ge=4, le=64)

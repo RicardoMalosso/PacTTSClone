@@ -754,6 +754,7 @@ def test_voice_generation_tuning_presets_and_per_job_override(page, live_server,
     card.locator(".voice-generation-settings summary").click()
     expect(card.get_by_label("Language", exact=True)).to_have_value("auto")
     card.get_by_label("Language", exact=True).select_option("en")
+    card.get_by_label("Output volume (%)", exact=True).fill("150")
     card.get_by_label("Speed", exact=True).fill("0.75")
     card.get_by_label("Inference Steps").fill("14")
     card.get_by_label("Duration (seconds)").fill("7.5")
@@ -769,21 +770,25 @@ def test_voice_generation_tuning_presets_and_per_job_override(page, live_server,
     card = page.locator(".voice-card").first
     card.locator(".voice-generation-settings summary").click()
     expect(card.get_by_label("Language", exact=True)).to_have_value("en")
+    expect(card.get_by_label("Output volume (%)", exact=True)).to_have_value("150")
     expect(card.get_by_label("Inference Steps")).to_have_value("14")
     expect(card.get_by_label("Denoise")).not_to_be_checked()
     open_tab(page, "Local")
     page.locator("#voice-select").select_option(label="Browser voice")
     expect(page.locator("#language")).to_have_value("en")
+    expect(page.locator("#volume")).to_have_value("150")
     expect(page.locator("#steps")).to_have_value("14")
     expect(page.locator("#duration")).to_have_value("7.5")
     page.get_by_text("Generation settings", exact=True).click()
     page.locator("#language").select_option("pt")
+    page.locator("#volume").fill("75")
     page.locator("#steps").fill("22")
     page.locator("#text").fill("Voice settings smoke test")
     page.locator("#generate").click()
     expect(page.locator("#player")).to_be_visible(timeout=15000)
     jobs = [job for job in app.state.service.history() if job["kind"] == "speech"]
     assert jobs[0]["request"]["language"] == "pt"
+    assert jobs[0]["request"]["volume"] == 75
     assert jobs[0]["request"]["steps"] == 22
     assert jobs[0]["request"]["denoise"] is False
     assert jobs[0]["request"]["duration"] == 7.5
@@ -794,6 +799,7 @@ def test_voice_generation_tuning_presets_and_per_job_override(page, live_server,
     if not card.locator(".voice-generation-settings").evaluate("node => node.open"):
         card.locator(".voice-generation-settings summary").click()
     card.get_by_role("button", name="Restore OmniVoice defaults").click()
+    expect(card.get_by_label("Output volume (%)", exact=True)).to_have_value("100")
     expect(card.get_by_label("Language", exact=True)).to_have_value("auto")
     card.get_by_role("button", name="Save generation defaults").click()
     wait_until(

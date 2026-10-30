@@ -112,6 +112,7 @@ def test_builtin_thumbnails_seed_existing_voices_and_preserve_custom_images(
     finally:
         studio.close()
 
+
 def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine, mp3, monkeypatch):
     monkeypatch.setattr("pacttsclone.voices.BUILTIN_CATALOG", None)
     settings = Settings(data_dir=tmp_path / "data")
@@ -121,8 +122,15 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         with mp3.open("rb") as reference:
             voice = studio.voices.create(reference, "Test", "reference.mp3", "Exact transcript.")
         defaults = GenerationSettings(
-            language="en", speed=0.7, duration=6.0, steps=12, denoise=False, guidance_scale=1.5,
-            preprocess_prompt=False, postprocess_output=False,
+            volume=150,
+            language="en",
+            speed=0.7,
+            duration=6.0,
+            steps=12,
+            denoise=False,
+            guidance_scale=1.5,
+            preprocess_prompt=False,
+            postprocess_output=False,
         )
         studio.voices.set_generation_settings(voice["id"], defaults)
         job = studio.voices.generate(
@@ -133,9 +141,11 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         for key, value in defaults.model_dump().items():
             assert finished["request"][key] == value
         overridden = studio.voices.generate(
-            voice["id"], GenerationRequest(text="Manual", language="pt", speed=1.2, duration=None)
+            voice["id"],
+            GenerationRequest(text="Manual", volume=75, language="pt", speed=1.2, duration=None),
         )
         assert overridden["request"]["language"] == "pt"
+        assert overridden["request"]["volume"] == 75
         assert overridden["request"]["speed"] == 1.2
         assert overridden["request"]["duration"] is None
         assert overridden["request"]["steps"] == 12
@@ -154,10 +164,21 @@ def test_voice_generation_defaults_persist_and_override_per_job(tmp_path, engine
         studio.close()
 
 
-@pytest.mark.parametrize("values", [
-    {"speed": 1.8}, {"duration": 0.1}, {"steps": 0}, {"guidance_scale": 5.0},
-    {"language": "invalid"}, {"unexpected": "not accepted"}, {"duration": float("nan")},
-])
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"volume": -1},
+        {"volume": 301},
+        {"volume": float("nan")},
+        {"speed": 1.8},
+        {"duration": 0.1},
+        {"steps": 0},
+        {"guidance_scale": 5.0},
+        {"language": "invalid"},
+        {"unexpected": "not accepted"},
+        {"duration": float("nan")},
+    ],
+)
 def test_invalid_generation_settings_rejected(values):
     from pydantic import ValidationError
 
