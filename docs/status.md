@@ -700,3 +700,6 @@ adding four real FFmpeg volume checks (mute/attenuate/unity/boost). Preset tests
 cover persistence, inheritance, override and invalid values. Ruff, Python
 compilation, JavaScript syntax and diff checks passed. Browser validation is
 recorded with the PR. Real GPU generation and Windows acceptance are not claimed.
+
+Voice control explanations now appear as mouseover hints on labels and inputs,
+with accessible descriptions and locale updates for EN/PT-BR.

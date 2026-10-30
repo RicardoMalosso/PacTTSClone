@@ -450,7 +450,7 @@ draft prerelease and never overwrites or auto-publishes previous release assets.
 ### Voice settings help
 
 Open **Voices → Voice generation defaults** to change a voice, then click
-**Save generation defaults**. Each control includes an explanation in English
+**Save generation defaults**. Hover over a control or its label for an explanation in English
 or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
 50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
 Boosting too much can distort loud peaks. Local generation can override saved

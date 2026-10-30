@@ -431,8 +431,8 @@
       const node = walker.currentNode, key = node.nodeValue.trim();
       if (!['SCRIPT', 'STYLE'].includes(node.parentElement?.tagName) && Object.hasOwn(pt, key)) captured.push([node, node.nodeValue, key]);
     }
-    for (const node of document.querySelectorAll('[placeholder],[aria-label]')) {
-      for (const attr of ['placeholder', 'aria-label']) {
+    for (const node of document.querySelectorAll('[placeholder],[aria-label],[title],[aria-description]')) {
+      for (const attr of ['placeholder', 'aria-label', 'title', 'aria-description']) {
         const key = node.getAttribute(attr); if (Object.hasOwn(pt, key)) attributes.push([node, attr, key]);
       }
     }

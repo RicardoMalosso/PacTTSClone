@@ -278,7 +278,9 @@ for (const [key, explanation] of Object.entries(generationHelp)) {
   const input = $('generate-form').querySelector(`[data-setting="${key}"]`);
   if (input) {
     input.closest('label').classList.add('generation-setting');
-    input.closest('label').append(el('small', {class: 'muted'}, t(explanation)));
+    input.title = t(explanation);
+    input.setAttribute('aria-description', t(explanation));
+    input.closest('label').title = t(explanation);
   }
 }
 function voiceGenerationSettings(voice) { return {...defaultGenerationSettings, ...(voice?.generation_settings || {})}; }
@@ -354,7 +356,9 @@ function createVoiceSettingsEditor(voice) {
       ? el('label', {class: 'check'}, input, ' ', t(label))
       : el('label', {}, t(label), input);
     labelNode.classList.add('generation-setting');
-    labelNode.append(el('small', {class: 'muted'}, t(generationHelp[key])));
+    labelNode.title = t(generationHelp[key]);
+    input.title = t(generationHelp[key]);
+    input.setAttribute('aria-description', t(generationHelp[key]));
     container.append(labelNode);
   }
   const editor = el('details', {class: 'voice-generation-settings'},
