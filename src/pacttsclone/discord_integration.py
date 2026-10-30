@@ -185,6 +185,8 @@ class DiscordIntegration:
             except queue.Empty:
                 continue
             with self.lock:
+                if self.stopping.is_set():
+                    return
                 if revision != self.revision or not self.config.enabled:
                     self.store.patch("discord_delivery", job_id, status="cancelled")
                     continue
@@ -194,11 +196,15 @@ class DiscordIntegration:
             try:
                 self.sender(url, self.service.output_path(job_id))
                 with self.lock:
+                    if self.stopping.is_set():
+                        return
                     self.store.patch("discord_delivery", job_id, status="sent")
                     self.status, self.error = "sent", None
             except Exception as exc:
                 error = str(exc) if isinstance(exc, UserError) else "Discord upload failed."
                 with self.lock:
+                    if self.stopping.is_set():
+                        return
                     self.store.patch("discord_delivery", job_id, status="failed", error=error)
                     self.status, self.error = "failed", error
 
