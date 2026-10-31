@@ -11,7 +11,7 @@ weights and the default flow decoder. It does not use the older CPU ONNX KittenT
 | GPU | NVIDIA CUDA with native BF16 (Ampere or newer); CPU speech fallback disabled |
 | VRAM | Upstream recommends about 8 GB **free** VRAM; estimate, not an app measurement |
 | Assets | 2,114,438,061 bytes of pinned source/model/decoder/voice assets |
-| Installation space | Assets plus a conservative 16 GiB budget for private CUDA environment and package cache; actual usage varies |
+| Installation space | Assets plus a conservative 20 GiB budget for private CUDA environment and package cache; actual usage varies |
 | System RAM | Minimum not measured; packed weights expand while loading |
 | Languages | 20 upstream languages including Portuguese; automatically detected from text |
 | Voice cloning | Saved 5–30 second reference plus exact transcript |
@@ -28,8 +28,9 @@ runs before replacing the previous selection. No driver is installed. The engine
 Python packages are isolated from OmniVoice and Ming. Inference uses verified local
 files with Hub offline mode; it never downloads Whisper large automatically.
 Blank reference transcripts use the app's separately installed shared CPU Whisper,
-or can be entered manually. Preset mode ignores the saved reference audio; selecting
-a saved voice still selects its stored Kitten settings.
+or can be entered manually. Preset mode ignores the saved reference audio and
+requires no Whisper or reference preparation. Save preset mode in a voice profile, then select that profile in Local
+or Twitch; the profile selects its stored Kitten settings.
 
 Code revision: `b9517e3050adced306219f8bea5f117d87ecfaa7` (kittenml 0.9.7).
 Model: `KittenML/kitten-tts-2@c93cb7c271baa51d9ae8204d5277988906f235a2`.
@@ -44,18 +45,27 @@ Official sources:
 
 ## Validation status
 
-Implementation is complete; final release acceptance is in progress. The local
-backend regression suite passed (289 tests before the Python-version guard was
-added; 46 focused tests including that guard passed). All 41 Chromium tests passed,
-including settings persistence, language switching and mobile layout. Ruff,
-JavaScript syntax, compilation and packaged wheel contents passed.
+Implementation is complete. The final local suite passed **291 backend tests and
+41 Chromium tests**, including preset generation from an unprepared profile with
+no ASR, independent engine settings, language switching and mobile layout. Ruff,
+JavaScript syntax, compilation, wheel contents and desktop/mobile visual checks passed.
 
 Actual private CUDA dependency installation, pip check, upstream imports and repeated
-source/runtime cache reuse passed on Windows and Linux (Actions run 41252188987).
-The direct dependency versions resolved identically on both platforms and are now
-pinned. Final pinned-version acceptance and Windows installer acceptance are pending.
-Full local model/decoder download and offline cache validation are still running.
+source/runtime cache reuse passed on Windows and Linux (Actions runs 41252188987
+and 41252608236). Direct dependency versions are pinned identically on both
+platforms. Full local source/model/decoder download and integrity checks passed.
+Repeated installation with asset downloads and pip indexes disabled passed, including
+reuse without reinstalling dependencies. Offline structural checks passed for the
+tokenizer, model config, packed/speaker/decoder tensor files and all 115 voices'
+reference files, artifacts and transcripts. Actual CPU-only activation preflight
+correctly rejected unsupported hardware.
+
+The initial Linux installation reported about 14.97 GB including runtime/cache.
+Repeated validation retained temporary/resumable files and reached about 19.45 GB;
+the 20 GiB runtime/cache budget is conservative guidance, not a fixed size or minimum.
+The UI reports each installation's actual receipt size. Final CI/Windows installer
+acceptance and v2.3.0-rc.1 publication run through the release workflow.
 
 No physical CUDA synthesis, measured quality/latency/VRAM or minimum system RAM has
 been established. Do not treat an import or simulated audio test as real GPU
-generation. A separate v2.3.0-rc.1 preview release follows successful acceptance.
+generation. This remains a preview release.

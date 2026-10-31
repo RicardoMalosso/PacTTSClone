@@ -129,7 +129,7 @@ class EngineManager:
         rows[2] = self.kitten.row()
         return {
             "engines": rows,
-            "directory": str(self.service.settings.data_dir / "models"),
+            "directory": str(self.service.settings.data_dir),
             "free_bytes": shutil.disk_usage(self.service.settings.data_dir).free,
             "busy": self.service.setup_busy,
             "loaded": bool(

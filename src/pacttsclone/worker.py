@@ -166,7 +166,12 @@ def execute_task(engine, settings, task, emit):
         reference_cropped = pipeline.decode(workspace / "reference.mp3", reference)
         request = GenerationRequest(**task["request"])
         transcript = request.ref_text
-        if not transcript:
+        preset_speech = (
+            settings.engine_id == "kittentts2"
+            and request.kitten.mode == "preset"
+            and task.get("kind") != "transcribe"
+        )
+        if not transcript and not preset_speech:
             if not hasattr(engine, "transcribe"):
                 # Explicit test engines may provide a deterministic transcript.
                 transcript = "Test reference transcript."

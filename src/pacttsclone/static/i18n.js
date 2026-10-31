@@ -1,6 +1,9 @@
 'use strict';
 (() => {
   const pt = {
+    "Save preset mode in Voices to use a built-in voice without preparing the reference or installing Whisper.": "Salve o modo de voz integrada em Vozes para usá-la sem preparar a referência nem instalar o Whisper.",
+    "Requirements marked “Not verified” have no established minimum. Download sizes cover model/source assets; CUDA packages are additional. Peak installation budgets include dependencies and caches. Uninstall retains personal voices and audio; private engine runtimes are removed with their engine.": "Requisitos marcados como “Não verificado” não têm mínimo estabelecido. O tamanho do download cobre modelos e código; os pacotes CUDA são adicionais. A estimativa de instalação inclui dependências e caches. Desinstalar preserva vozes pessoais e áudios; o ambiente privado de cada motor é removido com ele.",
+    "Installation directory": "Pasta de instalação",
     "The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.": "O limite vale para cada trecho; 25 tokens de áudio equivalem a aproximadamente um segundo. Uma semente fixa ajuda a reproduzir o pedido.",
     "KittenTTS2 settings": "Configurações do KittenTTS2",
     "Voice mode": "Modo da voz",

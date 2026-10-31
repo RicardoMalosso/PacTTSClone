@@ -1,4 +1,4 @@
-"""Verified Ming assets and isolated dependency installation. Run in a cancellable child."""
+"""Verified engine assets and isolated dependency installation. Run in a cancellable child."""
 
 import argparse
 import hashlib
@@ -43,7 +43,7 @@ def safe_destination(root, name):
         or any(p.is_symlink() for p in [destination, *destination.parents])
         or not destination.resolve().is_relative_to(root.resolve())
     ):
-        raise ValueError("Unsafe Ming installation path.")
+        raise ValueError("Unsafe engine installation path.")
     return destination
 
 
@@ -97,7 +97,7 @@ def install(root, runtime_only=False, profile="ming"):
     reserve = (
         0
         if reused and python.is_file()
-        else (16 * 1024**3 if profile == "kitten" else RUNTIME_RESERVE)
+        else (20 * 1024**3 if profile == "kitten" else RUNTIME_RESERVE)
     )
     selected = (("source", source),) if runtime_only else (("source", source), ("model", model))
     entries = [

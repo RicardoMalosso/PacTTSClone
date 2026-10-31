@@ -195,3 +195,51 @@ def test_unsupported_host_python_fails_before_installing(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="Python 3.12"):
         ming_install.install(tmp_path / "kitten", profile="kitten")
     assert not (tmp_path / "kitten").exists()
+
+
+def test_unprepared_profile_preset_generates_without_asr(tmp_path, mp3, engine):
+    import shutil
+
+    from pacttsclone.domain import GenerationSettings
+    from pacttsclone.service import GenerationService
+    from pacttsclone.voices import Voices
+    from tests.conftest import wait_job
+
+    service = GenerationService(Settings(data_dir=tmp_path), engine)
+    service.settings = service.runner.settings = replace(service.settings, engine_id="kittentts2")
+    voices = Voices(service)
+    root = voices.root / "profile"
+    root.mkdir()
+    shutil.copyfile(mp3, root / "reference.mp3")
+    service.store.put(
+        "voice",
+        "profile",
+        {
+            "id": "profile",
+            "status": "unprepared",
+            "transcript": "",
+            "title": "Preset profile",
+            "original_filename": "reference.mp3",
+        },
+    )
+    voices.set_generation_settings(
+        "profile", GenerationSettings(kitten=KittenOptions(mode="preset"))
+    )
+
+    def no_asr(reference):
+        raise AssertionError("Preset speech must not call ASR")
+
+    engine.transcribe = no_asr
+    try:
+        job = voices.generate("profile", GenerationRequest(text="Olá"))
+        result = wait_job(service, job["id"])
+        assert result["status"] == "succeeded", result.get("error")
+        assert engine.calls[0][1].ref_text == ""
+        assert engine.calls[0][1].kitten.mode == "preset"
+        assert service.store.get("voice", "profile")["status"] == "unprepared"
+        with pytest.raises(UserError, match="not ready"):
+            voices.generate(
+                "profile", GenerationRequest(text="Olá", kitten=KittenOptions(mode="clone"))
+            )
+    finally:
+        service.close()

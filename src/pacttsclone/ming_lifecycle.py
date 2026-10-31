@@ -237,6 +237,7 @@ class MingLifecycle:
             installed_bytes = total
         return {
             "id": self.engine_id,
+            "directory": str(self.root),
             "name": "Ming 3.0 · 0.5B dense",
             "supported": True,
             "installed": installed,

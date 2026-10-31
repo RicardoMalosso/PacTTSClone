@@ -200,3 +200,16 @@ channel IDs, default ready voice, filters, text limit and cooldown. `/tts` and
 endpoint. Generation stays isolated in the existing worker and inherits saved
 voice settings. Disconnect/remove/cancel-all/shutdown close the connection and
 cancel undelivered generation. See [Discord contract](discord.md).
+
+
+## KittenTTS2 engine
+
+Engines supports a separately installed KittenTTS2 1.7B packed native CUDA runtime,
+with explicit activation, cancellation, uninstall safety and independent voice
+settings. Expose 115 built-in voices and reference cloning (5–30 seconds plus
+transcript), automatic language detection including Portuguese, stable/expressive
+presets, token budget, normalization, reference conditioning, seed and output volume.
+Hide and reject unsupported OmniVoice controls. Target compatible NVIDIA native
+BF16 GPUs generally; the owner's hardware is not a requirement. Label upstream
+VRAM guidance as an estimate and unmeasured minima explicitly. See
+[requirements and validation record](kitten-integration.md).

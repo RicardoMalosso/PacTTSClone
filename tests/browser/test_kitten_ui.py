@@ -12,6 +12,8 @@ def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, 
     page.goto(url)
     add_ready_voice(page, mp3, title="Kitten test voice")
     service = app.state.service
+    profile = service.store.all("voice")[0]
+    service.store.patch("voice", profile["id"], status="unprepared", transcript="")
     service.settings = service.runner.settings = replace(service.settings, engine_id="kittentts2")
     service.kitten_installed = lambda: True
     app.state.runtime_setup.update(active_engine="kittentts2", engine_enabled=True)
@@ -51,6 +53,11 @@ def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, 
     page.get_by_text("Generation settings", exact=True).click()
     expect(page.locator('#generate-form [data-kitten="preset"]')).to_have_value("expressive")
     expect(page.locator('#generate-form [data-kitten="seed"]')).to_have_value("42")
+    page.locator("#text").fill("Olá do preset Kitten.")
+    page.locator("#requester-name").fill("Preset test")
+    page.locator("#generate").click()
+    expect(page.locator("#player")).to_be_visible(timeout=15000)
+    assert service.store.get("voice", profile["id"])["transcript"] == ""
     page.locator('#generate-form [data-kitten="mode"]').select_option("clone")
     expect(page.locator('#generate-form [data-kitten="voice"]')).to_be_hidden()
     page.locator('[data-locale="pt"]').click()
