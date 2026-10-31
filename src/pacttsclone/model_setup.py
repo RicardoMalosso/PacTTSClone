@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import time
 import urllib.request
 from pathlib import Path
@@ -152,6 +153,22 @@ def download_models(root, repos, hf_cache, search_roots=(), move_weights=False, 
                 raise ValueError("Invalid model integrity metadata.")
             entry["url"] = f"https://huggingface.co/{repo}/resolve/{plan['revision']}/{name}"
         plans.append(plan)
+    # Reserve space for full replacement files, including corrupt existing caches.
+    # Verified reuse may need less; never discover a full disk mid-download knowingly.
+    if not import_only:
+        required = sum(
+            entry["size"]
+            for plan in plans
+            for entry in plan["files"]
+            if not verify_file(
+                root / plan["repo"].replace("/", "--") / plan["revision"] / entry["name"],
+                entry["size"],
+                entry["hash"],
+                entry["algorithm"],
+            )
+        )
+        if required > shutil.disk_usage(root).free:
+            raise ValueError(f"Insufficient disk space: need {required} additional model bytes.")
     total = sum(f["size"] for p in plans for f in p["files"] if not import_only or is_weight(f))
     weight_sizes = {entry["size"] for plan in plans for entry in plan["files"] if is_weight(entry)}
     roots = list(dict.fromkeys([str(hf_cache), *search_roots]))

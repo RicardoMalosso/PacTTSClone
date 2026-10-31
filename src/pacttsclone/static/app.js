@@ -141,7 +141,7 @@ const channelControls = $('channel-connection').parentElement;
 const channelControlsHost = channelControls.parentElement;
 function tab(name) {
   if (name === 'general') name = 'studio';
-  if (!runtimeSetup.ready && !['setup', 'config'].includes(name)) name = 'setup';
+  if (!runtimeSetup.ready && !['setup', 'config', 'engines'].includes(name)) name = 'setup';
   if (name === 'bugs' && !bugPlayerReady) { openBugVideo(); return; }
   window.Locale.apply();
   if (name !== 'bugs') stopBugVideo();
@@ -776,7 +776,7 @@ function renderSetup(data) {
   if (data.stage === 'models' && data.download?.total_bytes) {
     modelDownloaded = Math.max(modelDownloaded, data.download.completed_bytes || 0);
   }
-  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && !['setup', 'config'].includes(node.dataset.tab); });
+  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && !['setup', 'config', 'engines'].includes(node.dataset.tab); });
   $('generate').disabled = busy || !data.ready;
   renderGlobalStatus();
   $('tunnel-card').hidden = !data.ready;
@@ -824,7 +824,7 @@ function renderSetup(data) {
     ` · ${d.reused_files || 0} ${t('verified cached files reused')}` :
     (isDependency ? 'Dependency progress appears above.' : 'Waiting for model downloads.');
   if (!data.ready && !setupAvailable) return;
-  if (!data.ready && $('pane-config').hidden && (wasReady || !$('pane-setup').hidden)) tab('setup');
+  if (!data.ready && $('pane-config').hidden && $('pane-engines').hidden && (wasReady || !$('pane-setup').hidden)) tab('setup');
 }
 async function runtimeStatus() {
   if (session?.remote_access) { renderSetup({ready: state.setup_ready ?? session.setup_ready, status: 'host', stage: 'Waiting for host setup', ...(state.setup_activity || {})}); document.querySelector('[data-tab="setup"]').hidden = runtimeSetup.ready; $('setup-start').hidden = true; $('setup-cancel').hidden = true; $('setup-device').disabled = true; $('tunnel-card').hidden = true; return; }
@@ -1138,3 +1138,43 @@ async function refreshUpdates(check = false) {
 $('update-check').onclick = () => refreshUpdates(true);
 setInterval(() => refreshUpdates(), 30000);
 refreshUpdates();
+
+async function renderEngines() {
+  if (!session || session.remote_access || $('pane-engines').hidden) return;
+  const data = await api('/api/engines');
+  const size = n => n == null ? t('Not verified') : `${(n / 1073741824).toFixed(2)} GiB`;
+  $('engine-hardware').textContent = (state.model_residency?.loaded ? t('Model loaded in memory') : t('Model unloaded')) + ' · ' + $('vram').textContent;
+  $('engine-storage').textContent = `${data.directory} · ${size(data.free_bytes)} ${t('free')}`;
+  $('engine-rows').replaceChildren(...data.engines.map(engine => {
+    const controls = el('td');
+    const details = el('details', {}, el('summary', {}, t('Requirements and features')));
+    const add = (label, value) => details.append(el('p', {}, `${t(label)}: ${t(value)}`));
+    add('Runtime', engine.runtime); add('System RAM', engine.ram);
+    add('Languages', engine.languages); add('License', engine.license);
+    for (const [name, value] of Object.entries(engine.capabilities)) add(name, value);
+    for (const model of engine.models) details.append(el('p', {}, `${model.repo}@${model.revision}`));
+    details.append(el('a', {href: engine.source, target: '_blank', rel: 'noopener noreferrer'}, t('Model documentation')));
+    const run = operation => async () => {
+      if (operation === 'uninstall' && !confirm('Remove installed engine model files? Saved voices and audio are retained.')) return;
+      await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
+      await renderEngines();
+    };
+    if (!engine.supported) controls.textContent = t('Available in a later release');
+    else if (data.busy) controls.append(button('Cancel setup', run('cancel')));
+    else if (!engine.installed) controls.append(button('Install', run('install')));
+    else {
+      controls.append(button(engine.active ? 'Deactivate' : 'Activate', run(engine.active ? 'deactivate' : 'activate')));
+      const remove = button('Uninstall', run('uninstall'));
+      remove.disabled = engine.active;
+      controls.append(remove);
+    }
+    return el('tr', {}, el('td', {}, engine.name),
+      el('td', {}, `${size(engine.installed_bytes)} ${t('installed')} / ${size(engine.download_bytes)} ${t('download')}; ${t('Peak installation space')}: ${t('Not verified')}`),
+      el('td', {}, t(engine.vram)), el('td', {}, t(engine.features), details),
+      el('td', {}, t(engine.active ? (data.loaded ? 'Active / loaded' : 'Active / unloaded') : engine.status)), controls);
+  }));
+  const download = data.setup.download;
+  $('engine-progress').textContent = data.setup.error || (download ? `${download.phase || ''}: ${size(download.completed_bytes)} / ${size(download.total_bytes)}` : data.setup.stage);
+}
+window.addEventListener('localechange', () => renderEngines().catch(e => error(e.message)));
+setInterval(() => renderEngines().catch(e => error(e.message)), 2000);

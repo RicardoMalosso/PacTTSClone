@@ -1,6 +1,6 @@
 # Task 1 — Engines installation manager
 
-Status: planned; implementation begins here. Owner authorized implementation and release.
+Status: implemented; release validation in progress. Owner authorized implementation and release.
 Order: complete and release this task before Task 2. Never bundle Ming or Kitten inference into this release.
 
 ## Deliverable
