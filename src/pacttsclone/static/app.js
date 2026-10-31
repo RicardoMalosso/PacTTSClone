@@ -870,6 +870,9 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const ming = state.active_engine === 'ming-3';
+  $('engine-text-hint').textContent = t(ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
+  $('engine-timing-hint').textContent = t(ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
   const residency = state.model_residency || {};
   const active = state.active_job;
   const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
@@ -1231,7 +1234,8 @@ function renderMingOptions(container, saved = {}) {
   panel.querySelector('[data-ming="task"]').addEventListener('change', visibility);
   panel.append(el('details', {}, el('summary', {}, t('Supported vocal tags')),
     '[Breathing] [Cough] [Sigh] [Laughter] [Surprise-ah] [Surprise-oh] [Dissatisfaction-hnn] [Uhm] [Confirmation-en] [Question-ei] [Question-ah] [Question-en] [Question-oh] [Question-huh]'));
-  visibility(); container.append(panel);
+  panel.style.gridColumn = "1 / -1"; panel.style.minWidth = "0";
+  visibility(); (container.querySelector(".settings") || container).append(panel);
 }
 
 window.addEventListener('localechange', () => {

@@ -1,6 +1,10 @@
 'use strict';
 (() => {
   const pt = {
+    "Ming interprets punctuation and supported vocal tags.": "O Ming interpreta pontuação e tags vocais compatíveis.",
+    "Each Ming task has its own controls; saved voice selection also chooses its settings preset.": "Cada tarefa do Ming possui controles próprios; selecionar a voz também escolhe seus ajustes salvos.",
+    "Saved voices share the active engine. Warm means its base model is in memory; each reference still needs preparation and conditioning.": "As vozes salvas compartilham o motor ativo. Quente significa que seu modelo base está na memória; cada referência ainda precisa de preparação e condicionamento.",
+
     "Ming task settings": "Configurações do Ming",
     "Task": "Tarefa",
     "Clone / vocal tags": "Clonagem / tags vocais",

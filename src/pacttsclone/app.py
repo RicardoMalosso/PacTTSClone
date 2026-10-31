@@ -272,7 +272,9 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def health():
         return {
             "ffmpeg_available": service.audio.available(),
-            "inference_installed": dependencies_available(),
+            "inference_installed": service.ming_installed()
+            if service.settings.engine_id == "ming-3"
+            else dependencies_available(),
             "device_requested": settings.device,
             "offline": settings.offline,
         }

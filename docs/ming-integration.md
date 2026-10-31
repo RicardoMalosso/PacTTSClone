@@ -96,5 +96,8 @@ storage was approximately 15.3 GB including the private runtime and caches; this
 is one Linux measurement, not a universal requirement. The actual runtime preflight
 correctly refused CPU-only hardware. The core suite passed 269 tests and Chromium
 passed 40 tests before the final metadata checks; focused follow-up tests passed.
-Windows runtime/import and release installer acceptance are pending. Release remains gated by the
+Windows and Linux private-runtime install/import and repeated cache reuse both passed
+in Actions run 41232561493. Windows installer acceptance is in progress.
+Final core suite: 271 passed; full Chromium: 40 passed; targeted Ming/Engines UI: 3 passed.
+Desktop/mobile layout was visually inspected, with no horizontal overflow at 390 px. Release remains gated by the
 recorded results and Windows installer acceptance; no release is claimed here.

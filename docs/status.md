@@ -800,3 +800,14 @@ No physical GPU synthesis, audio quality, minimum VRAM or latency result is clai
 Windows private-runtime/import and installer acceptance will run in Actions.
 Task 1 PR21 merged after all seven versioned CI jobs passed; its separate 2.1.0
 publication workflow is running. Ming is prepared as separate 2.2.0rc1 preview.
+
+### Ming cross-platform runtime validation
+
+Actions run 41232561493 passed real private CUDA dependency installation, verified
+source imports and repeated runtime/cache reuse on both Windows and Linux.
+Run 41232561209 passed all seven Windows/Linux core/Chromium/tooling jobs; its
+Windows installer acceptance is in progress. Final local core: 271 passed; full
+Chromium: 40 passed; final targeted Engines/Ming UI: 3 passed. Visual inspection
+confirmed desktop/mobile layout with no overflow at 390px. A final UI correction
+keeps Ming controls inside the collapsible settings panel and makes health/help
+text describe the active engine. No runtime/dependency contract changed.

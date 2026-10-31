@@ -33,6 +33,7 @@ def test_ming_task_controls_saved_separately_and_restored(page, live_server, mp3
     page.reload()
     page.locator('[data-tab="studio"]').click()
     page.locator("#voice-select").select_option(label="Ming test voice")
+    expect(page.locator("#generate-form [data-ming=task]")).to_be_hidden()
     page.get_by_text("Generation settings", exact=True).click()
     expect(page.locator('#generate-form [data-ming="task"]')).to_have_value("EMOTION")
     expect(page.locator('#generate-form [data-ming="emotion"]')).to_have_value("happy")
