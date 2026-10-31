@@ -736,3 +736,20 @@ check. Windows installer acceptance now executes the same lifecycle check.
 Ruff, JavaScript syntax, compilation, workflow YAML, wheel build and diff checks
 passed. Browser and actual Windows acceptance results are tracked in the release PR.
 Live Discord/GPU validation remains separate from controlled transport/inference tests.
+
+## Engines manager implementation — 2026-10-31
+
+Initial Task 1 implementation adds host-only catalogue and install/cancel controls
+using the existing runtime setup, persistent active/deactivated selection, and
+manifest-scoped uninstall after deactivation while queues are idle. Existing model
+files are recognized. Ming 3.0 and KittenTTS2 remain planned without install buttons.
+The table distinguishes unknown VRAM/disk estimates from measured installed bytes.
+Model downloads check free space before transfer. New lifecycle/API/Chromium tests
+cover deletion boundaries, busy state, unsupported engines and token enforcement.
+
+Validation so far: 238 core tests passed before the additional API test; 16 focused
+engine/setup checks passed. Ruff, JS syntax and compilation passed. The new Chromium catalogue/localization test passed; full Chromium
+is in progress. Real CUDA and Windows installer acceptance are not claimed.
+Task 1 remains in progress: complete sourced hardware/features metadata, installation
+peak/runtime accounting, full EN/PT dynamic text and release validation before
+publishing. No release yet. Tasks 2/3 have not begun.

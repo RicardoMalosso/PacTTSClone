@@ -14,6 +14,7 @@ from pydantic import ValidationError
 from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, Engine, GenerationRequest, GenerationSettings, UserError
 from .engine import dependencies_available
+from .engines import EngineManager
 from .models import AppConfig, ChannelConfig, DiscordConfig
 from .playback import GENERAL_PLAYER
 from .service import GenerationService
@@ -126,6 +127,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     tunnel = Tunnel(service)
     runtime_setup = RuntimeSetup(service)
     runtime_setup.on_ready = studio.start
+    engines = EngineManager(runtime_setup)
     updater = Updater()
     token = secrets.token_urlsafe(32)
 
@@ -180,6 +182,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             },
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.get("/api/engines")
+    def engine_status(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Engine management requires local access.")
+        return engines.snapshot()
+
+    @app.post("/api/engines/{engine_id}/{operation}")
+    def engine_change(engine_id: str, operation: str, request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Engine management requires local access.")
+        return engines.change(engine_id, operation)
 
     @app.get("/api/setup")
     def setup_status():

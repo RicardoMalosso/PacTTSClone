@@ -94,7 +94,7 @@ class RuntimeSetup:
             )
             return {
                 **self.state,
-                "ready": ready,
+                "ready": ready and self.state.get("engine_enabled", True),
                 "lines": self.lines[-500:],
                 "weight_discovery": self.discovery,
                 "import_status": self.import_status,

@@ -1,6 +1,16 @@
 'use strict';
 (() => {
   const pt = {
+    "Engines": "Motores",
+    "Disk space / download": "Espaço em disco / download",
+    "VRAM requirement": "Requisito de VRAM",
+    "Features": "Recursos",
+    "Controls": "Controles",
+    "Install": "Instalar",
+    "Uninstall": "Desinstalar",
+    "Activate": "Ativar",
+    "Deactivate": "Desativar",
+
     "Automatically post selected generated MP3s to a Discord channel. Webhooks cannot read messages or accept TTS commands.": "Publique automaticamente MP3s gerados selecionados em um canal do Discord. Webhooks não leem mensagens nem recebem comandos de TTS.",
     "How to configure Discord": "Como configurar o Discord",
     "In Discord, open Server Settings → Integrations → Webhooks.": "No Discord, abra Configurações do servidor → Integrações → Webhooks.",
