@@ -48,7 +48,7 @@ def fetch_file(entry, destination, progress=lambda n, phase: None):
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_name(destination.name + ".partial")
     offset = partial.stat().st_size if partial.exists() else 0
-    if offset >= size:
+    if partial.exists() and offset >= size:
         if verify_file(
             partial, size, checksum, algorithm, lambda n: progress(n, "verifying partial")
         ):

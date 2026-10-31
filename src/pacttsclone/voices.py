@@ -209,14 +209,23 @@ class Voices:
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
         # Twitch callers pass text alone; only explicitly supplied fields override
         # the voice's stored generation defaults. Snapshot before queueing.
-        saved = voice.get("generation_settings") or {}
+        engine_id = self.service.settings.engine_id
+        saved = (
+            (voice.get("generation_settings") or {})
+            if engine_id == "omnivoice"
+            else (
+                (voice.get("engine_generation_settings") or {}).get(engine_id) or {"language": "en"}
+            )
+        )
         explicit = {
             key: getattr(request, key)
             for key in GenerationSettings.model_fields
             if key in request.model_fields_set
         }
         effective = GenerationSettings.model_validate({**saved, **explicit}).model_dump()
-        request = request.model_copy(update={"ref_text": voice["transcript"], **effective})
+        request = GenerationRequest.model_validate(
+            {**request.model_dump(), "ref_text": voice["transcript"], **effective}
+        )
         with self.service._lock:
             with (self.root / voice_id / "reference.mp3").open("rb") as reference:
                 result = self.service.submit(
@@ -237,6 +246,11 @@ class Voices:
             if not self.store.get("voice", voice_id):
                 raise UserError("Voice not found.")
             # Previously queued generation requests retain their snapshot.
+            if self.service.settings.engine_id != "omnivoice":
+                voice = self.store.get("voice", voice_id)
+                engines = dict(voice.get("engine_generation_settings") or {})
+                engines[self.service.settings.engine_id] = settings.model_dump()
+                return self.store.patch("voice", voice_id, engine_generation_settings=engines)
             return self.store.patch("voice", voice_id, generation_settings=settings.model_dump())
 
     def update(self, voice_id, title, transcript):

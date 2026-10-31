@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-2.0.0.exe` in the [v2 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.0.0). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+`PacTTSClone-Setup-2.1.0.exe` in the [v2 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.1.0). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -454,3 +454,12 @@ or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
 50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
 Boosting too much can distort loud peaks. Local generation can override saved
 settings for one request; existing recordings keep their original volume.
+
+## Ming 3.0 dense engine (preview)
+
+Engines can install Ming 3.0 0.5B in an isolated CUDA runtime, then activate it
+explicitly. Native BF16 NVIDIA GPUs (Ampere or newer) are required. Minimum VRAM
+has not been established. English/Chinese and five additional target languages
+are supported; Portuguese is not. Voices and Local expose Ming-specific cloning,
+emotion, attribute, dialect, freeform, design and preset tasks. Engine-specific
+voice settings are retained independently. [Setup, limitations and validation](docs/ming-integration.md).

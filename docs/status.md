@@ -775,3 +775,28 @@ Ten deterministic tests passed for request mapping, unsupported language/setting
 CUDA/BF16 rejection and waveform normalization. Ruff passed. Upstream BF16 excludes
 GTX 1660 SUPER in this implementation; FP16 needs separate real validation.
 Runtime isolation, verified installs/UI, task controls and real inference remain.
+
+## Ming integration implementation — 2026-10-31
+
+Implemented host-only lifecycle and verified source/model manifests, private CUDA
+runtime, persistent JSON/WAV inference bridge, preflight/selection persistence,
+separate voice task defaults, Local controls and normal Twitch/MP3/OBS/Discord
+routing. Supports dense 0.5B cloning/tags, multilingual, emotion, attributes,
+dialect, freeform/design and selected preset voices. Does not expose Tiny MoE.
+Native BF16 NVIDIA GPU required; no personal hardware constraints and no CPU speech.
+
+Fixed the shared downloader's zero-byte repository-file bug and graceful worker
+shutdown leaving a resident external inference process. Added real child transport
+and shutdown tests, activation rollback/restart, task/default separation and browser
+coverage. Core 269 and Chromium 40 passed before final metadata checks; focused
+follow-ups passed. Ruff, JS syntax, Python compilation and application wheel passed.
+
+Actual Linux installation downloaded/verified 3,003,464,609 model/source bytes,
+installed the private Torch/CUDA/Transformers stack, passed pip check and imported
+upstream Ming. A repeat with asset HTTP disabled reused verified assets/packages.
+Observed total runtime/cache/assets approximately 15.3 GB; not a universal minimum.
+Actual CPU-only preflight returned the required CUDA error, without fallback.
+No physical GPU synthesis, audio quality, minimum VRAM or latency result is claimed.
+Windows private-runtime/import and installer acceptance will run in Actions.
+Task 1 PR21 merged after all seven versioned CI jobs passed; its separate 2.1.0
+publication workflow is running. Ming is prepared as separate 2.2.0rc1 preview.

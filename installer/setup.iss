@@ -1,12 +1,12 @@
 #ifndef AppVersion
-#define AppVersion "2.0.0"
+#define AppVersion "2.2.0-rc.1"
 #endif
 [Setup]
 AppId={{7FF568CE-33A3-40B1-A7C0-15AA76F1DB84}
 AppName=PacTTSClone
 AppVersion={#AppVersion}
 AppVerName=PacTTSClone {#AppVersion}
-VersionInfoVersion=2.0.0.0
+VersionInfoVersion=2.2.2.0rc1
 DefaultDirName={localappdata}\Programs\PacTTSClone
 DefaultGroupName=PacTTSClone
 PrivilegesRequired=lowest

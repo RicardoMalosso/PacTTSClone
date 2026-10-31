@@ -72,7 +72,11 @@ class RuntimeSetup:
         if self.state["status"] == "succeeded" and self._models_present():
             paths = list(self.state["models"]["paths"].values())
             settings = replace(
-                self.service.settings, model=paths[0], asr_model=paths[1], offline=True
+                self.service.settings,
+                model=paths[0],
+                asr_model=paths[1],
+                offline=True,
+                model_revision=Path(paths[0]).name if len(Path(paths[0]).name) == 40 else "",
             )
             self.service.settings = settings
             self.service.runner.settings = settings
@@ -94,7 +98,13 @@ class RuntimeSetup:
             )
             return {
                 **self.state,
-                "ready": ready and self.state.get("engine_enabled", True),
+                "ready": (
+                    (self.service.ming_installed() and not self.service.setup_busy)
+                    if self.service.settings.engine_id == "ming-3"
+                    and hasattr(self.service, "ming_installed")
+                    else ready
+                )
+                and self.state.get("engine_enabled", True),
                 "lines": self.lines[-500:],
                 "weight_discovery": self.discovery,
                 "import_status": self.import_status,
@@ -264,6 +274,8 @@ class RuntimeSetup:
             self.thread.join(5)
 
     def start(self, device, search_roots=None, move_weights=False):
+        if self.service.settings.engine_id == "ming-3":
+            raise UserError("Deactivate Ming before repairing the shared OmniVoice setup.")
         if not isinstance(move_weights, bool):
             raise UserError("Choose copy or move for the selected old model folders.")
         if search_roots is not None:

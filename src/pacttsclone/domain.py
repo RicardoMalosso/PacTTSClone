@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -13,10 +13,26 @@ class BusyError(UserError):
     pass
 
 
+class MingOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    task: Literal["TTS", "EMOTION", "BASIC", "FREEFORM", "VOICE_DESIGN", "IP", "DIALECT"] = "TTS"
+    language: Literal["en", "zh", "de", "es", "fr", "ko", "ja"] = "en"
+    emotion: Literal["happy", "sad", "angry", "afraid", "disgusted", "surprised", "neutral"] = (
+        "neutral"
+    )
+    speed: Literal["slow", "normal", "fast"] = "normal"
+    pitch: Literal["low", "normal", "high"] = "normal"
+    loudness: Literal["low", "normal", "high"] = "normal"
+    instruction: str = Field(default="", max_length=1000)
+    voice: Literal["US_Emma", "UK_George", "UK_Charlotte"] = "US_Emma"
+    dialect: Literal["chuanyu dialect", "cantonese"] = "cantonese"
+
+
 class GenerationSettings(BaseModel):
     """Persistent defaults for individual voices."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    ming: MingOptions = Field(default_factory=MingOptions)
     language: str = "auto"
     volume: float = Field(default=100.0, ge=0, le=300)
     speed: float = Field(default=1.0, ge=0.5, le=1.5)

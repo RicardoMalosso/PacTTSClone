@@ -167,6 +167,10 @@ class GenerationService:
                 raise BusyError("Já existe uma geração em andamento. Aguarde a conclusão.")
             if len(pending) >= self.config.max_queue:
                 raise BusyError("Generation queue is full.")
+            if self.settings.engine_id == "ming-3" and kind == "speech":
+                from .ming_engine import generation_arguments
+
+                generation_arguments("reference.wav", request)
             workspace = Path(tempfile.mkdtemp(prefix="job-", dir=self.temporary))
             try:
                 total = 0
@@ -202,6 +206,9 @@ class GenerationService:
                     "error": None,
                     "output_url": None,
                     "workspace": str(workspace),
+                    "engine_id": self.settings.engine_id,
+                    "engine_model": self.settings.model,
+                    "engine_revision": self.settings.model_revision,
                     "request": request.model_dump(),
                     "voice_id": voice_id,
                     "channel": channel,

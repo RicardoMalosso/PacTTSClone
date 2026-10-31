@@ -1,6 +1,7 @@
 # Task 2 — Ming 3.0 engine
 
-Status: planned. Depends on Task 1 passing and its release being published.
+Status: implementation complete; validation/release in progress. Owner requested starting
+implementation before Task 1 publication. Task 1 has merged; its separate release is running.
 Owner authorized implementation and a separate release.
 
 ## Resolve upstream identity first

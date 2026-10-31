@@ -139,6 +139,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             yield
         finally:
             updater.close()
+            engines.ming.close()
             runtime_setup.close()
             tunnel.close()
             studio.close()
@@ -182,6 +183,15 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             },
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.get("/api/engines/ming-3/log")
+    def ming_install_log(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Engine management requires local access.")
+        path = service.logs / "ming-install.log"
+        if not path.is_file():
+            raise HTTPException(404, "No Ming installation log yet.")
+        return FileResponse(path, media_type="text/plain", filename="ming-install.log")
 
     @app.get("/api/engines")
     def engine_status(request: Request):
@@ -447,12 +457,13 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             "player_links": tunnel.snapshot()["players"],
             "jobs": jobs,
             "request_history": service.request_history(),
+            "active_engine": service.settings.engine_id,
             "model_residency": {
                 **getattr(service.runner, "model_state", {}),
                 "loaded": bool(
                     service.runner.pid and getattr(service.runner, "model_state", {}).get("loaded")
                 ),
-                "model": runtime_setup.model_ids[0],
+                "model": service.settings.model,
                 "worker_pid": service.runner.pid,
             },
             "voices": service.store.all("voice"),

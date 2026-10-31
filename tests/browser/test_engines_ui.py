@@ -11,8 +11,10 @@ def test_engines_catalog_has_honest_future_controls(page, live_server):
     omni = page.locator("#engine-rows tr").filter(has_text="OmniVoice")
     expect(omni.get_by_role("button", name="Install", exact=True)).to_be_visible()
     ming = page.locator("#engine-rows tr").filter(has_text="Ming 3.0")
-    expect(ming).to_contain_text("Available in a later release")
-    expect(ming.get_by_role("button")).to_have_count(0)
+    expect(ming.get_by_role("button", name="Install", exact=True)).to_be_visible()
+    expect(page.locator("#engine-rows tr").filter(has_text="KittenTTS2")).to_contain_text(
+        "Available in a later release"
+    )
     expect(page.locator("#engine-storage")).to_contain_text(
         str(app.state.service.settings.data_dir)
     )

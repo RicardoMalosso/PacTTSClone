@@ -77,7 +77,11 @@ class Reporter:
             self.stage_peak_ram = max(self.stage_peak_ram, sample["process_ram_bytes"] or 0)
             cuda = {}
             # Reading PyTorch allocator counters is optional and does not allocate CUDA memory.
-            if self.engine and getattr(self.engine, "device", None) == "cuda":
+            if (
+                self.engine
+                and getattr(self.engine, "device", None) == "cuda"
+                and not getattr(self.engine, "external_runtime", False)
+            ):
                 with contextlib.suppress(Exception):
                     import torch
 
@@ -116,7 +120,14 @@ class Reporter:
                 "hardware": self.resources.hardware(),
                 "worker_cpu_seconds": round(time.process_time() - self.total_cpu_start, 4),
                 "peak_ram_bytes": self.peak_ram,
-                "peak_cuda_allocated_bytes": self.peak_cuda,
+                "peak_cuda_allocated_bytes": None
+                if getattr(self.engine, "external_runtime", False)
+                else self.peak_cuda,
+                "external_runtime": bool(getattr(self.engine, "external_runtime", False)),
+                "measurement_scope": "Bridge process CPU/RAM only; isolated Ming runtime excluded. "
+                "CUDA allocator counters unavailable; NVML is device-wide."
+                if getattr(self.engine, "external_runtime", False)
+                else "Inference worker",
                 "cuda_stream_elapsed_seconds": getattr(self.engine, "last_gpu_seconds", None),
                 "resource_sample_interval_seconds": 0.5,
                 "accounting_note": "CPU seconds count worker threads, exclude external FFmpeg. "
@@ -131,7 +142,12 @@ def execute_task(engine, settings, task, emit):
     report = Reporter(emit, engine)
     if hasattr(engine, "residency_observer"):
         engine.residency_observer = lambda loaded, device: emit(
-            {"type": "model_state", "loaded": loaded, "device": device}
+            {
+                "type": "model_state",
+                "loaded": loaded,
+                "device": device,
+                "runtime_pid": getattr(getattr(engine, "process", None), "pid", None),
+            }
         )
     if hasattr(engine, "observer"):
         engine.observer = report.stage
@@ -196,17 +212,29 @@ def worker_main(settings, commands, events, engine_factory):
     if os.name == "posix":
         os.setsid()
     settings = Settings(**settings)
-    engine = engine_factory(settings) if engine_factory else OmniVoiceEngine(settings)
+    if engine_factory:
+        engine = engine_factory(settings)
+    elif settings.engine_id == "ming-3":
+        from .ming_process import MingProcessEngine
+
+        engine = MingProcessEngine(settings)
+    else:
+        engine = OmniVoiceEngine(settings)
 
     def emit(value):
         with contextlib.suppress(queue.Full, OSError):
             events.put(value, timeout=0.2)
 
-    while True:
-        task = commands.get()
-        if task is None:
-            break
-        emit(execute_task(engine, settings, task, emit))
+    try:
+        while True:
+            task = commands.get()
+            if task is None:
+                break
+            emit(execute_task(engine, settings, task, emit))
+    finally:
+        if hasattr(engine, "close"):
+            with contextlib.suppress(Exception):
+                engine.close()
 
 
 class ProcessRunner:
@@ -228,7 +256,7 @@ class ProcessRunner:
         from dataclasses import replace
 
         settings = replace(self.settings, device=config["device"])
-        fingerprint = (settings.device, config["cpu_threads"])
+        fingerprint = (settings.engine_id, settings.model, settings.device, config["cpu_threads"])
         with self.lock:
             if self.fingerprint != fingerprint or not self.pid:
                 self.reset()
