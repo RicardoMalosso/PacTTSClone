@@ -765,3 +765,13 @@ Added null-progress/pinned-plan, symlink containment and explicit-activation reg
 Full core suite: 242 passed. Focused engine/setup: 20 passed. Ruff and JS syntax passed.
 Previous full Chromium: 38 passed; new uninstall/retained-personal-file regression
 is being checked. Windows installer acceptance and a release remain pending.
+
+## Ming adapter started — 2026-10-31
+
+User requested beginning Ming before the Task 1 release completes. Added an
+inference-only dense 0.5b adapter and upstream source/runtime inspection record
+in ming-integration.md. It is not wired to production or advertised as installable.
+Ten deterministic tests passed for request mapping, unsupported language/settings,
+CUDA/BF16 rejection and waveform normalization. Ruff passed. Upstream BF16 excludes
+GTX 1660 SUPER in this implementation; FP16 needs separate real validation.
+Runtime isolation, verified installs/UI, task controls and real inference remain.
