@@ -120,3 +120,34 @@ def test_symlink_manifest_never_deletes_external_files(tmp_path):
         engines.change("omnivoice", "uninstall")
     assert external.read_bytes() == b"keep"
     assert weight.exists()
+
+
+def test_uninstall_inactive_omni_retains_selected_engine_and_shared_asr(tmp_path, monkeypatch):
+    engines, weight = manager(tmp_path)
+    engines.setup.state.update(active_engine="kittentts2", engine_enabled=True)
+    engines.service.settings.engine_id = "kittentts2"
+    monkeypatch.setattr(engines.kitten, "installed", lambda: True)
+    asr = weight.parent / "whisper" / "weights.bin"
+    asr.parent.mkdir()
+    asr.write_bytes(b"shared")
+    engines.service.settings.asr_model = str(asr.parent)
+    engines.setup.state["models"]["files"].append({"path": str(asr), "size": 6})
+    engines.change("omnivoice", "uninstall")
+    assert not weight.exists()
+    assert asr.read_bytes() == b"shared"
+    assert engines.setup.state["active_engine"] == "kittentts2"
+    assert engines.setup.state["engine_enabled"] is True
+    assert engines.service.settings.engine_id == "kittentts2"
+    engines.service.runner.reset.assert_not_called()
+
+
+def test_missing_selected_installation_does_not_block_omni_repair(tmp_path):
+    engines, weight = manager(tmp_path)
+    engines.setup.state.update(active_engine="kittentts2", engine_enabled=True)
+    restarted = EngineManager(engines.setup)
+    assert restarted.setup.state["active_engine"] == "omnivoice"
+    assert restarted.setup.state["engine_enabled"] is False
+    weight.unlink()
+    restarted.setup.start = Mock(return_value={})
+    restarted.change("omnivoice", "install")
+    restarted.setup.start.assert_called_once_with("cuda")

@@ -27,6 +27,10 @@ Uninstall. Installation does not activate the model. CUDA/BF16 activation prefli
 runs before replacing the previous selection. No driver is installed. The engine's
 Python packages are isolated from OmniVoice and Ming. Inference uses verified local
 files with Hub offline mode; it never downloads Whisper large automatically.
+Removing an inactive OmniVoice installation preserves the selected private engine
+and its shared Whisper files/path, including after restart. Missing private assets
+clear an invalid selection so another engine can be installed.
+
 Blank reference transcripts use the app's separately installed shared CPU Whisper,
 or can be entered manually. Preset mode ignores the saved reference audio and
 requires no Whisper or reference preparation. Save preset mode in a voice profile, then select that profile in Local
@@ -45,7 +49,7 @@ Official sources:
 
 ## Validation status
 
-Implementation is complete. The final local suite passed **291 backend tests and
+Implementation is complete. The final local suite passed **294 backend tests and
 41 Chromium tests**, including preset generation from an unprepared profile with
 no ASR, independent engine settings, language switching and mobile layout. Ruff,
 JavaScript syntax, compilation, wheel contents and desktop/mobile visual checks passed.

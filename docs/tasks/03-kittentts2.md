@@ -1,6 +1,6 @@
 # Task 3 — KittenTTS2 engine
 
-Status: implementation complete and validated (291 backend / 41 Chromium tests).
+Status: implementation complete and validated (294 backend / 41 Chromium tests).
 Release: [v2.3.0-rc.1 preview](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.3.0-rc.1), published through the final CI/Windows release gate. Tasks 1 and 2 released as v2.1.0 and v2.2.0-rc.1.
 See [integration and validation record](../kitten-integration.md).
 Owner authorized implementation and a third separate release.

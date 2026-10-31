@@ -243,3 +243,40 @@ def test_unprepared_profile_preset_generates_without_asr(tmp_path, mp3, engine):
             )
     finally:
         service.close()
+
+
+def test_shared_asr_path_survives_omni_removal_and_restart(tmp_path, engine, monkeypatch):
+    # Fake model files verify lifecycle metadata only, never real inference.
+    monkeypatch.setattr(
+        "pacttsclone.ming_lifecycle.receipt_valid", lambda root, profile="ming": profile == "kitten"
+    )
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    tts = tmp_path / "models" / "tts" / "weights.bin"
+    asr = tmp_path / "models" / "asr" / "weights.bin"
+    for path in [tts, asr]:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"fixture")
+    app.state.runtime_setup.update(
+        status="succeeded",
+        device="cuda",
+        models={
+            "paths": {"tts": str(tts.parent), "asr": str(asr.parent)},
+            "files": [{"path": str(p), "size": 7} for p in [tts, asr]],
+        },
+        active_engine="kittentts2",
+        engine_enabled=True,
+    )
+    app.state.runtime_setup._apply_models()
+    service = app.state.service
+    service.settings = service.runner.settings = replace(service.settings, engine_id="kittentts2")
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        headers = {"X-PacTTS-Token": client.get("/api/session").json()["token"]}
+        assert client.post("/api/engines/omnivoice/uninstall", headers=headers).status_code == 200
+        assert not tts.exists() and asr.exists()
+        assert service.settings.engine_id == "kittentts2"
+        assert app.state.runtime_setup.state["engine_enabled"] is True
+    restored = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(restored, base_url="http://127.0.0.1") as client:
+        assert restored.state.service.settings.engine_id == "kittentts2"
+        assert restored.state.service.settings.asr_model == str(asr.parent)
+        assert client.get("/api/setup").json()["ready"]

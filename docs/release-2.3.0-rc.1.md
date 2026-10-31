@@ -6,7 +6,9 @@ flow decoder. Verified source, model, decoder and all 115 preset voices are pinn
 Dependencies live in their own environment alongside OmniVoice and Ming.
 
 Engines exposes disk/VRAM/features, install/cancel/resume, activate/deactivate and
-uninstall. Activation checks CUDA/native BF16 before changing the selected engine.
+uninstall. Removing inactive OmniVoice retains the selected engine and shared
+Whisper, including its path after restart. Missing private assets no longer block
+installing another engine. Activation checks CUDA/native BF16 before changing the selected engine.
 Local and Voices offer reference cloning, 115 preset voices, stable/expressive
 presets, token budget, text normalization, reference conditioning, seed and output
 volume. Settings persist separately per engine and apply to Twitch/Discord jobs.
@@ -29,4 +31,4 @@ request mapping, process transport, settings, rollback, persistence and safe rem
 No physical GPU synthesis, audio quality, latency or VRAM measurement is claimed.
 See [requirements and current validation](kitten-integration.md) for remaining gates.
 
-Local acceptance: 291 backend tests, 41 Chromium tests, Ruff, JavaScript/compilation and wheel checks passed. Full verified model/decoder download, offline cache reuse and structural artifact validation passed. Windows installer and final CI results are recorded by Actions.
+Local acceptance: 294 backend tests, 41 Chromium tests, Ruff, JavaScript/compilation and wheel checks passed. Full verified model/decoder download, offline cache reuse and structural artifact validation passed. Windows installer and final CI results are recorded by Actions.

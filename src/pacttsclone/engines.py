@@ -29,7 +29,7 @@ class EngineManager:
                 )
                 self.service.settings = self.service.runner.settings = settings
             else:
-                setup.update(engine_enabled=False)
+                setup.update(active_engine="omnivoice", engine_enabled=False)
         original_ready = self.service.setup_ready
         self.service.setup_ready = lambda: (
             (
@@ -185,19 +185,27 @@ class EngineManager:
                 raise BusyError("Finish or cancel generation/setup before changing engines.")
             if operation == "activate" and not self.setup._models_present():
                 raise UserError("Install this engine first.")
-            if operation == "uninstall" and self.setup.state.get("engine_enabled", True):
+            if (
+                operation == "uninstall"
+                and self.setup.state.get("active_engine", "omnivoice") == "omnivoice"
+                and self.setup.state.get("engine_enabled", True)
+            ):
                 raise UserError("Deactivate this engine before uninstalling it.")
             if (
                 operation == "deactivate"
                 and self.setup.state.get("active_engine", "omnivoice") != "omnivoice"
             ):
                 raise UserError("OmniVoice is not the active engine.")
-            self.service.runner.reset()
+            if operation != "uninstall":
+                self.service.runner.reset()
             if operation == "uninstall":
                 root = self.service.settings.data_dir / "models"
                 # Validate every path before deleting any file. External imported source
                 # files, shared HF caches and personal assets are never removed.
                 paths = []
+                retained_asr = []
+                asr = Path(getattr(self.service.settings, "asr_model", ""))
+                shared = any(engine.installed() for engine in self.managed.values())
                 for entry in self.setup.state.get("models", {}).get("files", []):
                     path = Path(entry["path"])
                     if (
@@ -207,23 +215,29 @@ class EngineManager:
                         or any(p.is_symlink() for p in path.parents)
                     ):
                         raise UserError("Model manifest contains an unsafe path; no files removed.")
-                    # Whisper may be shared with an installed Ming engine.
-                    asr = Path(getattr(self.service.settings, "asr_model", ""))
+                    # Private engines can keep using this shared CPU transcription model.
                     if (
-                        any(engine.installed() for engine in self.managed.values())
+                        shared
                         and asr.is_absolute()
                         and path.resolve().is_relative_to(asr.resolve())
                     ):
+                        retained_asr.append(entry)
                         continue
                     paths.append(path)
                 for path in paths:
                     path.unlink(missing_ok=True)
-                self.setup.update(models={}, status="idle", stage="uninstalled")
+                self.setup.update(
+                    models={},
+                    status="idle",
+                    stage="uninstalled",
+                    shared_asr={"path": str(asr), "files": retained_asr} if retained_asr else {},
+                )
             if operation == "activate":
                 self.service.settings = self.service.runner.settings = replace(
                     self.service.settings, engine_id="omnivoice"
                 )
                 self.setup._apply_models()
                 self.setup.update(active_engine="omnivoice")
-            self.setup.update(engine_enabled=operation == "activate")
+            if operation != "uninstall":
+                self.setup.update(engine_enabled=operation == "activate")
         return self.snapshot()
