@@ -28,10 +28,22 @@ class MingOptions(BaseModel):
     dialect: Literal["chuanyu dialect", "cantonese"] = "cantonese"
 
 
+class KittenOptions(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    mode: Literal["clone", "preset"] = "clone"
+    voice: str = Field(default="Bruno", min_length=1, max_length=100)
+    preset: Literal["stable", "expressive"] = "stable"
+    max_new_tokens: int = Field(default=1000, ge=100, le=2000)
+    normalize: bool = True
+    use_reference_prompt: bool = True
+    seed: int | None = Field(default=None, ge=0, le=2147483647)
+
+
 class GenerationSettings(BaseModel):
     """Persistent defaults for individual voices."""
 
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+    kitten: KittenOptions = Field(default_factory=KittenOptions)
     ming: MingOptions = Field(default_factory=MingOptions)
     language: str = "auto"
     volume: float = Field(default=100.0, ge=0, le=300)

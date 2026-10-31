@@ -285,8 +285,11 @@ for (const [key, explanation] of Object.entries(generationHelp)) {
 }
 function voiceGenerationSettings(voice) {
   const ming = state.active_engine === 'ming-3';
-  const saved = ming ? voice?.engine_generation_settings?.['ming-3'] : voice?.generation_settings;
+  const saved = state.active_engine && state.active_engine !== 'omnivoice' ? voice?.engine_generation_settings?.[state.active_engine] : voice?.generation_settings;
   return {...defaultGenerationSettings, ...(ming ? {language: 'en'} : {}), ...(saved || {})};
+}
+function voiceAvailable(voice) {
+  return voice.status === 'ready' || (state.active_engine === 'kittentts2' && voiceGenerationSettings(voice).kitten?.mode === 'preset');
 }
 function settingsControls(container) {
   return Object.fromEntries(generationFields.map(([key]) => [key, container.querySelector(`[data-setting="${key}"]`)]));
@@ -306,10 +309,15 @@ function readGenerationSettings(container) {
     values.language = 'auto';
     values.ming = Object.fromEntries([...container.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
   }
+  if (state.active_engine === 'kittentts2') {
+    for (const key of ['speed','duration','steps','denoise','preprocess_prompt','guidance_scale','postprocess_output','language']) values[key] = defaultGenerationSettings[key];
+    values.kitten = readKittenOptions(container);
+  }
   return values;
 }
 function applySettingsValues(container, values) {
   renderMingOptions(container, values.ming);
+  renderKittenOptions(container, values.kitten);
   const controls = settingsControls(container);
   for (const [key, , type] of generationFields) {
     if (type === 'checkbox') controls[key].checked = Boolean(values[key]);
@@ -373,11 +381,12 @@ function createVoiceSettingsEditor(voice) {
     container.append(labelNode);
   }
   renderMingOptions(container, values.ming);
+  renderKittenOptions(container, values.kitten);
   const editor = el('details', {class: 'voice-generation-settings', 'data-engine':state.active_engine || 'omnivoice'},
     el('summary', {}, t('Voice generation defaults')),
     el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
-    container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
-    button(state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
+    container, el('p', {class: 'muted'}, t(state.active_engine === 'kittentts2' ? 'The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
+    button(state.active_engine === 'kittentts2' ? 'Restore KittenTTS2 defaults' : state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
       applySettingsValues(editor, defaultGenerationSettings);
       editor.closest('.voice-card').dataset.settingsDirty = 'true';
     }),
@@ -387,14 +396,14 @@ function createVoiceSettingsEditor(voice) {
       await refresh();
     })
   );
-  editor.querySelectorAll('[data-setting], [data-ming]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
+  editor.querySelectorAll('[data-setting], [data-ming], [data-kitten]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
   return editor;
 }
 function renderVoices() {
   const key = JSON.stringify([state.active_engine, state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
   const selected = $('voice-select').value;
   $('voice-select').replaceChildren(el('option', {value: ''}, t('Choose a saved voice')));
-  for (const v of state.voices.filter(v => v.status === 'ready')) $('voice-select').append(el('option', {value: v.id}, v.title));
+  for (const v of state.voices.filter(voiceAvailable)) $('voice-select').append(el('option', {value: v.id}, v.title));
   $('voice-select').value = selected; $('voice-select').dispatchEvent(new Event('change'));
   const drafts = new Map([...document.querySelectorAll('.voice-card')].filter(card => card.dataset.dirty === 'true').map(card => [card.dataset.voiceId, {title: card.querySelector('input[data-field="title"]').value, transcript: card.querySelector('textarea').value}]));
   const editorDrafts = new Map([...document.querySelectorAll('.voice-card')].map(card => {
@@ -406,6 +415,7 @@ function renderVoices() {
       return [key, type === 'checkbox' ? input.checked : input.value];
     })) : null;
     if (dirty && state.active_engine === 'ming-3') values.ming = Object.fromEntries([...editor.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
+    if (dirty && state.active_engine === 'kittentts2') values.kitten = readKittenOptions(editor);
     return [card.dataset.voiceId, {engine: editor.dataset.engine || 'omnivoice', open: editor.open, dirty, values}];
   }));
   $('voices-list').replaceChildren();
@@ -419,7 +429,7 @@ function renderVoices() {
     thumbnailInput.addEventListener('change', action(async () => { const file = thumbnailInput.files[0]; if (!file) return; const body = new FormData(); body.set('thumbnail', file); await api(`/api/voices/${v.id}/thumbnail`, {method: 'POST', body}); await refresh(); }));
     const card = el('section', {class: 'card voice-card', 'data-voice-id': v.id}, v.thumbnail_url ? el('img', {src: v.thumbnail_url, alt: v.title}) : null,
       el('h2', {}, v.title), el('p', {class: 'muted'}, v.original_filename), v.warning ? el('p', {class: 'notice'}, t(v.warning)) : null, thumbnailControl, el('span', {class: 'pill'}, t(v.status)),
-      v.status === 'unprepared' ? el('p', {class: 'preparation-note'}, t('Not prepared for first use. Complete Initial Setup, then click Prepare to save the reference transcript locally.')) : null,
+      v.status === 'unprepared' && !voiceAvailable(v) ? el('p', {class: 'preparation-note'}, t('Not prepared for first use. Complete Initial Setup, then click Prepare to save the reference transcript locally.')) : null,
       preparing ? el('div', {class: 'preparation-note', role: 'status'}, el('strong', {}, t('Preparing for first use…')), el('progress', {max: '1'}), el('p', {}, `${t(prep?.stage || 'queued')} · ${t('Model files are already verified. Loading and transcription run locally. You can cancel and retry.')} `), button('Cancel preparation', async () => { await api(`/api/jobs/${v.preparation_job_id}/cancel`, {method: 'POST'}); await refresh(); }, 'danger small-button')) : null,
       v.error ? el('p', {class: 'error'}, v.error) : null, el('label', {}, t('Title'), title), el('label', {}, t('Saved reference transcript'), transcript),
       el('audio', {controls: '', src: `/api/voices/${v.id}/reference`, preload: 'none'}),
@@ -442,7 +452,7 @@ function renderVoices() {
     card.querySelector('.row-actions button').disabled = preparing;
     $('voices-list').append(card);
   }
-  window.Locale.bind($('prepare-voices'), state.voices.some(v => v.status !== 'ready') ? 'Some voices need preparation · open Voices' : 'Manage voices');
+  window.Locale.bind($('prepare-voices'), state.voices.some(v => !voiceAvailable(v)) ? 'Some voices need preparation · open Voices' : 'Manage voices');
   if (!state.voices.length) $('voices-list').append(el('p', {class: 'muted'}, t('No saved voices yet.')));
 }
 function renderJobs() {
@@ -474,7 +484,7 @@ function renderHistory() {
 function refreshCommandVoices() {
   for (const select of document.querySelectorAll('.command-row select')) {
     const selected = select.value;
-    const ready = state.voices.filter(v => v.status === 'ready');
+    const ready = state.voices.filter(voiceAvailable);
     const key = JSON.stringify([window.Locale.language, ready.map(v => [v.id, v.title])]);
     if (select.dataset.voicesKey === key) continue;
     select.dataset.voicesKey = key;
@@ -487,7 +497,7 @@ function refreshCommandVoices() {
 function commandRow(keyword = '', voiceId = '') {
   const input = el('input', {placeholder: '!lula', value: keyword, pattern: '![a-zA-Z0-9_]{1,30}', required: '', 'aria-label': 'Command keyword'});
   const select = el('select', {'aria-label': 'Command voice', required: ''}, el('option', {value: ''}, t('Choose voice')));
-  for (const voice of state.voices.filter(v => v.status === 'ready')) select.append(el('option', {value: voice.id}, voice.title));
+  for (const voice of state.voices.filter(voiceAvailable)) select.append(el('option', {value: voice.id}, voice.title));
   select.value = voiceId;
   const row = el('div', {class: 'command-row'}, input, select, button('Remove', () => row.remove()));
   $('commands-list').append(row);
@@ -870,9 +880,10 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const kitten = state.active_engine === 'kittentts2';
   const ming = state.active_engine === 'ming-3';
-  $('engine-text-hint').textContent = t(ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
-  $('engine-timing-hint').textContent = t(ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
+  $('engine-text-hint').textContent = t(kitten ? 'KittenTTS2 supports [emotion], <event> and (((emphasis))) tags; language is detected automatically.' : ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
+  $('engine-timing-hint').textContent = t(kitten ? 'The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.' : ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
   const residency = state.model_residency || {};
   const active = state.active_job;
   const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
@@ -886,7 +897,7 @@ function renderResidency() {
   const model = state.model_residency || {};
   const warm = Boolean(model.loaded);
   $('model-residency').textContent = `${model.model || 'k2-fsa/OmniVoice'} · ${t(warm ? 'Warm · loaded in memory' : 'Cold · not loaded')} · ${model.device || t('N/A')}`;
-  $('voice-residency-list').replaceChildren(...state.voices.map(voice => el('p', {}, `${voice.title} · ${t(voice.status === 'ready' ? (warm ? 'Warm' : 'Cold') : 'Needs preparation')}`)));
+  $('voice-residency-list').replaceChildren(...state.voices.map(voice => el('p', {}, `${voice.title} · ${t(voiceAvailable(voice) ? (warm ? 'Warm' : 'Cold') : 'Needs preparation')}`)));
 }
 function renderGlobalStatus() {
   $('live-generation').hidden = false;
@@ -988,10 +999,10 @@ function eventRuleRow(rule = {}) {
 }
 function refreshEventVoices() {
   for (const select of document.querySelectorAll('#event-rules [data-voice]')) {
-    const key = JSON.stringify([window.Locale.language, state.voices.map(v => [v.id, v.title, v.status])]);
+    const key = JSON.stringify([window.Locale.language, state.active_engine, state.voices.map(v => [v.id, v.title, voiceAvailable(v)])]);
     if (select.dataset.key === key) continue;
     const selected = select.value; select.dataset.key = key;
-    select.replaceChildren(el('option', {value: ''}, t('Choose voice')), ...state.voices.filter(v => v.status === 'ready').map(v => el('option', {value: v.id}, v.title))); select.value = selected;
+    select.replaceChildren(el('option', {value: ''}, t('Choose voice')), ...state.voices.filter(voiceAvailable).map(v => el('option', {value: v.id}, v.title))); select.value = selected;
   }
 }
 function readEventRules() {
@@ -1167,6 +1178,7 @@ async function renderEngines() {
     const details = el('details', {}, el('summary', {}, t('Requirements and features')));
     const add = (label, value) => details.append(el('p', {}, `${t(label)}: ${t(value)}`));
     add('Runtime', engine.runtime); add('System RAM', engine.ram);
+    if (engine.directory) add('Installation directory', engine.directory);
     add('Languages', engine.languages); add('License', engine.license);
     for (const [name, value] of Object.entries(engine.capabilities)) add(name, value);
     for (const model of engine.models) details.append(el('p', {}, `${model.repo}@${model.revision}`));
@@ -1176,9 +1188,9 @@ async function renderEngines() {
       await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
       await refresh(); await runtimeStatus(); await renderEngines();
     };
-    if (engine.id === 'ming-3') controls.append(el('a', {href: '/api/engines/ming-3/log', download: ''}, t('Installation log')));
+    if (['ming-3','kittentts2'].includes(engine.id)) controls.append(el('a', {href: `/api/engines/${engine.id}/log`, download: ''}, t('Installation log')));
     if (!engine.supported) controls.textContent = t('Available in a later release');
-    else if (data.busy && ((engine.id === 'ming-3' && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
+    else if (data.busy && ((['ming-3','kittentts2'].includes(engine.id) && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
     else if (data.busy) controls.append(el('span', {}, t('Wait for installation')));
     else if (!engine.installed) controls.append(button('Install', run('install')));
     else {
@@ -1243,4 +1255,44 @@ window.addEventListener('localechange', () => {
   const form = $('generate-form');
   const values = Object.fromEntries([...form.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
   renderMingOptions(form, values);
+});
+
+function readKittenOptions(container) {
+  return Object.fromEntries([...container.querySelectorAll('[data-kitten]')].map(input => [input.dataset.kitten,
+    input.type === 'checkbox' ? input.checked : input.type === 'number' ? (input.value.trim() === '' ? null : Number(input.value)) : input.value]));
+}
+function renderKittenOptions(container, saved = {}) {
+  container.querySelector('.kitten-options')?.remove();
+  const active = state.active_engine === 'kittentts2';
+  for (const key of ['language','speed','duration','steps','denoise','preprocess_prompt','guidance_scale','postprocess_output']) {
+    const input = container.querySelector(`[data-setting="${key}"]`);
+    if (input) input.closest('label').hidden = active || (state.active_engine === 'ming-3' && !['guidance_scale','postprocess_output'].includes(key));
+  }
+  if (!active) return;
+  const values = {mode:'clone',voice:'Bruno',preset:'stable',max_new_tokens:1000,normalize:true,use_reference_prompt:true,seed:null,...saved};
+  const panel = el('fieldset', {class:'kitten-options'}, el('legend',{},t('KittenTTS2 settings')),
+    el('p',{},t('Cloning needs a 5–30 second reference and exact transcript. Preset mode uses a built-in voice; the saved voice selects its settings.')), el('p',{},t('Save preset mode in Voices to use a built-in voice without preparing the reference or installing Whisper.')));
+  for (const [key,label,options] of [
+    ['mode','Voice mode',[['clone','Clone reference'],['preset','Built-in voice']]],
+    ['voice','Built-in voice',(state.kitten_voices || ['Bruno']).map(x=>[x,x])],
+    ['preset','Delivery preset',[['stable','Stable'],['expressive','Expressive']]]
+  ]) {
+    const input = el('select',{'data-kitten':key,title:t(label)},...options.map(([value,name])=>el('option',{value},t(name))));
+    input.value = values[key]; panel.append(el('label',{},t(label),input));
+  }
+  for (const [key,label,min,max] of [['max_new_tokens','Token budget per chunk',100,2000],['seed','Seed (blank for random)',0,2147483647]]) {
+    const input = el('input',{type:'number','data-kitten':key,min,max,step:1,title:t(label)});
+    input.value = values[key] ?? ''; panel.append(el('label',{},t(label),input));
+  }
+  for (const [key,label] of [['normalize','Normalize written text'],['use_reference_prompt','Condition on reference audio']]) {
+    const input = el('input',{type:'checkbox','data-kitten':key,title:t(label)}); input.checked=values[key];
+    panel.append(el('label',{class:'check'},input,' ',t(label)));
+  }
+  const visibility = () => {panel.querySelector('[data-kitten="voice"]').closest('label').hidden = panel.querySelector('[data-kitten="mode"]').value !== 'preset';};
+  panel.querySelector('[data-kitten="mode"]').addEventListener('change',visibility);
+  visibility(); panel.style.gridColumn='1 / -1'; panel.style.minWidth='0';
+  (container.querySelector('.settings') || container).append(panel);
+}
+window.addEventListener('localechange', () => {
+  if (state.active_engine === 'kittentts2') {const form=$('generate-form'); renderKittenOptions(form,readKittenOptions(form));}
 });

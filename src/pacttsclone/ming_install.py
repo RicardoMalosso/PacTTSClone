@@ -1,4 +1,4 @@
-"""Verified Ming assets and isolated dependency installation. Run in a cancellable child."""
+"""Verified engine assets and isolated dependency installation. Run in a cancellable child."""
 
 import argparse
 import hashlib
@@ -25,10 +25,10 @@ def emit(**value):
         print(MARKER + json.dumps(value), flush=True)
 
 
-def manifests():
+def manifests(profile="ming"):
     return [
         json.loads(Path(__file__).with_name(name).read_text(encoding="utf-8"))
-        for name in ("ming_source.json", "ming_model.json")
+        for name in (f"{profile}_source.json", f"{profile}_model.json")
     ]
 
 
@@ -43,7 +43,7 @@ def safe_destination(root, name):
         or any(p.is_symlink() for p in [destination, *destination.parents])
         or not destination.resolve().is_relative_to(root.resolve())
     ):
-        raise ValueError("Unsafe Ming installation path.")
+        raise ValueError("Unsafe engine installation path.")
     return destination
 
 
@@ -51,12 +51,12 @@ def python_path(root):
     return root / "runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
-def receipt_valid(root):
+def receipt_valid(root, profile="ming"):
     try:
         receipt = json.loads((root / "installation.json").read_text())
         if not python_path(root).is_file():
             return False
-        source, model = manifests()
+        source, model = manifests(profile)
         if (
             receipt["source_revision"] != source["revision"]
             or receipt["model_revision"] != model["revision"]
@@ -70,18 +70,23 @@ def receipt_valid(root):
         return (
             receipt["requirements_hash"]
             == hashlib.sha256(
-                Path(__file__).with_name("ming_requirements.txt").read_bytes()
+                Path(__file__).with_name(f"{profile}_requirements.txt").read_bytes()
             ).hexdigest()
         )
     except (OSError, ValueError, KeyError, TypeError):
         return False
 
 
-def install(root, runtime_only=False):
+def install(root, runtime_only=False, profile="ming"):
+    if profile == "kitten" and sys.version_info[:2] != (3, 12):
+        raise ValueError(
+            "KittenTTS2 requires Python 3.12. Use the Windows installer "
+            "or launch the source app with Python 3.12."
+        )
     root.mkdir(parents=True, exist_ok=True)
     safe_destination(root.parent, root.name)
-    source, model = manifests()
-    requirements = Path(__file__).with_name("ming_requirements.txt")
+    source, model = manifests(profile)
+    requirements = Path(__file__).with_name(f"{profile}_requirements.txt")
     digest = hashlib.sha256(requirements.read_bytes()).hexdigest()
     runtime_marker = root / "runtime-packages.json"
     try:
@@ -89,7 +94,11 @@ def install(root, runtime_only=False):
     except (OSError, ValueError, KeyError):
         reused = False
     python = python_path(root)
-    reserve = 0 if reused and python.is_file() else RUNTIME_RESERVE
+    reserve = (
+        0
+        if reused and python.is_file()
+        else (20 * 1024**3 if profile == "kitten" else RUNTIME_RESERVE)
+    )
     selected = (("source", source),) if runtime_only else (("source", source), ("model", model))
     entries = [
         (root / folder, entry) for folder, manifest in selected for entry in manifest["files"]
@@ -139,7 +148,7 @@ def install(root, runtime_only=False):
     with ThreadPoolExecutor(max_workers=4) as executor:
         list(executor.map(transfer, entries))
     if not reused or not python.is_file():
-        emit(stage="dependencies", message="Preparing private Ming Python/CUDA environment")
+        emit(stage="dependencies", message=f"Preparing private {profile} Python/CUDA environment")
         if not python.is_file():
             venv.EnvBuilder(with_pip=True).create(root / "runtime")
         cache = root / "pip-cache"
@@ -168,13 +177,35 @@ def install(root, runtime_only=False):
             env=env,
             check=True,
         )
+        if profile == "kitten":
+            subprocess.run(
+                [
+                    str(python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    "--no-build-isolation",
+                    str(root / "source"),
+                ],
+                env=env,
+                check=True,
+            )
         subprocess.run([str(python), "-m", "pip", "check"], env=env, check=True)
         runtime_marker.write_text(json.dumps({"requirements_hash": digest}))
     # CPU-only import check; GPU compatibility is checked explicitly at activation.
     env = {**os.environ, "PYTHONNOUSERSITE": "1", "PYTHONPATH": str(root / "source")}
     env.pop("PYTHONHOME", None)
     subprocess.run(
-        [str(python), "-c", "import torch, torchaudio, transformers; from ming_tts import MingTTS"],
+        [
+            str(python),
+            "-c",
+            (
+                "import torch, torchaudio, transformers; from ming_tts import MingTTS"
+                if profile == "ming"
+                else "from kittenml import KittenTTS2"
+            ),
+        ],
         env=env,
         check=True,
     )
@@ -200,9 +231,10 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--runtime-only", action="store_true")
+    parser.add_argument("--profile", choices=["ming", "kitten"], default="ming")
     args = parser.parse_args()
     try:
-        install(args.root.absolute(), runtime_only=args.runtime_only)
+        install(args.root.absolute(), runtime_only=args.runtime_only, profile=args.profile)
     except Exception as exc:
         emit(status="failed", error=str(exc)[:1500])
         sys.exit(1)

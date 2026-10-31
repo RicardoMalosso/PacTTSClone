@@ -124,7 +124,7 @@ class Reporter:
                 if getattr(self.engine, "external_runtime", False)
                 else self.peak_cuda,
                 "external_runtime": bool(getattr(self.engine, "external_runtime", False)),
-                "measurement_scope": "Bridge process CPU/RAM only; isolated Ming runtime excluded. "
+                "measurement_scope": "Bridge CPU/RAM only; isolated engine runtime excluded. "
                 "CUDA allocator counters unavailable; NVML is device-wide."
                 if getattr(self.engine, "external_runtime", False)
                 else "Inference worker",
@@ -166,7 +166,12 @@ def execute_task(engine, settings, task, emit):
         reference_cropped = pipeline.decode(workspace / "reference.mp3", reference)
         request = GenerationRequest(**task["request"])
         transcript = request.ref_text
-        if not transcript:
+        preset_speech = (
+            settings.engine_id == "kittentts2"
+            and request.kitten.mode == "preset"
+            and task.get("kind") != "transcribe"
+        )
+        if not transcript and not preset_speech:
             if not hasattr(engine, "transcribe"):
                 # Explicit test engines may provide a deterministic transcript.
                 transcript = "Test reference transcript."
@@ -214,6 +219,10 @@ def worker_main(settings, commands, events, engine_factory):
     settings = Settings(**settings)
     if engine_factory:
         engine = engine_factory(settings)
+    elif settings.engine_id == "kittentts2":
+        from .kitten_engine import KittenProcessEngine
+
+        engine = KittenProcessEngine(settings)
     elif settings.engine_id == "ming-3":
         from .ming_process import MingProcessEngine
 

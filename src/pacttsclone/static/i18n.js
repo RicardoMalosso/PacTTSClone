@@ -1,6 +1,27 @@
 'use strict';
 (() => {
   const pt = {
+    "Save preset mode in Voices to use a built-in voice without preparing the reference or installing Whisper.": "Salve o modo de voz integrada em Vozes para usá-la sem preparar a referência nem instalar o Whisper.",
+    "Requirements marked “Not verified” have no established minimum. Download sizes cover model/source assets; CUDA packages are additional. Peak installation budgets include dependencies and caches. Uninstall retains personal voices and audio; private engine runtimes are removed with their engine.": "Requisitos marcados como “Não verificado” não têm mínimo estabelecido. O tamanho do download cobre modelos e código; os pacotes CUDA são adicionais. A estimativa de instalação inclui dependências e caches. Desinstalar preserva vozes pessoais e áudios; o ambiente privado de cada motor é removido com ele.",
+    "Installation directory": "Pasta de instalação",
+    "The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.": "O limite vale para cada trecho; 25 tokens de áudio equivalem a aproximadamente um segundo. Uma semente fixa ajuda a reproduzir o pedido.",
+    "KittenTTS2 settings": "Configurações do KittenTTS2",
+    "Voice mode": "Modo da voz",
+    "Clone reference": "Clonar referência",
+    "Delivery preset": "Perfil de interpretação",
+    "Stable": "Estável",
+    "Expressive": "Expressivo",
+    "Token budget per chunk": "Limite de tokens por trecho",
+    "Seed (blank for random)": "Semente (vazio para aleatória)",
+    "Normalize written text": "Normalizar texto escrito",
+    "Condition on reference audio": "Usar o áudio de referência no contexto",
+    "Restore KittenTTS2 defaults": "Restaurar padrões do KittenTTS2",
+    "Cloning needs a 5–30 second reference and exact transcript. Preset mode uses a built-in voice; the saved voice selects its settings.": "A clonagem exige referência de 5–30 segundos e transcrição exata. O modo de voz integrada usa uma voz do modelo; a voz salva seleciona seus ajustes.",
+    "KittenTTS2 supports [emotion], <event> and (((emphasis))) tags; language is detected automatically.": "O KittenTTS2 aceita tags [emotion], <event> e (((ênfase))); o idioma é detectado automaticamente.",
+    "About 8 GB free VRAM recommended upstream; estimate, not measured here": "O projeto recomenda cerca de 8 GB de VRAM livre; estimativa, sem medição local",
+    "Reference cloning (5–30 s + transcript); 115 preset voices; expression tags": "Clonagem (5–30 s + transcrição); 115 vozes integradas; tags de expressão",
+    "20 upstream languages including Portuguese; automatic detection": "20 idiomas, incluindo português; detecção automática",
+
     "Ming interprets punctuation and supported vocal tags.": "O Ming interpreta pontuação e tags vocais compatíveis.",
     "Each Ming task has its own controls; saved voice selection also chooses its settings preset.": "Cada tarefa do Ming possui controles próprios; selecionar a voz também escolhe seus ajustes salvos.",
     "Saved voices share the active engine. Warm means its base model is in memory; each reference still needs preparation and conditioning.": "As vozes salvas compartilham o motor ativo. Quente significa que seu modelo base está na memória; cada referência ainda precisa de preparação e condicionamento.",

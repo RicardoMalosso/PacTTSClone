@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pacttsclone"
-version = "2.2.0rc1"
+version = "2.3.0rc1"
 description = "Local OmniVoice voice cloning to MP3"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -31,7 +31,7 @@ pacttsclone-smoke = "pacttsclone.cli:smoke"
 where = ["src"]
 
 [tool.setuptools.package-data]
-pacttsclone = ["static/*", "assets/voices/*", "ming_*.json", "ming_requirements.txt"]
+pacttsclone = ["static/*", "assets/voices/*", "ming_*.json", "ming_requirements.txt", "kitten_*.json", "kitten_requirements.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

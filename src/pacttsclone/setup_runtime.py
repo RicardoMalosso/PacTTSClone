@@ -69,6 +69,28 @@ class RuntimeSetup:
             return False
 
     def _apply_models(self):
+        # OmniVoice removal may retain the shared ASR for a private speech engine.
+        # Restore its owned local path without marking OmniVoice installed/ready.
+        shared = self.state.get("shared_asr") or {}
+        try:
+            asr = Path(shared.get("path", ""))
+            files = shared.get("files") or []
+            owned = self.service.settings.data_dir / "models"
+            if (
+                asr.is_absolute()
+                and asr.resolve().is_relative_to(owned.resolve())
+                and files
+                and all(
+                    Path(f["path"]).resolve().is_relative_to(asr.resolve())
+                    and Path(f["path"]).is_file()
+                    and Path(f["path"]).stat().st_size == f["size"]
+                    for f in files
+                )
+            ):
+                settings = replace(self.service.settings, asr_model=str(asr))
+                self.service.settings = self.service.runner.settings = settings
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
         if self.state["status"] == "succeeded" and self._models_present():
             paths = list(self.state["models"]["paths"].values())
             settings = replace(
@@ -99,8 +121,15 @@ class RuntimeSetup:
             return {
                 **self.state,
                 "ready": (
-                    (self.service.ming_installed() and not self.service.setup_busy)
-                    if self.service.settings.engine_id == "ming-3"
+                    (
+                        (
+                            self.service.kitten_installed()
+                            if self.service.settings.engine_id == "kittentts2"
+                            else self.service.ming_installed()
+                        )
+                        and not self.service.setup_busy
+                    )
+                    if self.service.settings.engine_id in {"ming-3", "kittentts2"}
                     and hasattr(self.service, "ming_installed")
                     else ready
                 )
@@ -274,8 +303,10 @@ class RuntimeSetup:
             self.thread.join(5)
 
     def start(self, device, search_roots=None, move_weights=False):
-        if self.service.settings.engine_id == "ming-3":
-            raise UserError("Deactivate Ming before repairing the shared OmniVoice setup.")
+        if self.service.settings.engine_id in {"ming-3", "kittentts2"}:
+            raise UserError(
+                "Deactivate the active engine before repairing the shared OmniVoice setup."
+            )
         if not isinstance(move_weights, bool):
             raise UserError("Choose copy or move for the selected old model folders.")
         if search_roots is not None:

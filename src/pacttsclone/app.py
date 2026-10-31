@@ -140,6 +140,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         finally:
             updater.close()
             engines.ming.close()
+            engines.kitten.close()
             runtime_setup.close()
             tunnel.close()
             studio.close()
@@ -183,6 +184,19 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             },
             headers={"Cache-Control": "no-store"},
         )
+
+    from .kitten_engine import available_voices
+
+    kitten_voices = available_voices()
+
+    @app.get("/api/engines/kittentts2/log")
+    def kitten_install_log(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Host only.")
+        path = service.logs / "kitten-install.log"
+        if not path.is_file():
+            raise HTTPException(404, "No KittenTTS2 installation log yet.")
+        return FileResponse(path, media_type="text/plain", filename="kitten-install.log")
 
     @app.get("/api/engines/ming-3/log")
     def ming_install_log(request: Request):
@@ -272,7 +286,9 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     def health():
         return {
             "ffmpeg_available": service.audio.available(),
-            "inference_installed": service.ming_installed()
+            "inference_installed": service.kitten_installed()
+            if service.settings.engine_id == "kittentts2"
+            else service.ming_installed()
             if service.settings.engine_id == "ming-3"
             else dependencies_available(),
             "device_requested": settings.device,
@@ -460,6 +476,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             "jobs": jobs,
             "request_history": service.request_history(),
             "active_engine": service.settings.engine_id,
+            "kitten_voices": kitten_voices,
             "model_residency": {
                 **getattr(service.runner, "model_state", {}),
                 "loaded": bool(

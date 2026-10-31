@@ -338,3 +338,24 @@ The worker applies linear amplitude gain after synthesis and before MP3 encoding
 using the same output path for every consumer. The reference and model input are
 unchanged. Samples are clipped to the existing PCM range; extreme boosts may
 distort peaks. Previously generated MP3s are not reprocessed.
+
+
+## KittenTTS2 runtime
+
+KittenProcessEngine shares the persistent isolated subprocess protocol with Ming,
+using its own worker, marker, engine directory and validated request mapping.
+KittenLifecycle shares serialized install/cancel/preflight/switch/removal behavior
+with Ming while selecting a separate source/model/dependency manifest. The private
+Python 3.12 runtime uses Torch CUDA, packed language-model weights and the default
+S3 decoder. The decoder's Hub cache contains a pinned snapshot/ref and inference
+runs offline. Cloning supplies an exact transcript to avoid upstream automatic
+Whisper-large downloads; blank saved references use the existing shared CPU ASR.
+Preset mode uses packaged reference artifacts. Per-engine defaults persist under
+engine_generation_settings and are snapshotted into queued jobs. External runtime
+CPU/RAM is excluded from bridge-only metrics; no fabricated private allocator
+measurements are reported. Details: [integration](kitten-integration.md).
+
+Kitten's upstream reference caches use file paths as keys. Since app references
+are unique per-job temporary paths, the bridge clears both reference-conditioning
+caches after each completed generation while keeping the base model resident.
+This prevents unbounded retention across repeated requests.

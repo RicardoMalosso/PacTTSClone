@@ -463,3 +463,12 @@ has not been established. English/Chinese and five additional target languages
 are supported; Portuguese is not. Voices and Local expose Ming-specific cloning,
 emotion, attribute, dialect, freeform, design and preset tasks. Engine-specific
 voice settings are retained independently. [Setup, limitations and validation](docs/ming-integration.md).
+
+## KittenTTS2 packed engine (preview)
+
+Engines can install KittenTTS2 1.7B packed in a private CUDA runtime. It offers
+reference cloning and 115 built-in voices, automatic language detection including
+Portuguese, stable/expressive delivery and expression tags. Native BF16 NVIDIA
+GPUs (Ampere or newer) are required; upstream's roughly 8 GB free VRAM guidance
+is an estimate. Source installations must use Python 3.12. Saved settings are
+independent from OmniVoice and Ming. [Requirements, setup and validation](docs/kitten-integration.md).
