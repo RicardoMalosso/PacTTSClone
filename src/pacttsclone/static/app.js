@@ -382,7 +382,7 @@ function createVoiceSettingsEditor(voice) {
   const editor = el('details', {class: 'voice-generation-settings', 'data-engine':state.active_engine || 'omnivoice'},
     el('summary', {}, t('Voice generation defaults')),
     el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
-    container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
+    container, el('p', {class: 'muted'}, t(state.active_engine === 'kittentts2' ? 'The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
     button(state.active_engine === 'kittentts2' ? 'Restore KittenTTS2 defaults' : state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
       applySettingsValues(editor, defaultGenerationSettings);
       editor.closest('.voice-card').dataset.settingsDirty = 'true';
@@ -880,7 +880,7 @@ function renderResidency() {
   const kitten = state.active_engine === 'kittentts2';
   const ming = state.active_engine === 'ming-3';
   $('engine-text-hint').textContent = t(kitten ? 'KittenTTS2 supports [emotion], <event> and (((emphasis))) tags; language is detected automatically.' : ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
-  $('engine-timing-hint').textContent = t(kitten ? 'Cloning needs a 5–30 second reference and exact transcript. Preset mode uses a built-in voice; the saved voice selects its settings.' : ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
+  $('engine-timing-hint').textContent = t(kitten ? 'The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.' : ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
   const residency = state.model_residency || {};
   const active = state.active_job;
   const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];

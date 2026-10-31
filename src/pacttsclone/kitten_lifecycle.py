@@ -17,7 +17,7 @@ class KittenLifecycle(MingLifecycle):
             name="KittenTTS2 · 1.7B packed",
             runtime_reserve_bytes=16 * 1024**3,
             license="Apache-2.0 code; Stellon Labs Community License weights; MIT decoder",
-            runtime="Private Python; PyTorch CUDA 12.8; native BF16 GPU (Ampere+)",
+            runtime="Private Python 3.12; PyTorch CUDA 12.8; native BF16 GPU (Ampere+)",
             languages="20 upstream languages including Portuguese; automatic detection",
             source="https://github.com/KittenML/KittenTTS",
             vram="About 8 GB free VRAM recommended upstream; estimate, not measured here",

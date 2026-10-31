@@ -1,6 +1,7 @@
 'use strict';
 (() => {
   const pt = {
+    "The token budget limits each chunk; 25 audio tokens are approximately one second. A fixed seed helps reproduce a request.": "O limite vale para cada trecho; 25 tokens de áudio equivalem a aproximadamente um segundo. Uma semente fixa ajuda a reproduzir o pedido.",
     "KittenTTS2 settings": "Configurações do KittenTTS2",
     "Voice mode": "Modo da voz",
     "Clone reference": "Clonar referência",

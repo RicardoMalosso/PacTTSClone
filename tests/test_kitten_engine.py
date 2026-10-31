@@ -186,3 +186,12 @@ def test_engine_settings_remain_independent(tmp_path, engine):
         assert json.loads(json.dumps(saved)) == saved
     finally:
         service.close()
+
+
+def test_unsupported_host_python_fails_before_installing(tmp_path, monkeypatch):
+    from pacttsclone import ming_install
+
+    monkeypatch.setattr(ming_install.sys, "version_info", (3, 11))
+    with pytest.raises(ValueError, match="Python 3.12"):
+        ming_install.install(tmp_path / "kitten", profile="kitten")
+    assert not (tmp_path / "kitten").exists()

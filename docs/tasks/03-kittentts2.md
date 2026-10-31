@@ -1,6 +1,6 @@
 # Task 3 — KittenTTS2 engine
 
-Status: implementation in progress. Tasks 1 and 2 released as v2.1.0 and v2.2.0-rc.1.
+Status: implementation complete; final validation and release in progress. Tasks 1 and 2 released as v2.1.0 and v2.2.0-rc.1.
 See [integration and validation record](../kitten-integration.md).
 Owner authorized implementation and a third separate release.
 

@@ -7,6 +7,7 @@ weights and the default flow decoder. It does not use the older CPU ONNX KittenT
 
 | Item | Requirement / behavior |
 |---|---|
+| Python | 3.12 (included by the Windows installer); source installations must use 3.12 |
 | GPU | NVIDIA CUDA with native BF16 (Ampere or newer); CPU speech fallback disabled |
 | VRAM | Upstream recommends about 8 GB **free** VRAM; estimate, not an app measurement |
 | Assets | 2,114,438,061 bytes of pinned source/model/decoder/voice assets |
@@ -43,9 +44,18 @@ Official sources:
 
 ## Validation status
 
-Implementation is in progress. Focused contract/API/process tests passed (45 tests,
-including Ming and Engines regression tests). These use simulated inference.
-Real dependency installation, full regression/Chromium and Windows installer gates
-are pending. No physical CUDA synthesis, measured quality/latency/VRAM or minimum
-system RAM has been established. Do not treat an import or simulated audio test as
-real GPU generation. A separate release follows successful acceptance.
+Implementation is complete; final release acceptance is in progress. The local
+backend regression suite passed (289 tests before the Python-version guard was
+added; 46 focused tests including that guard passed). All 41 Chromium tests passed,
+including settings persistence, language switching and mobile layout. Ruff,
+JavaScript syntax, compilation and packaged wheel contents passed.
+
+Actual private CUDA dependency installation, pip check, upstream imports and repeated
+source/runtime cache reuse passed on Windows and Linux (Actions run 41252188987).
+The direct dependency versions resolved identically on both platforms and are now
+pinned. Final pinned-version acceptance and Windows installer acceptance are pending.
+Full local model/decoder download and offline cache validation are still running.
+
+No physical CUDA synthesis, measured quality/latency/VRAM or minimum system RAM has
+been established. Do not treat an import or simulated audio test as real GPU
+generation. A separate v2.3.0-rc.1 preview release follows successful acceptance.

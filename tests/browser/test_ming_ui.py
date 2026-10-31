@@ -25,7 +25,13 @@ def test_ming_task_controls_saved_separately_and_restored(page, live_server, mp3
     options.locator('[data-ming="task"]').select_option("EMOTION")
     options.locator('[data-ming="emotion"]').select_option("happy")
     expect(options.locator('[data-ming="language"]')).to_be_hidden()
-    editor.get_by_role("button", name="Save generation defaults", exact=True).click()
+    with page.expect_response(
+        lambda response: (
+            response.url.endswith("/generation-settings") and response.request.method == "PUT"
+        )
+    ) as saved_response:
+        editor.get_by_role("button", name="Save generation defaults", exact=True).click()
+    assert saved_response.value.status == 200
     expect(editor.locator('[data-ming="emotion"]')).to_have_value("happy")
     voice = service.store.all("voice")[0]
     assert voice["generation_settings"]["speed"] == 1

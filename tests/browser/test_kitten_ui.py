@@ -6,7 +6,7 @@ from .test_ui import add_ready_voice
 from .test_ui import live_server as live_server
 
 
-def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, mp3):
+def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, mp3, tmp_path):
     # Explicit fake inference server. This covers UI/API, not model quality.
     url, app = live_server
     page.goto(url)
@@ -34,7 +34,13 @@ def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, 
     editor.locator('[data-kitten="voice"]').select_option("Bruno")
     editor.locator('[data-kitten="preset"]').select_option("expressive")
     editor.locator('[data-kitten="seed"]').fill("42")
-    editor.get_by_role("button", name="Save generation defaults", exact=True).click()
+    with page.expect_response(
+        lambda response: (
+            response.url.endswith("/generation-settings") and response.request.method == "PUT"
+        )
+    ) as saved_response:
+        editor.get_by_role("button", name="Save generation defaults", exact=True).click()
+    assert saved_response.value.status == 200
     expect(editor.locator('[data-kitten="seed"]')).to_have_value("42")
     saved = service.store.all("voice")[0]
     assert saved["engine_generation_settings"]["kittentts2"]["kitten"]["mode"] == "preset"
@@ -47,5 +53,14 @@ def test_kitten_controls_presets_and_engine_settings_persist(page, live_server, 
     expect(page.locator('#generate-form [data-kitten="seed"]')).to_have_value("42")
     page.locator('#generate-form [data-kitten="mode"]').select_option("clone")
     expect(page.locator('#generate-form [data-kitten="voice"]')).to_be_hidden()
+    page.locator('[data-locale="pt"]').click()
+    expect(page.locator("#generate-form .kitten-options legend")).to_have_text(
+        "Configurações do KittenTTS2"
+    )
+    expect(page.locator('#generate-form [data-kitten="mode"]')).to_have_value("clone")
+    expect(page.locator('#generate-form [data-kitten="seed"]')).to_have_value("42")
+    page.screenshot(path=str(tmp_path / "kitten-desktop.png"), full_page=True)
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+
+    page.screenshot(path=str(tmp_path / "kitten-mobile.png"), full_page=True)

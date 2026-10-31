@@ -820,6 +820,6 @@ version, avoiding RC suffixes in VersionInfoVersion. Added a regression for that
 contract and a cached-runtime low-disk regression; cache reuse no longer reserves
 another full runtime budget. Asset progress is rate limited while retaining real bytes.
 
-## KittenTTS2 — implementation in progress
+## KittenTTS2 — release acceptance in progress
 
-Native CUDA adapter, verified asset manifests, isolated installer/lifecycle and engine-specific Local/Voices controls are implemented. See [validation status](kitten-integration.md). Third release is pending acceptance; no physical GPU synthesis claim.
+Native CUDA adapter, verified asset manifests, isolated installer/lifecycle and engine-specific Local/Voices controls are implemented. See [validation status](kitten-integration.md). All 41 local Chromium tests passed; actual isolated runtime install/import/cache acceptance passed on Windows/Linux. Third release v2.3.0-rc.1 is pending final acceptance; no physical GPU synthesis claim.

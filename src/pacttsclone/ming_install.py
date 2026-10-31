@@ -78,6 +78,11 @@ def receipt_valid(root, profile="ming"):
 
 
 def install(root, runtime_only=False, profile="ming"):
+    if profile == "kitten" and sys.version_info[:2] != (3, 12):
+        raise ValueError(
+            "KittenTTS2 requires Python 3.12. Use the Windows installer "
+            "or launch the source app with Python 3.12."
+        )
     root.mkdir(parents=True, exist_ok=True)
     safe_destination(root.parent, root.name)
     source, model = manifests(profile)
