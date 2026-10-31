@@ -287,3 +287,33 @@ def test_standalone_preflight_reports_hardware_failure(
     with pytest.raises(SystemExit):
         ming_runtime_worker.main()
     assert message in capsys.readouterr().out
+
+
+def test_cached_runtime_does_not_require_another_installation_budget(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from pacttsclone import ming_install
+
+    python = ming_install.python_path(tmp_path)
+    python.parent.mkdir(parents=True)
+    python.touch()
+    digest = hashlib.sha256(
+        Path(ming_install.__file__).with_name("ming_requirements.txt").read_bytes()
+    ).hexdigest()
+    (tmp_path / "runtime-packages.json").write_text(json.dumps({"requirements_hash": digest}))
+    monkeypatch.setattr(
+        ming_install,
+        "manifests",
+        lambda: ({"revision": "a" * 40, "files": []}, {"revision": "b" * 40, "files": []}),
+    )
+    monkeypatch.setattr(ming_install.shutil, "disk_usage", lambda root: SimpleNamespace(free=0))
+    commands = []
+    monkeypatch.setattr(
+        ming_install.subprocess, "run", lambda command, **kw: commands.append(command)
+    )
+    ming_install.install(tmp_path, runtime_only=True)
+    assert len(commands) == 1  # Import preflight only; no package installation.
+    assert commands[0][1] == "-c"

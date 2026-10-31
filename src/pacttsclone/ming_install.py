@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import venv
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -80,6 +81,15 @@ def install(root, runtime_only=False):
     root.mkdir(parents=True, exist_ok=True)
     safe_destination(root.parent, root.name)
     source, model = manifests()
+    requirements = Path(__file__).with_name("ming_requirements.txt")
+    digest = hashlib.sha256(requirements.read_bytes()).hexdigest()
+    runtime_marker = root / "runtime-packages.json"
+    try:
+        reused = json.loads(runtime_marker.read_text())["requirements_hash"] == digest
+    except (OSError, ValueError, KeyError):
+        reused = False
+    python = python_path(root)
+    reserve = 0 if reused and python.is_file() else RUNTIME_RESERVE
     selected = (("source", source),) if runtime_only else (("source", source), ("model", model))
     entries = [
         (root / folder, entry) for folder, manifest in selected for entry in manifest["files"]
@@ -94,14 +104,15 @@ def install(root, runtime_only=False):
             entry["algorithm"],
         )
     )
-    if shutil.disk_usage(root).free < missing + RUNTIME_RESERVE:
+    if shutil.disk_usage(root).free < missing + reserve:
         raise ValueError(
-            f"Insufficient disk space: reserve {missing + RUNTIME_RESERVE} bytes "
+            f"Insufficient disk space: reserve {missing + reserve} bytes "
             "for missing assets, private CUDA runtime and installation cache."
         )
     total = sum(entry["size"] for _, entry in entries)
     counts = {}
     progress_lock = threading.Lock()
+    last_progress = [0.0]
 
     def transfer(pair):
         folder, entry = pair
@@ -110,6 +121,10 @@ def install(root, runtime_only=False):
         def progress(count, phase):
             with progress_lock:
                 counts[key] = max(counts.get(key, 0), count)
+                now = time.monotonic()
+                if now - last_progress[0] < 0.2 and count != entry["size"]:
+                    return
+                last_progress[0] = now
                 emit(
                     stage="assets",
                     file=entry["name"],
@@ -123,14 +138,6 @@ def install(root, runtime_only=False):
 
     with ThreadPoolExecutor(max_workers=4) as executor:
         list(executor.map(transfer, entries))
-    requirements = Path(__file__).with_name("ming_requirements.txt")
-    digest = hashlib.sha256(requirements.read_bytes()).hexdigest()
-    runtime_marker = root / "runtime-packages.json"
-    try:
-        reused = json.loads(runtime_marker.read_text())["requirements_hash"] == digest
-    except (OSError, ValueError, KeyError):
-        reused = False
-    python = python_path(root)
     if not reused or not python.is_file():
         emit(stage="dependencies", message="Preparing private Ming Python/CUDA environment")
         if not python.is_file():

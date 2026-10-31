@@ -1,6 +1,7 @@
 # Task 1 — Engines installation manager
 
-Status: implemented; release validation in progress. Owner authorized implementation and release.
+Status: completed and released as v2.1.0.
+Release: https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.1.0
 Order: complete and release this task before Task 2. Never bundle Ming or Kitten inference into this release.
 
 ## Deliverable

@@ -811,3 +811,11 @@ Chromium: 40 passed; final targeted Engines/Ming UI: 3 passed. Visual inspection
 confirmed desktop/mobile layout with no overflow at 390px. A final UI correction
 keeps Ming controls inside the collapsible settings panel and makes health/help
 text describe the active engine. No runtime/dependency contract changed.
+
+Task 1 release v2.1.0 is published with installer, application wheel, provenance and
+checksums after run 41232408239 passed actual Windows install/reinstall/uninstall
+and uploaded-asset validation. Ming remains a separate release.
+Final Ming packaging correction derives Inno's numeric version from the package
+version, avoiding RC suffixes in VersionInfoVersion. Added a regression for that
+contract and a cached-runtime low-disk regression; cache reuse no longer reserves
+another full runtime budget. Asset progress is rate limited while retaining real bytes.
