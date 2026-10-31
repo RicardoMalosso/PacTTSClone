@@ -14,11 +14,29 @@ from .models import DiscordConfig
 MAX_FILE = 10 * 1024 * 1024
 
 
-def send_webhook(url, path=None):
+def webhook_content(job, voice_title=None):
+    """Bound Discord content while keeping user text literal inside a code block."""
+
+    def clean(value, limit):
+        value = str(value or "").replace("`", "ˋ").replace("\r", " ")
+        encoded = value.encode("utf-16-le")
+        if len(encoded) <= limit * 2:
+            return value
+        return encoded[: (limit - 1) * 2].decode("utf-16-le", errors="ignore") + "…"
+
+    sender = clean(job.get("username") or job.get("requester_name") or "Unknown requester", 80)
+    voice = clean(voice_title or "TTS", 100)
+    text = clean((job.get("request") or {}).get("text"), 1700)
+    return f"{sender} sent a '{voice}' TTS:\n```\n{text}\n```"
+
+
+def send_webhook(url, path=None, content=None):
     boundary = "pactts" + uuid.uuid4().hex
     payload = json.dumps(
         {
-            "content": "PacTTSClone audio" if path else "PacTTSClone webhook connected.",
+            "content": (content or "PacTTSClone audio")
+            if path
+            else "PacTTSClone webhook connected.",
             "allowed_mentions": {"parse": []},
         }
     )
@@ -167,7 +185,12 @@ class DiscordIntegration:
                 return
             if self.store.get("discord_delivery", job["id"]):
                 return
-            entry = {"id": job["id"], "status": "queued"}
+            voice = self.store.get("voice", job.get("voice_id")) if job.get("voice_id") else None
+            entry = {
+                "id": job["id"],
+                "status": "queued",
+                "content": webhook_content(job, (voice or {}).get("title")),
+            }
             self.store.put("discord_delivery", job["id"], entry)
             try:
                 self.queue.put_nowait((job["id"], self.revision))
@@ -194,7 +217,8 @@ class DiscordIntegration:
                 self.status, self.error = "sending", None
                 self.store.patch("discord_delivery", job_id, status="sending")
             try:
-                self.sender(url, self.service.output_path(job_id))
+                entry = self.store.get("discord_delivery", job_id)
+                self.sender(url, self.service.output_path(job_id), entry.get("content"))
                 with self.lock:
                     if self.stopping.is_set():
                         return

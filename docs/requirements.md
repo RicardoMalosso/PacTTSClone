@@ -200,3 +200,7 @@ channel IDs, default ready voice, filters, text limit and cooldown. `/tts` and
 endpoint. Generation stays isolated in the existing worker and inherits saved
 voice settings. Disconnect/remove/cancel-all/shutdown close the connection and
 cancel undelivered generation. See [Discord contract](discord.md).
+
+## Webhook adjustment — 2.1.1
+
+Selected Discord audio deliveries include the requester name, saved voice title and spoken request text alongside the MP3. Snapshot content when enqueueing; preserve source filtering, duplicate suppression and disabled mentions. Bound content to Discord limits and neutralize embedded code fences.

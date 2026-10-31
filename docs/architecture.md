@@ -338,3 +338,7 @@ The worker applies linear amplitude gain after synthesis and before MP3 encoding
 using the same output path for every consumer. The reference and model input are
 unchanged. Samples are clipped to the existing PCM range; extreme boosts may
 distort peaks. Previously generated MP3s are not reprocessed.
+
+## Webhook adjustment — 2.1.1
+
+Selected Discord audio deliveries include the requester name, saved voice title and spoken request text alongside the MP3. Snapshot content when enqueueing; preserve source filtering, duplicate suppression and disabled mentions. Bound content to Discord limits and neutralize embedded code fences.
