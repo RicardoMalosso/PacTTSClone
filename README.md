@@ -454,3 +454,12 @@ or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
 50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
 Boosting too much can distort loud peaks. Local generation can override saved
 settings for one request; existing recordings keep their original volume.
+
+## Ming 3.0 dense engine (preview)
+
+Engines can install Ming 3.0 0.5B in an isolated CUDA runtime, then activate it
+explicitly. Native BF16 NVIDIA GPUs (Ampere or newer) are required. Minimum VRAM
+has not been established. English/Chinese and five additional target languages
+are supported; Portuguese is not. Voices and Local expose Ming-specific cloning,
+emotion, attribute, dialect, freeform, design and preset tasks. Engine-specific
+voice settings are retained independently. [Setup, limitations and validation](docs/ming-integration.md).

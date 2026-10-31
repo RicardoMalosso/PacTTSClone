@@ -67,7 +67,7 @@ jobs:
       - name: Compile small unsigned setup
         shell: pwsh
         run: |
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion="${{ steps.identity.outputs.installer_version }}" installer/setup.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion="${{ steps.identity.outputs.installer_version }}" /DAppNumericVersion="${{ steps.identity.outputs.numeric_version }}" installer/setup.iss
           if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed.' }
           $setup = Get-Item dist/PacTTSClone-Setup-*.exe
           if ($setup.Length -gt 150MB) { throw 'Installer exceeds 150 MiB.' }

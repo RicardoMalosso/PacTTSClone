@@ -1,0 +1,76 @@
+{
+  "repo": "inclusionAI/Ming-3.0-tts-0.5b",
+  "revision": "7247f4c94a5b2e987404ed28a5cfec41b1a4ca61",
+  "files": [
+    {
+      "name": "added_tokens.json",
+      "size": 1785,
+      "hash": "6ed12db23265d04f85fef76b45a75fe6e0a2c5d9",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/added_tokens.json"
+    },
+    {
+      "name": "campplus.onnx",
+      "size": 28303423,
+      "hash": "a6ac6a63997761ae2997373e2ee1c47040854b4b759ea41ec48e4e42df0f4d73",
+      "algorithm": "sha256",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/campplus.onnx"
+    },
+    {
+      "name": "config.json",
+      "size": 4754,
+      "hash": "3b33bfbb7b316f212e3baa4c36b9469666305aa5",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/config.json"
+    },
+    {
+      "name": "configuration.json",
+      "size": 51,
+      "hash": "b120f7ddae024b7ce9634614656c5120a241fa20",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/configuration.json"
+    },
+    {
+      "name": "merges.txt",
+      "size": 1671853,
+      "hash": "31349551d90c7606f325fe0f11bbb8bd5fa0d7c7",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/merges.txt"
+    },
+    {
+      "name": "model.safetensors",
+      "size": 2959055504,
+      "hash": "45c4d78d8ad6b1d942e3da86ba035fece02de569f7b2ca7e9d121dfaf18d674c",
+      "algorithm": "sha256",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/model.safetensors"
+    },
+    {
+      "name": "special_tokens_map.json",
+      "size": 2726,
+      "hash": "cfdd7ee20831ec9f4dc5db451063915b94381ce3",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/special_tokens_map.json"
+    },
+    {
+      "name": "tokenizer.json",
+      "size": 11431389,
+      "hash": "87d54ca3b44ea2f822ba39a0a45cb1b61644bd6606d9d3536dea75367bffb06d",
+      "algorithm": "sha256",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/tokenizer.json"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "size": 16260,
+      "hash": "d26ca5cf2e50334e29ff075de13e7b3bed3c383b",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/tokenizer_config.json"
+    },
+    {
+      "name": "vocab.json",
+      "size": 2776833,
+      "hash": "4783fe10ac3adce15ac8f358ef5462739852c569",
+      "algorithm": "sha1",
+      "url": "https://huggingface.co/inclusionAI/Ming-3.0-tts-0.5b/resolve/7247f4c94a5b2e987404ed28a5cfec41b1a4ca61/vocab.json"
+    }
+  ]
+}

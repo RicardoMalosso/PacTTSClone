@@ -1,0 +1,355 @@
+{
+  "revision": "9332fb9443325d4726ce02cefd4ec1c211df4079",
+  "files": [
+    {
+      "name": "LEGAL.md",
+      "size": 572,
+      "hash": "f96892081dd58b22ee2199adffd7b188b79e7e7f",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/LEGAL.md"
+    },
+    {
+      "name": "LICENSE",
+      "size": 1067,
+      "hash": "fc637dcc53bd81e03b6b896e632eee77b0e4ccae",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/LICENSE"
+    },
+    {
+      "name": "audio_tokenizer/audio_encoder.py",
+      "size": 5771,
+      "hash": "2c67443cba94e1dad322647a38583e045ef42a1a",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/audio_encoder.py"
+    },
+    {
+      "name": "audio_tokenizer/configuration_audio_vae.py",
+      "size": 1182,
+      "hash": "72b1f05831b636ee643ffe848de466be6cf7b828",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/configuration_audio_vae.py"
+    },
+    {
+      "name": "audio_tokenizer/istft.py",
+      "size": 7530,
+      "hash": "8cb36fd565e98a5c8846b0f326ed1a2e865b053e",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/istft.py"
+    },
+    {
+      "name": "audio_tokenizer/modeling_audio_vae.py",
+      "size": 5931,
+      "hash": "4c2052ef8d8fceb11ebc02b31a4896ce385947c3",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/modeling_audio_vae.py"
+    },
+    {
+      "name": "audio_tokenizer/rope.py",
+      "size": 3077,
+      "hash": "0a22c53193d15e55e89413e9f8764d085878c835",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/rope.py"
+    },
+    {
+      "name": "audio_tokenizer/vae_modules.py",
+      "size": 7825,
+      "hash": "e35e7b718f126be85cd8cb9f7bc0ff9f9bf1d725",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/audio_tokenizer/vae_modules.py"
+    },
+    {
+      "name": "configuration_bailingmm.py",
+      "size": 3516,
+      "hash": "c051f5de5ca0d294a3ba89ba529c82c1c7eb1157",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/configuration_bailingmm.py"
+    },
+    {
+      "name": "fm/CFM.py",
+      "size": 3222,
+      "hash": "535a18961ea6ecfcef859b100f44e1613c32b403",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/fm/CFM.py"
+    },
+    {
+      "name": "fm/dit.py",
+      "size": 5757,
+      "hash": "fcf4a3e9e46ea97da2535ca7bc3bd27017223727",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/fm/dit.py"
+    },
+    {
+      "name": "fm/flowloss.py",
+      "size": 1375,
+      "hash": "0b800f21df7b132ec31bde030510147dca749297",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/fm/flowloss.py"
+    },
+    {
+      "name": "fm/modules.py",
+      "size": 4792,
+      "hash": "c669ced045d261aadcf0582dbe809f335948aa7a",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/fm/modules.py"
+    },
+    {
+      "name": "frontend/__init__.py",
+      "size": 0,
+      "hash": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/__init__.py"
+    },
+    {
+      "name": "frontend/number_en.py",
+      "size": 10878,
+      "hash": "3ff2a0f1bd4399cc467aa52df02a63e6a7ec6b03",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/number_en.py"
+    },
+    {
+      "name": "frontend/talker_tn/__init__.py",
+      "size": 0,
+      "hash": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/__init__.py"
+    },
+    {
+      "name": "frontend/talker_tn/normalizer.py",
+      "size": 1123,
+      "hash": "b5d8147bfc59bd95473c05fa5e559e588ab5de05",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/normalizer.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/__init__.py",
+      "size": 0,
+      "hash": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/__init__.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_base.py",
+      "size": 360,
+      "hash": "e2e3cc8c1543864ba5aa1814c8991eab4fe78fd1",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_base.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_char.py",
+      "size": 231,
+      "hash": "f84e9c1019024d179f85ed9462def8d6e5e1e0f8",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_char.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_date.py",
+      "size": 3828,
+      "hash": "c1f8fbf3475d91f8b3d3dca965e0e4e816fd3f85",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_date.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_decimal.py",
+      "size": 1059,
+      "hash": "bdf5a33f63a7526b38a70807ba483f7175a1a6e5",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_decimal.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_digit.py",
+      "size": 2832,
+      "hash": "8a93419d2a9292c171d9a1fcc16760caff91a51f",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_digit.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_formula.py",
+      "size": 1360,
+      "hash": "6196f506eeb8a46c2ddcca2707e7dfe7894d05e4",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_formula.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_frac.py",
+      "size": 1192,
+      "hash": "49c58f2cee0de31424fd92244df46f03cf885d51",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_frac.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_ip.py",
+      "size": 763,
+      "hash": "2fd88a51bdb8eab0aeb0845f44fa7b6ad28650e1",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_ip.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_measure.py",
+      "size": 2380,
+      "hash": "dcec66151c8aa0c85fd0c1538e6fea4865910955",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_measure.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_money.py",
+      "size": 1315,
+      "hash": "c13d6892589407d4585df789779b130dd376bbf1",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_money.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_order.py",
+      "size": 589,
+      "hash": "30bc385d7e79d029478a5a2a7512647617576a4b",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_order.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_percent.py",
+      "size": 814,
+      "hash": "3b9af7f5ea809c5b08b1c7bda992f4fae48e05ad",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_percent.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_phone_dash.py",
+      "size": 1305,
+      "hash": "dec2edde15570a73af590fd95ecd90d828986e25",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_phone_dash.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_punc.py",
+      "size": 232,
+      "hash": "14bcc86f01d75054fdeae9474f34ca271b8977ad",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_punc.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_serial.py",
+      "size": 1703,
+      "hash": "0a448abf06422ecb16216fccb34e261c98969825",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_serial.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_sn.py",
+      "size": 1480,
+      "hash": "347884245e1c274a1425d4dd74117242577eb277",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_sn.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_time.py",
+      "size": 3942,
+      "hash": "60f024d69851da69eb06c57b50f50915ffe3690a",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_time.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_utils.py",
+      "size": 2648,
+      "hash": "c1a493bd1fa0b2bd8b6ed8c1f82b90d6da121370",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_utils.py"
+    },
+    {
+      "name": "frontend/talker_tn/re_utils/re_version.py",
+      "size": 912,
+      "hash": "c75506524308809f58465992d768ca7a9766de5b",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/re_utils/re_version.py"
+    },
+    {
+      "name": "frontend/talker_tn/talker_pre_processor.py",
+      "size": 1746,
+      "hash": "532e960a16b2500c284fad3bb8510510b55dd29f",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/talker_pre_processor.py"
+    },
+    {
+      "name": "frontend/talker_tn/talker_re.py",
+      "size": 6606,
+      "hash": "13d2459fda2b37fcfc6dd9351cc87b5c13350a81",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/talker_re.py"
+    },
+    {
+      "name": "frontend/talker_tn/talker_tn.py",
+      "size": 1909,
+      "hash": "46b7228f470cd2ad18423bf93c969dcf64a55010",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/talker_tn.py"
+    },
+    {
+      "name": "frontend/talker_tn/token_parser.py",
+      "size": 4487,
+      "hash": "900acf9524e2a8df95f6c2ddeed45637ccb21493",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/talker_tn/token_parser.py"
+    },
+    {
+      "name": "frontend/text_segment_cut.py",
+      "size": 14867,
+      "hash": "a82e764c3166e8d9ce07f2c4f2e6bccf6b07cc83",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/text_segment_cut.py"
+    },
+    {
+      "name": "frontend/toolkit.py",
+      "size": 10839,
+      "hash": "ee5eb87e8fe52cda826767daa777d84d12be2adc",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/frontend/toolkit.py"
+    },
+    {
+      "name": "infer.py",
+      "size": 5018,
+      "hash": "dd9b84e67efb570ef4608ee93bf318cc4dc00250",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/infer.py"
+    },
+    {
+      "name": "infer_tiny.py",
+      "size": 5244,
+      "hash": "4470705c21864894d3f39aa20f3cfb3f46c1615e",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/infer_tiny.py"
+    },
+    {
+      "name": "ming_tts.py",
+      "size": 14702,
+      "hash": "1fe6926c130cf768e6797273475c648067e9c322",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/ming_tts.py"
+    },
+    {
+      "name": "modeling_bailingmm.py",
+      "size": 23073,
+      "hash": "3c7607c36aa7304999ca8152a81aab134afeca48",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/modeling_bailingmm.py"
+    },
+    {
+      "name": "prompt_contract.py",
+      "size": 7707,
+      "hash": "3bfc9e210be8aa594e5064c8554a089f72e8aaf2",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/prompt_contract.py"
+    },
+    {
+      "name": "spkemb_extractor.py",
+      "size": 1284,
+      "hash": "bfbe26f9c2befccc352e9a883e8bfddbc8bee9f6",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/spkemb_extractor.py"
+    },
+    {
+      "name": "tts_tasks.py",
+      "size": 9986,
+      "hash": "1b41678cb2ba5d6fa13148840020dcdfd75621ce",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/inclusionAI/Ming-3.0-tts/9332fb9443325d4726ce02cefd4ec1c211df4079/tts_tasks.py"
+    }
+  ]
+}

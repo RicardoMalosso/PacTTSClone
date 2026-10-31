@@ -283,13 +283,17 @@ for (const [key, explanation] of Object.entries(generationHelp)) {
     input.closest('label').title = t(explanation);
   }
 }
-function voiceGenerationSettings(voice) { return {...defaultGenerationSettings, ...(voice?.generation_settings || {})}; }
+function voiceGenerationSettings(voice) {
+  const ming = state.active_engine === 'ming-3';
+  const saved = ming ? voice?.engine_generation_settings?.['ming-3'] : voice?.generation_settings;
+  return {...defaultGenerationSettings, ...(ming ? {language: 'en'} : {}), ...(saved || {})};
+}
 function settingsControls(container) {
   return Object.fromEntries(generationFields.map(([key]) => [key, container.querySelector(`[data-setting="${key}"]`)]));
 }
 function readGenerationSettings(container) {
   const controls = settingsControls(container);
-  return Object.fromEntries(generationFields.map(([key, , type]) => {
+  const values = Object.fromEntries(generationFields.map(([key, , type]) => {
     const input = controls[key];
     if (type === 'checkbox') return [key, input.checked];
     if (type === 'select') return [key, input.value];
@@ -297,8 +301,15 @@ function readGenerationSettings(container) {
     if (input.value.trim() === '') throw new Error(t('Enter a valid generation setting.'));
     return [key, Number(input.value)];
   }));
+  if (state.active_engine === 'ming-3') {
+    for (const key of ['speed', 'duration', 'steps', 'denoise', 'preprocess_prompt']) values[key] = defaultGenerationSettings[key];
+    values.language = 'auto';
+    values.ming = Object.fromEntries([...container.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
+  }
+  return values;
 }
 function applySettingsValues(container, values) {
+  renderMingOptions(container, values.ming);
   const controls = settingsControls(container);
   for (const [key, , type] of generationFields) {
     if (type === 'checkbox') controls[key].checked = Boolean(values[key]);
@@ -309,7 +320,7 @@ let appliedStudioPreset = '';
 function applyStudioVoiceDefaults() {
   const voice = state.voices.find(v => v.id === $('voice-select').value);
   const snapshot = voiceGenerationSettings(voice);
-  const identity = (voice?.id || '') + JSON.stringify(snapshot);
+  const identity = (state.active_engine || 'omnivoice') + (voice?.id || '') + JSON.stringify(snapshot);
   if (identity === appliedStudioPreset) return;
   appliedStudioPreset = identity;
   applySettingsValues($('generate-form'), snapshot);
@@ -361,11 +372,12 @@ function createVoiceSettingsEditor(voice) {
     input.setAttribute('aria-description', t(generationHelp[key]));
     container.append(labelNode);
   }
-  const editor = el('details', {class: 'voice-generation-settings'},
+  renderMingOptions(container, values.ming);
+  const editor = el('details', {class: 'voice-generation-settings', 'data-engine':state.active_engine || 'omnivoice'},
     el('summary', {}, t('Voice generation defaults')),
     el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
     container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
-    button('Restore OmniVoice defaults', () => {
+    button(state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
       applySettingsValues(editor, defaultGenerationSettings);
       editor.closest('.voice-card').dataset.settingsDirty = 'true';
     }),
@@ -375,11 +387,11 @@ function createVoiceSettingsEditor(voice) {
       await refresh();
     })
   );
-  editor.querySelectorAll('[data-setting]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
+  editor.querySelectorAll('[data-setting], [data-ming]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
   return editor;
 }
 function renderVoices() {
-  const key = JSON.stringify([state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
+  const key = JSON.stringify([state.active_engine, state.voices, state.jobs.filter(j => j.kind === 'transcribe' && ['queued', 'running'].includes(j.status)).map(j => [j.id, j.status, j.stage])]); if (key === voicesKey) return; voicesKey = key;
   const selected = $('voice-select').value;
   $('voice-select').replaceChildren(el('option', {value: ''}, t('Choose a saved voice')));
   for (const v of state.voices.filter(v => v.status === 'ready')) $('voice-select').append(el('option', {value: v.id}, v.title));
@@ -388,11 +400,13 @@ function renderVoices() {
   const editorDrafts = new Map([...document.querySelectorAll('.voice-card')].map(card => {
     const editor = card.querySelector('.voice-generation-settings');
     if (!editor) return [card.dataset.voiceId, null];
-    const dirty = card.dataset.settingsDirty === 'true';
-    return [card.dataset.voiceId, {open: editor.open, dirty, values: dirty ? Object.fromEntries(generationFields.map(([key, , type]) => {
+    const dirty = card.dataset.settingsDirty === 'true' && (editor.dataset.engine || 'omnivoice') === (state.active_engine || 'omnivoice');
+    const values = dirty ? Object.fromEntries(generationFields.map(([key, , type]) => {
       const input = editor.querySelector(`[data-setting="${key}"]`);
       return [key, type === 'checkbox' ? input.checked : input.value];
-    })) : null}];
+    })) : null;
+    if (dirty && state.active_engine === 'ming-3') values.ming = Object.fromEntries([...editor.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
+    return [card.dataset.voiceId, {engine: editor.dataset.engine || 'omnivoice', open: editor.open, dirty, values}];
   }));
   $('voices-list').replaceChildren();
   for (const v of state.voices) {
@@ -416,7 +430,7 @@ function renderVoices() {
     const draft = drafts.get(v.id);
     if (draft && !preparing) { title.value = draft.title; transcript.value = draft.transcript; card.dataset.dirty = 'true'; }
     const editorDraft = editorDrafts.get(v.id);
-    if (editorDraft) {
+    if (editorDraft && editorDraft.engine === (state.active_engine || 'omnivoice')) {
       const editor = card.querySelector('.voice-generation-settings');
       editor.open = editorDraft.open;
       if (editorDraft.dirty) {
@@ -856,6 +870,9 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const ming = state.active_engine === 'ming-3';
+  $('engine-text-hint').textContent = t(ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
+  $('engine-timing-hint').textContent = t(ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
   const residency = state.model_residency || {};
   const active = state.active_job;
   const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
@@ -1155,12 +1172,14 @@ async function renderEngines() {
     for (const model of engine.models) details.append(el('p', {}, `${model.repo}@${model.revision}`));
     details.append(el('a', {href: engine.source, target: '_blank', rel: 'noopener noreferrer'}, t('Model documentation')));
     const run = operation => async () => {
-      if (operation === 'uninstall' && !confirm('Remove installed engine model files? Saved voices and audio are retained.')) return;
+      if (operation === 'uninstall' && !confirm(t('Remove installed engine model files? Saved voices and audio are retained.'))) return;
       await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
-      await renderEngines();
+      await refresh(); await runtimeStatus(); await renderEngines();
     };
+    if (engine.id === 'ming-3') controls.append(el('a', {href: '/api/engines/ming-3/log', download: ''}, t('Installation log')));
     if (!engine.supported) controls.textContent = t('Available in a later release');
-    else if (data.busy) controls.append(button('Cancel setup', run('cancel')));
+    else if (data.busy && ((engine.id === 'ming-3' && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
+    else if (data.busy) controls.append(el('span', {}, t('Wait for installation')));
     else if (!engine.installed) controls.append(button('Install', run('install')));
     else {
       controls.append(button(engine.active ? 'Deactivate' : 'Activate', run(engine.active ? 'deactivate' : 'activate')));
@@ -1169,8 +1188,8 @@ async function renderEngines() {
       controls.append(remove);
     }
     return el('tr', {}, el('td', {}, engine.name),
-      el('td', {}, `${size(engine.installed_bytes)} ${t('installed')} / ${size(engine.download_bytes)} ${t('download')}; ${t('Peak installation space')}: ${t('Not verified')}`),
-      el('td', {}, t(engine.vram)), el('td', {}, t(engine.features), details),
+      el('td', {}, `${size(engine.installed_bytes)} ${t('installed')} / ${size(engine.download_bytes)} ${t('download')}; ${t('Peak installation space')}: ${engine.runtime_reserve_bytes ? size(engine.download_bytes + engine.runtime_reserve_bytes) + ' (' + t('conservative budget') + ')' : t('Not verified')}`),
+      el('td', {}, t(engine.vram)), el('td', {}, t(engine.features), details, ...(engine.installation ? [el('p', {}, engine.installation.error || `${t(engine.installation.stage || 'idle')} · ${size(engine.installation.completed_bytes)} / ${size(engine.installation.total_bytes)}`)] : [])),
       el('td', {}, t(engine.active ? (data.loaded ? 'Active / loaded' : 'Active / unloaded') : engine.status)), controls);
   }));
   const download = data.setup.download;
@@ -1178,3 +1197,50 @@ async function renderEngines() {
 }
 window.addEventListener('localechange', () => renderEngines().catch(e => error(e.message)));
 setInterval(() => renderEngines().catch(e => error(e.message)), 2000);
+
+function renderMingOptions(container, saved = {}) {
+  container.querySelector('.ming-options')?.remove();
+  const active = state.active_engine === 'ming-3';
+  for (const key of ['language', 'speed', 'duration', 'steps', 'denoise', 'preprocess_prompt']) {
+    const input = container.querySelector(`[data-setting="${key}"]`);
+    if (input) input.closest('label').hidden = active;
+  }
+  if (!active) return;
+  const panel = el('fieldset', {class: 'ming-options'}, el('legend', {}, t('Ming task settings')),
+    el('p', {}, t('Each task uses its own controls. Cloning uses reference audio and transcript; freeform, voice design and presets create their own voice. Portuguese is unsupported.')));
+  const fields = [
+    ['task', 'Task', [['TTS','Clone / vocal tags'],['EMOTION','Emotion'],['BASIC','Speed / pitch / loudness'],['FREEFORM','Delivery instruction'],['VOICE_DESIGN','Voice design'],['IP','Built-in voice'],['DIALECT','Dialect']]],
+    ['language','Ming language', [['en','English'],['zh','Chinese'],['de','German'],['es','Spanish'],['fr','French'],['ko','Korean'],['ja','Japanese']]],
+    ['emotion','Emotion', ['neutral','happy','sad','angry','afraid','disgusted','surprised'].map(x=>[x,x])],
+    ['speed','Ming speed', ['normal','slow','fast'].map(x=>[x,x])],
+    ['pitch','Pitch', ['normal','low','high'].map(x=>[x,x])],
+    ['loudness','Loudness', ['normal','low','high'].map(x=>[x,x])],
+    ['voice','Built-in voice', ['US_Emma','UK_George','UK_Charlotte'].map(x=>[x,x])],
+    ['dialect','Dialect', [['cantonese','Cantonese'],['chuanyu dialect','Sichuanese']]]
+  ];
+  for (const [key,label,options] of fields) {
+    const input = el('select', {'data-ming':key, title:t(label)}, ...options.map(([value,label])=>el('option',{value},t(label))));
+    if (saved?.[key]) input.value = saved[key];
+    panel.append(el('label',{},t(label),input));
+  }
+  const instruction = el('textarea', {'data-ming':'instruction', maxlength:'1000', title:t('Delivery instruction / voice description')});
+  instruction.value = saved?.instruction || '';
+  panel.append(el('label', {}, t('Delivery instruction / voice description'), instruction));
+  const visibility = () => {
+    const task = panel.querySelector('[data-ming="task"]').value;
+    const visible = {TTS:['language'], EMOTION:['emotion'], BASIC:['speed','pitch','loudness'], FREEFORM:['instruction'], VOICE_DESIGN:['instruction'], IP:['voice'], DIALECT:['dialect']}[task];
+    for (const input of panel.querySelectorAll('[data-ming]')) input.closest('label').hidden = input.dataset.ming !== 'task' && !visible.includes(input.dataset.ming);
+  };
+  panel.querySelector('[data-ming="task"]').addEventListener('change', visibility);
+  panel.append(el('details', {}, el('summary', {}, t('Supported vocal tags')),
+    '[Breathing] [Cough] [Sigh] [Laughter] [Surprise-ah] [Surprise-oh] [Dissatisfaction-hnn] [Uhm] [Confirmation-en] [Question-ei] [Question-ah] [Question-en] [Question-oh] [Question-huh]'));
+  panel.style.gridColumn = "1 / -1"; panel.style.minWidth = "0";
+  visibility(); (container.querySelector(".settings") || container).append(panel);
+}
+
+window.addEventListener('localechange', () => {
+  if (state.active_engine !== 'ming-3') return;
+  const form = $('generate-form');
+  const values = Object.fromEntries([...form.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
+  renderMingOptions(form, values);
+});

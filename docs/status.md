@@ -765,3 +765,57 @@ Added null-progress/pinned-plan, symlink containment and explicit-activation reg
 Full core suite: 242 passed. Focused engine/setup: 20 passed. Ruff and JS syntax passed.
 Previous full Chromium: 38 passed; new uninstall/retained-personal-file regression
 is being checked. Windows installer acceptance and a release remain pending.
+
+## Ming adapter started — 2026-10-31
+
+User requested beginning Ming before the Task 1 release completes. Added an
+inference-only dense 0.5b adapter and upstream source/runtime inspection record
+in ming-integration.md. It is not wired to production or advertised as installable.
+Ten deterministic tests passed for request mapping, unsupported language/settings,
+CUDA/BF16 rejection and waveform normalization. Ruff passed. Upstream BF16 excludes
+GTX 1660 SUPER in this implementation; FP16 needs separate real validation.
+Runtime isolation, verified installs/UI, task controls and real inference remain.
+
+## Ming integration implementation — 2026-10-31
+
+Implemented host-only lifecycle and verified source/model manifests, private CUDA
+runtime, persistent JSON/WAV inference bridge, preflight/selection persistence,
+separate voice task defaults, Local controls and normal Twitch/MP3/OBS/Discord
+routing. Supports dense 0.5B cloning/tags, multilingual, emotion, attributes,
+dialect, freeform/design and selected preset voices. Does not expose Tiny MoE.
+Native BF16 NVIDIA GPU required; no personal hardware constraints and no CPU speech.
+
+Fixed the shared downloader's zero-byte repository-file bug and graceful worker
+shutdown leaving a resident external inference process. Added real child transport
+and shutdown tests, activation rollback/restart, task/default separation and browser
+coverage. Core 269 and Chromium 40 passed before final metadata checks; focused
+follow-ups passed. Ruff, JS syntax, Python compilation and application wheel passed.
+
+Actual Linux installation downloaded/verified 3,003,464,609 model/source bytes,
+installed the private Torch/CUDA/Transformers stack, passed pip check and imported
+upstream Ming. A repeat with asset HTTP disabled reused verified assets/packages.
+Observed total runtime/cache/assets approximately 15.3 GB; not a universal minimum.
+Actual CPU-only preflight returned the required CUDA error, without fallback.
+No physical GPU synthesis, audio quality, minimum VRAM or latency result is claimed.
+Windows private-runtime/import and installer acceptance will run in Actions.
+Task 1 PR21 merged after all seven versioned CI jobs passed; its separate 2.1.0
+publication workflow is running. Ming is prepared as separate 2.2.0rc1 preview.
+
+### Ming cross-platform runtime validation
+
+Actions run 41232561493 passed real private CUDA dependency installation, verified
+source imports and repeated runtime/cache reuse on both Windows and Linux.
+Run 41232561209 passed all seven Windows/Linux core/Chromium/tooling jobs; its
+Windows installer acceptance is in progress. Final local core: 271 passed; full
+Chromium: 40 passed; final targeted Engines/Ming UI: 3 passed. Visual inspection
+confirmed desktop/mobile layout with no overflow at 390px. A final UI correction
+keeps Ming controls inside the collapsible settings panel and makes health/help
+text describe the active engine. No runtime/dependency contract changed.
+
+Task 1 release v2.1.0 is published with installer, application wheel, provenance and
+checksums after run 41232408239 passed actual Windows install/reinstall/uninstall
+and uploaded-asset validation. Ming remains a separate release.
+Final Ming packaging correction derives Inno's numeric version from the package
+version, avoiding RC suffixes in VersionInfoVersion. Added a regression for that
+contract and a cached-runtime low-disk regression; cache reuse no longer reserves
+another full runtime budget. Asset progress is rate limited while retaining real bytes.

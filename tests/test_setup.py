@@ -260,6 +260,7 @@ def test_dependency_constraints_use_relative_path_in_directory_with_spaces(
     finally:
         app.state.studio.close()
 
+
 def test_dependency_progress_reports_actual_bytes_and_timestamp(tmp_path, engine):
     app = create_app(Settings(data_dir=tmp_path / "data"), engine)
     setup = app.state.runtime_setup
@@ -311,7 +312,6 @@ def test_countermeasure_offer_is_persisted_and_once_only(tmp_path, engine):
         app.state.studio.close()
 
 
-
 def test_completed_cuda_setup_reselection_does_not_install_or_hash(tmp_path, engine, monkeypatch):
     app = create_app(Settings(data_dir=tmp_path / "data"), engine)
     setup = app.state.runtime_setup
@@ -325,3 +325,22 @@ def test_completed_cuda_setup_reselection_does_not_install_or_hash(tmp_path, eng
         assert app.state.service.config.device == "cuda"
     finally:
         app.state.studio.close()
+
+
+def test_empty_repository_file_downloads_and_verifies(tmp_path, monkeypatch):
+    data = b""
+    entry = dict(
+        size=0,
+        hash=hashlib.sha1(b"blob 0\0").hexdigest(),
+        algorithm="sha1",
+        url="https://example.test/__init__.py",
+    )
+
+    class Response(io.BytesIO):
+        status = 200
+        headers = {}
+
+    monkeypatch.setattr(model_setup.urllib.request, "urlopen", lambda *a, **kw: Response(data))
+    target = tmp_path / "__init__.py"
+    assert model_setup.fetch_file(entry, target) == "downloaded and verified"
+    assert target.read_bytes() == data

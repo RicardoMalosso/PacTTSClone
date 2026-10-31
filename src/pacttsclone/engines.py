@@ -2,18 +2,38 @@
 
 import json
 import shutil
+from dataclasses import replace
 from pathlib import Path
 
 from .domain import BusyError, UserError
+from .ming_lifecycle import MingLifecycle
 
 
 class EngineManager:
     def __init__(self, setup):
         self.setup = setup
         self.service = setup.service
+        self.ming = MingLifecycle(setup)
+        if setup.state.get("active_engine") == "ming-3" and self.service.ming_installed():
+            settings = replace(
+                self.service.settings,
+                engine_id="ming-3",
+                model_revision=self.ming.row()["models"][0]["revision"],
+                model=str(self.ming.root / "model"),
+                offline=True,
+            )
+            self.service.settings = self.service.runner.settings = settings
+        if setup.state.get("active_engine") == "ming-3" and not self.service.ming_installed():
+            setup.update(engine_enabled=False)
         original_ready = self.service.setup_ready
         self.service.setup_ready = lambda: (
-            original_ready() and self.setup.state.get("engine_enabled", True)
+            (
+                self.service.ming_installed()
+                if self.service.settings.engine_id == "ming-3"
+                else original_ready()
+            )
+            and self.setup.state.get("engine_enabled", True)
+            and not self.service.setup_busy
         )
 
     def snapshot(self):
@@ -94,6 +114,10 @@ class EngineManager:
                     "status": setup["status"] if supported else "Planned",
                 }
             )
+        rows[0]["active"] = (
+            rows[0]["active"] and self.setup.state.get("active_engine", "omnivoice") == "omnivoice"
+        )
+        rows[1] = self.ming.row()
         return {
             "engines": rows,
             "directory": str(self.service.settings.data_dir / "models"),
@@ -107,12 +131,36 @@ class EngineManager:
         }
 
     def change(self, engine_id, operation):
+        if engine_id == "ming-3":
+            if operation == "install":
+                return self.ming.start()
+            if operation == "cancel":
+                return self.ming.cancel()
+            if operation == "activate":
+                return self.ming.activate()
+            if operation == "uninstall":
+                return self.ming.uninstall()
+            if operation != "deactivate":
+                raise UserError("Unknown engine operation.")
+            if self.setup.state.get("active_engine") != "ming-3":
+                raise UserError("Ming is not active.")
+            with self.service._lock:
+                self.ming._idle()
+                self.service.runner.reset()
+                self.service.settings = self.service.runner.settings = replace(
+                    self.service.settings, engine_id="omnivoice"
+                )
+                self.setup._apply_models()
+                self.setup.update(active_engine="omnivoice", engine_enabled=False)
+            return self.snapshot()
         if engine_id != "omnivoice":
             raise UserError("This engine integration is not available yet.")
         if operation == "install":
             with self.service._lock:
                 if self.service.setup_busy or self.service.pending() or self.service.active_id:
                     raise BusyError("Finish or cancel generation/setup before changing engines.")
+                if self.setup.state.get("active_engine") == "ming-3":
+                    raise UserError("Deactivate Ming before installing or repairing OmniVoice.")
                 if not self.setup._models_present():
                     self.setup.update(engine_enabled=False)
                 return self.setup.start("cuda")
@@ -127,6 +175,11 @@ class EngineManager:
                 raise UserError("Install this engine first.")
             if operation == "uninstall" and self.setup.state.get("engine_enabled", True):
                 raise UserError("Deactivate this engine before uninstalling it.")
+            if (
+                operation == "deactivate"
+                and self.setup.state.get("active_engine", "omnivoice") != "omnivoice"
+            ):
+                raise UserError("OmniVoice is not the active engine.")
             self.service.runner.reset()
             if operation == "uninstall":
                 root = self.service.settings.data_dir / "models"
@@ -142,9 +195,23 @@ class EngineManager:
                         or any(p.is_symlink() for p in path.parents)
                     ):
                         raise UserError("Model manifest contains an unsafe path; no files removed.")
+                    # Whisper may be shared with an installed Ming engine.
+                    asr = Path(getattr(self.service.settings, "asr_model", ""))
+                    if (
+                        self.service.ming_installed()
+                        and asr.is_absolute()
+                        and path.resolve().is_relative_to(asr.resolve())
+                    ):
+                        continue
                     paths.append(path)
                 for path in paths:
                     path.unlink(missing_ok=True)
                 self.setup.update(models={}, status="idle", stage="uninstalled")
+            if operation == "activate":
+                self.service.settings = self.service.runner.settings = replace(
+                    self.service.settings, engine_id="omnivoice"
+                )
+                self.setup._apply_models()
+                self.setup.update(active_engine="omnivoice")
             self.setup.update(engine_enabled=operation == "activate")
         return self.snapshot()
