@@ -765,3 +765,9 @@ Added null-progress/pinned-plan, symlink containment and explicit-activation reg
 Full core suite: 242 passed. Focused engine/setup: 20 passed. Ruff and JS syntax passed.
 Previous full Chromium: 38 passed; new uninstall/retained-personal-file regression
 is being checked. Windows installer acceptance and a release remain pending.
+
+## Webhook adjustment — 2026-10-31
+
+Maintenance release 2.1.1 is based on v2.1.0, separate from Ming development. Discord posts now include requester, voice title and spoken text alongside the MP3, with bounded Unicode content, literal code-block formatting and mentions disabled. Delivery content is snapshotted before queueing. EN/PT-BR configuration explains the shared metadata.
+
+Local validation: 244 core tests, Ruff, compilation, release identity and wheel build passed. Transport/inference are controlled tests with real FFmpeg MP3s, not live Discord delivery. Chromium and Windows release acceptance are tracked separately. The maintenance branch may publish only through the existing full-test/installer/digest gates.

@@ -113,7 +113,7 @@ jobs:
             dist/SHA256SUMS.txt
             dist/FFmpeg-provenance.zip
       - name: Prepare draft prerelease
-        if: ${{ (inputs.publish_draft || inputs.publish_release) && github.ref == 'refs/heads/main' }}
+        if: ${{ (inputs.publish_draft || inputs.publish_release) && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/2.1') }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
@@ -129,7 +129,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
 
       - name: Publish accepted release
-        if: ${{ inputs.publish_release && github.ref == 'refs/heads/main' }}
+        if: ${{ inputs.publish_release && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release/2.1') }}
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh

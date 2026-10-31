@@ -52,6 +52,7 @@
     "Paste the URL below and save it. Click Send test message to check delivery.": "Cole a URL abaixo e salve. Clique em Enviar mensagem de teste para verificar a entrega.",
     "Select which outputs to mirror, enable the integration, and save.": "Selecione quais saídas espelhar, ative a integração e salve.",
     "Manage Webhooks permission is required. Keep the URL private: it allows posting to the channel.": "É necessária a permissão Gerenciar webhooks. Mantenha a URL privada: ela permite publicar no canal.",
+    "Audio posts include the requester name, voice name and spoken message.": "As publicações de áudio incluem o nome de quem pediu, o nome da voz e a mensagem falada.",
     "Webhook URL": "URL do webhook",
     "Leave blank to keep the saved webhook. Stored locally, protected with Windows DPAPI on Windows; never returned to the browser.": "Deixe vazio para manter o webhook salvo. Armazenado localmente, protegido com DPAPI no Windows; nunca retornado ao navegador.",
     "Mirror local generations": "Espelhar gerações locais",

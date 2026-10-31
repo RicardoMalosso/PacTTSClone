@@ -35,7 +35,7 @@ Rate limits and uncertain network failures are not retried automatically, avoidi
 duplicate posts. Interrupted uploads are marked interrupted on restart, not replayed.
 Reconfiguration/removal invalidates queued deliveries; an already-sending request
 may finish. Shutdown waits for the bounded request timeout before closing SQLite.
-No automatic upload of older History entries, generated text or requester names.
+Each new delivery includes the requester name, saved voice title and spoken message in a code block alongside the MP3. Mentions stay disabled. Long text is truncated to Discord limits; unavailable legacy names use an explicit fallback. Older History entries are never automatically uploaded.
 
 Validation covers secret redaction/protection, URL restrictions, host boundaries,
 source/voice/channel selection, completion delivery, duplicate suppression, queued
