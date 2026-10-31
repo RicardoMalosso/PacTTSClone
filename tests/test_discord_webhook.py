@@ -83,7 +83,9 @@ def test_completed_mp3_delivery_and_duplicate_suppression(webhook_app, mp3):
     )
     finished = wait_job(app.state.service, job["id"])
     assert finished["status"] == "succeeded"
-    wait_until(lambda: manager.store.get("discord_delivery", job["id"])["status"] == "sent")
+    wait_until(
+        lambda: (manager.store.get("discord_delivery", job["id"]) or {}).get("status") == "sent"
+    )
     manager.enqueue(finished)
     assert len(deliveries) == 1
     assert deliveries[0][1].stat().st_size > 0
@@ -203,6 +205,8 @@ def test_twitch_delivery_includes_sender_and_message(webhook_app, mp3):
         voice["id"], GenerationRequest(text="Olá chat!"), "channel", "viewer"
     )
     assert wait_job(app.state.service, job["id"])["status"] == "succeeded"
-    wait_until(lambda: manager.store.get("discord_delivery", job["id"])["status"] == "sent")
+    wait_until(
+        lambda: (manager.store.get("discord_delivery", job["id"]) or {}).get("status") == "sent"
+    )
     assert deliveries[0][2] == "viewer sent a 'Lula' TTS:\n```\nOlá chat!\n```"
     assert len(webhook_content({"request": {"text": "😀" * 2000}}).encode("utf-16-le")) <= 4000
