@@ -14,6 +14,7 @@ if f'__version__ = "{version}"' not in Path("src/pacttsclone/__init__.py").read_
     raise SystemExit("Runtime version differs from package version")
 output = (
     f"version={version}\ntag={tag}\ninstaller_version={tag[1:]}\n"
+    f"numeric_version={match[1]}.0\n"
     f"prerelease={str(bool(match[2])).lower()}\nmake_latest={str(not bool(match[2])).lower()}\n"
 )
 if os.environ.get("GITHUB_OUTPUT"):
