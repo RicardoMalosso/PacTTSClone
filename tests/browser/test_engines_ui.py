@@ -13,7 +13,7 @@ def test_engines_catalog_has_honest_future_controls(page, live_server):
     ming = page.locator("#engine-rows tr").filter(has_text="Ming 3.0")
     expect(ming.get_by_role("button", name="Install", exact=True)).to_be_visible()
     expect(page.locator("#engine-rows tr").filter(has_text="KittenTTS2")).to_contain_text(
-        "Available in a later release"
+        "115 preset voices"
     )
     expect(page.locator("#engine-storage")).to_contain_text(
         str(app.state.service.settings.data_dir)

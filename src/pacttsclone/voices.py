@@ -214,7 +214,8 @@ class Voices:
             (voice.get("generation_settings") or {})
             if engine_id == "omnivoice"
             else (
-                (voice.get("engine_generation_settings") or {}).get(engine_id) or {"language": "en"}
+                (voice.get("engine_generation_settings") or {}).get(engine_id)
+                or {"language": "en" if engine_id == "ming-3" else "auto"}
             )
         )
         explicit = {

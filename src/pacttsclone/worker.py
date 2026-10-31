@@ -124,7 +124,7 @@ class Reporter:
                 if getattr(self.engine, "external_runtime", False)
                 else self.peak_cuda,
                 "external_runtime": bool(getattr(self.engine, "external_runtime", False)),
-                "measurement_scope": "Bridge process CPU/RAM only; isolated Ming runtime excluded. "
+                "measurement_scope": "Bridge CPU/RAM only; isolated engine runtime excluded. "
                 "CUDA allocator counters unavailable; NVML is device-wide."
                 if getattr(self.engine, "external_runtime", False)
                 else "Inference worker",
@@ -214,6 +214,10 @@ def worker_main(settings, commands, events, engine_factory):
     settings = Settings(**settings)
     if engine_factory:
         engine = engine_factory(settings)
+    elif settings.engine_id == "kittentts2":
+        from .kitten_engine import KittenProcessEngine
+
+        engine = KittenProcessEngine(settings)
     elif settings.engine_id == "ming-3":
         from .ming_process import MingProcessEngine
 

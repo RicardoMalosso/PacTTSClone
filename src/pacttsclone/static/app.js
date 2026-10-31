@@ -285,7 +285,7 @@ for (const [key, explanation] of Object.entries(generationHelp)) {
 }
 function voiceGenerationSettings(voice) {
   const ming = state.active_engine === 'ming-3';
-  const saved = ming ? voice?.engine_generation_settings?.['ming-3'] : voice?.generation_settings;
+  const saved = state.active_engine && state.active_engine !== 'omnivoice' ? voice?.engine_generation_settings?.[state.active_engine] : voice?.generation_settings;
   return {...defaultGenerationSettings, ...(ming ? {language: 'en'} : {}), ...(saved || {})};
 }
 function settingsControls(container) {
@@ -306,10 +306,15 @@ function readGenerationSettings(container) {
     values.language = 'auto';
     values.ming = Object.fromEntries([...container.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
   }
+  if (state.active_engine === 'kittentts2') {
+    for (const key of ['speed','duration','steps','denoise','preprocess_prompt','guidance_scale','postprocess_output','language']) values[key] = defaultGenerationSettings[key];
+    values.kitten = readKittenOptions(container);
+  }
   return values;
 }
 function applySettingsValues(container, values) {
   renderMingOptions(container, values.ming);
+  renderKittenOptions(container, values.kitten);
   const controls = settingsControls(container);
   for (const [key, , type] of generationFields) {
     if (type === 'checkbox') controls[key].checked = Boolean(values[key]);
@@ -373,11 +378,12 @@ function createVoiceSettingsEditor(voice) {
     container.append(labelNode);
   }
   renderMingOptions(container, values.ming);
+  renderKittenOptions(container, values.kitten);
   const editor = el('details', {class: 'voice-generation-settings', 'data-engine':state.active_engine || 'omnivoice'},
     el('summary', {}, t('Voice generation defaults')),
     el('p', {class: 'muted'}, t('These defaults apply to Twitch commands and new manual generations.')),
     container, el('p', {class: 'muted'}, t('Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.')),
-    button(state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
+    button(state.active_engine === 'kittentts2' ? 'Restore KittenTTS2 defaults' : state.active_engine === 'ming-3' ? 'Restore Ming defaults' : 'Restore OmniVoice defaults', () => {
       applySettingsValues(editor, defaultGenerationSettings);
       editor.closest('.voice-card').dataset.settingsDirty = 'true';
     }),
@@ -387,7 +393,7 @@ function createVoiceSettingsEditor(voice) {
       await refresh();
     })
   );
-  editor.querySelectorAll('[data-setting], [data-ming]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
+  editor.querySelectorAll('[data-setting], [data-ming], [data-kitten]').forEach(input => input.addEventListener('input', () => { editor.closest('.voice-card').dataset.settingsDirty = 'true'; }));
   return editor;
 }
 function renderVoices() {
@@ -406,6 +412,7 @@ function renderVoices() {
       return [key, type === 'checkbox' ? input.checked : input.value];
     })) : null;
     if (dirty && state.active_engine === 'ming-3') values.ming = Object.fromEntries([...editor.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
+    if (dirty && state.active_engine === 'kittentts2') values.kitten = readKittenOptions(editor);
     return [card.dataset.voiceId, {engine: editor.dataset.engine || 'omnivoice', open: editor.open, dirty, values}];
   }));
   $('voices-list').replaceChildren();
@@ -870,9 +877,10 @@ function showSharedResult(job) {
 }
 
 function renderResidency() {
+  const kitten = state.active_engine === 'kittentts2';
   const ming = state.active_engine === 'ming-3';
-  $('engine-text-hint').textContent = t(ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
-  $('engine-timing-hint').textContent = t(ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
+  $('engine-text-hint').textContent = t(kitten ? 'KittenTTS2 supports [emotion], <event> and (((emphasis))) tags; language is detected automatically.' : ming ? 'Ming interprets punctuation and supported vocal tags.' : 'Punctuation is interpreted by OmniVoice.');
+  $('engine-timing-hint').textContent = t(kitten ? 'Cloning needs a 5–30 second reference and exact transcript. Preset mode uses a built-in voice; the saved voice selects its settings.' : ming ? 'Each Ming task has its own controls; saved voice selection also chooses its settings preset.' : 'Duration overrides Speed when provided. Turning off output postprocessing avoids trimming trailing silence.');
   const residency = state.model_residency || {};
   const active = state.active_job;
   const latest = [...(state.jobs || [])].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
@@ -1176,9 +1184,9 @@ async function renderEngines() {
       await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
       await refresh(); await runtimeStatus(); await renderEngines();
     };
-    if (engine.id === 'ming-3') controls.append(el('a', {href: '/api/engines/ming-3/log', download: ''}, t('Installation log')));
+    if (['ming-3','kittentts2'].includes(engine.id)) controls.append(el('a', {href: `/api/engines/${engine.id}/log`, download: ''}, t('Installation log')));
     if (!engine.supported) controls.textContent = t('Available in a later release');
-    else if (data.busy && ((engine.id === 'ming-3' && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
+    else if (data.busy && ((['ming-3','kittentts2'].includes(engine.id) && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
     else if (data.busy) controls.append(el('span', {}, t('Wait for installation')));
     else if (!engine.installed) controls.append(button('Install', run('install')));
     else {
@@ -1243,4 +1251,44 @@ window.addEventListener('localechange', () => {
   const form = $('generate-form');
   const values = Object.fromEntries([...form.querySelectorAll('[data-ming]')].map(input => [input.dataset.ming, input.value]));
   renderMingOptions(form, values);
+});
+
+function readKittenOptions(container) {
+  return Object.fromEntries([...container.querySelectorAll('[data-kitten]')].map(input => [input.dataset.kitten,
+    input.type === 'checkbox' ? input.checked : input.type === 'number' ? (input.value.trim() === '' ? null : Number(input.value)) : input.value]));
+}
+function renderKittenOptions(container, saved = {}) {
+  container.querySelector('.kitten-options')?.remove();
+  const active = state.active_engine === 'kittentts2';
+  for (const key of ['language','speed','duration','steps','denoise','preprocess_prompt','guidance_scale','postprocess_output']) {
+    const input = container.querySelector(`[data-setting="${key}"]`);
+    if (input) input.closest('label').hidden = active || (state.active_engine === 'ming-3' && !['guidance_scale','postprocess_output'].includes(key));
+  }
+  if (!active) return;
+  const values = {mode:'clone',voice:'Bruno',preset:'stable',max_new_tokens:1000,normalize:true,use_reference_prompt:true,seed:null,...saved};
+  const panel = el('fieldset', {class:'kitten-options'}, el('legend',{},t('KittenTTS2 settings')),
+    el('p',{},t('Cloning needs a 5–30 second reference and exact transcript. Preset mode uses a built-in voice; the saved voice selects its settings.')));
+  for (const [key,label,options] of [
+    ['mode','Voice mode',[['clone','Clone reference'],['preset','Built-in voice']]],
+    ['voice','Built-in voice',(state.kitten_voices || ['Bruno']).map(x=>[x,x])],
+    ['preset','Delivery preset',[['stable','Stable'],['expressive','Expressive']]]
+  ]) {
+    const input = el('select',{'data-kitten':key,title:t(label)},...options.map(([value,name])=>el('option',{value},t(name))));
+    input.value = values[key]; panel.append(el('label',{},t(label),input));
+  }
+  for (const [key,label,min,max] of [['max_new_tokens','Token budget per chunk',100,2000],['seed','Seed (blank for random)',0,2147483647]]) {
+    const input = el('input',{type:'number','data-kitten':key,min,max,step:1,title:t(label)});
+    input.value = values[key] ?? ''; panel.append(el('label',{},t(label),input));
+  }
+  for (const [key,label] of [['normalize','Normalize written text'],['use_reference_prompt','Condition on reference audio']]) {
+    const input = el('input',{type:'checkbox','data-kitten':key,title:t(label)}); input.checked=values[key];
+    panel.append(el('label',{class:'check'},input,' ',t(label)));
+  }
+  const visibility = () => {panel.querySelector('[data-kitten="voice"]').closest('label').hidden = panel.querySelector('[data-kitten="mode"]').value !== 'preset';};
+  panel.querySelector('[data-kitten="mode"]').addEventListener('change',visibility);
+  visibility(); panel.style.gridColumn='1 / -1'; panel.style.minWidth='0';
+  (container.querySelector('.settings') || container).append(panel);
+}
+window.addEventListener('localechange', () => {
+  if (state.active_engine === 'kittentts2') {const form=$('generate-form'); renderKittenOptions(form,readKittenOptions(form));}
 });

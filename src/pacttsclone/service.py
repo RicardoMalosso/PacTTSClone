@@ -167,6 +167,10 @@ class GenerationService:
                 raise BusyError("Já existe uma geração em andamento. Aguarde a conclusão.")
             if len(pending) >= self.config.max_queue:
                 raise BusyError("Generation queue is full.")
+            if self.settings.engine_id == "kittentts2" and kind == "speech":
+                from .kitten_engine import generation_arguments as kitten_arguments
+
+                kitten_arguments("reference.wav", request)
             if self.settings.engine_id == "ming-3" and kind == "speech":
                 from .ming_engine import generation_arguments
 

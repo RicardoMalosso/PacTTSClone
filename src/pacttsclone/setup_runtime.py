@@ -99,8 +99,15 @@ class RuntimeSetup:
             return {
                 **self.state,
                 "ready": (
-                    (self.service.ming_installed() and not self.service.setup_busy)
-                    if self.service.settings.engine_id == "ming-3"
+                    (
+                        (
+                            self.service.kitten_installed()
+                            if self.service.settings.engine_id == "kittentts2"
+                            else self.service.ming_installed()
+                        )
+                        and not self.service.setup_busy
+                    )
+                    if self.service.settings.engine_id in {"ming-3", "kittentts2"}
                     and hasattr(self.service, "ming_installed")
                     else ready
                 )
@@ -274,8 +281,10 @@ class RuntimeSetup:
             self.thread.join(5)
 
     def start(self, device, search_roots=None, move_weights=False):
-        if self.service.settings.engine_id == "ming-3":
-            raise UserError("Deactivate Ming before repairing the shared OmniVoice setup.")
+        if self.service.settings.engine_id in {"ming-3", "kittentts2"}:
+            raise UserError(
+                "Deactivate the active engine before repairing the shared OmniVoice setup."
+            )
         if not isinstance(move_weights, bool):
             raise UserError("Choose copy or move for the selected old model folders.")
         if search_roots is not None:

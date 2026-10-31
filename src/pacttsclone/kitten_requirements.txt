@@ -1,0 +1,24 @@
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.8.0+cu128
+torchaudio==2.8.0+cu128
+transformers==5.20.2
+numpy==2.2.6
+safetensors
+scipy
+soundfile
+librosa
+huggingface_hub
+brotli
+einops
+diffusers
+omegaconf
+hydra-core
+s3tokenizer
+resemble-perth
+pyloudnorm
+kitten-text-processing>=0.1.0
+espeakng_loader
+phonemizer
+onnxruntime
+setuptools
+wheel

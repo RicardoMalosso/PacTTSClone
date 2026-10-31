@@ -1,0 +1,279 @@
+{
+  "repo": "KittenML/KittenTTS",
+  "revision": "b9517e3050adced306219f8bea5f117d87ecfaa7",
+  "files": [
+    {
+      "name": "LICENSE",
+      "size": 10394,
+      "hash": "29fc05a084daab285ea109734f9f7334a26cfd0c",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/LICENSE"
+    },
+    {
+      "name": "MANIFEST.in",
+      "size": 243,
+      "hash": "8e79b61e94cc2ba71d9f7495ebe553e1ef2c6832",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/MANIFEST.in"
+    },
+    {
+      "name": "README.md",
+      "size": 14141,
+      "hash": "47791ef83d1e904a2b684264eff07bc21000a52b",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/README.md"
+    },
+    {
+      "name": "kittenml/__init__.py",
+      "size": 1437,
+      "hash": "d438b64ec2cececd62134a79a23492f3ef0dc0f7",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/__init__.py"
+    },
+    {
+      "name": "kittenml/get_model.py",
+      "size": 6031,
+      "hash": "de474ffb996006e84564bdecd91d583981dfecb5",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/get_model.py"
+    },
+    {
+      "name": "kittenml/kittentts2/__init__.py",
+      "size": 528,
+      "hash": "8104b2fc18b58a15189f3f9a07f54ec958bce59b",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/__init__.py"
+    },
+    {
+      "name": "kittenml/kittentts2/docker/server.py",
+      "size": 19421,
+      "hash": "27917be5f7e143b88fb0c813bb9ff080edd2d454",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/docker/server.py"
+    },
+    {
+      "name": "kittenml/kittentts2/logits.py",
+      "size": 5139,
+      "hash": "a83ab8dbb4ef84903256e560d2c159de083dc60c",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/logits.py"
+    },
+    {
+      "name": "kittenml/kittentts2/mlx/__init__.py",
+      "size": 352,
+      "hash": "4630e48471e9a700f7843e5cd262893780b08783",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/mlx/__init__.py"
+    },
+    {
+      "name": "kittenml/kittentts2/mlx/backend.py",
+      "size": 5534,
+      "hash": "19a0ed82f3ef180fa668e79c2feae2c99bd2f213",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/mlx/backend.py"
+    },
+    {
+      "name": "kittenml/kittentts2/mlx/loader.py",
+      "size": 3963,
+      "hash": "08a1d42212e5b90076c447b249d5c946241bac12",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/mlx/loader.py"
+    },
+    {
+      "name": "kittenml/kittentts2/mlx/model.py",
+      "size": 11610,
+      "hash": "5d59ab533c290bb8f5e90beb325c5e1f44855a34",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/mlx/model.py"
+    },
+    {
+      "name": "kittenml/kittentts2/mlx/sample.py",
+      "size": 5959,
+      "hash": "cd5f8d38beaf3b4112b44204d80763169ff30ded",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/mlx/sample.py"
+    },
+    {
+      "name": "kittenml/kittentts2/model.py",
+      "size": 28890,
+      "hash": "0b687d2ba958a2850895d866bbbd99fba5846e52",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/model.py"
+    },
+    {
+      "name": "kittenml/kittentts2/prompt.py",
+      "size": 2615,
+      "hash": "09bdef9bb1cf46348d19ca901dc7416b0762f941",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/prompt.py"
+    },
+    {
+      "name": "kittenml/kittentts2/s3gen.py",
+      "size": 164300,
+      "hash": "79beda5a631fd8a16dd69542f8d8ddfd2c34a3f8",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/s3gen.py"
+    },
+    {
+      "name": "kittenml/kittentts2/speaker.py",
+      "size": 11307,
+      "hash": "8f68569dde065e6e855147daffe7791561c2c39e",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/speaker.py"
+    },
+    {
+      "name": "kittenml/kittentts2/speaker_embedding.py",
+      "size": 8440,
+      "hash": "0aa8a4131d1fd9e200621eecf6f2754180663ef3",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/speaker_embedding.py"
+    },
+    {
+      "name": "kittenml/kittentts2/student_flow.py",
+      "size": 88528,
+      "hash": "a6ad0f0fa09fe0c3ba77c70a522f9472666d0d02",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/student_flow.py"
+    },
+    {
+      "name": "kittenml/kittentts2/ternary.py",
+      "size": 4871,
+      "hash": "1ec3bcc6dfb330033a23275a7181748416eab936",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/ternary.py"
+    },
+    {
+      "name": "kittenml/kittentts2/text.py",
+      "size": 19586,
+      "hash": "a516ecf7701dc62741b01fc506f0e87bfbe47a25",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/text.py"
+    },
+    {
+      "name": "kittenml/kittentts2/tl2_emb4.py",
+      "size": 9039,
+      "hash": "bdc29a1cf5863070cd315e036633f750ea446409",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/tl2_emb4.py"
+    },
+    {
+      "name": "kittenml/kittentts2/tokens.py",
+      "size": 2188,
+      "hash": "902a09287bb0b418c1f63044ae2829dc828e4101",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/tokens.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/__init__.py",
+      "size": 49,
+      "hash": "780a557f5405121a585c39ae38bfcdc174db42df",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/__init__.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/backend.py",
+      "size": 32853,
+      "hash": "707d5e55dcedd6cfd36e36b8ef9721e39f8a5443",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/backend.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/fp16.py",
+      "size": 10354,
+      "hash": "8f7a1ba3272c9fff83d13019823f7c51cbd70795",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/fp16.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/loader.py",
+      "size": 7811,
+      "hash": "fc1606116391cae37c3b305ccf46e33ad0c6ef17",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/loader.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/logits.py",
+      "size": 1683,
+      "hash": "bcc0f4a535531ff2bf6a8f03eca34b5c87222947",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/logits.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/rocm.py",
+      "size": 7976,
+      "hash": "6b47c5c5c0163326bbda55620bcb87b3ce0c9515",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/rocm.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vllm/w4a16.py",
+      "size": 10033,
+      "hash": "984e76f424f8b1011ecd899a5186d214bceb023c",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vllm/w4a16.py"
+    },
+    {
+      "name": "kittenml/kittentts2/vocoder.py",
+      "size": 11573,
+      "hash": "0ab6670d9d4de7607db6023f8422abf8baf316f2",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/vocoder.py"
+    },
+    {
+      "name": "kittenml/kittentts2/weights.py",
+      "size": 3474,
+      "hash": "0ba20db27be47d155c8cc8a33353fcc734c0251a",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts2/weights.py"
+    },
+    {
+      "name": "kittenml/kittentts_legacy/__init__.py",
+      "size": 729,
+      "hash": "cd0ac14399e72cd4cf81125be1ddbae3fcba4db6",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts_legacy/__init__.py"
+    },
+    {
+      "name": "kittenml/kittentts_legacy/model.py",
+      "size": 4897,
+      "hash": "50b16c7e92ebd374690db26644ee348591a99ac8",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts_legacy/model.py"
+    },
+    {
+      "name": "kittenml/kittentts_legacy/onnx_model.py",
+      "size": 6756,
+      "hash": "130a3ff1b6b8cbbea17417ce71cc0f41513accf6",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/kittentts_legacy/onnx_model.py"
+    },
+    {
+      "name": "kittenml/preprocess.py",
+      "size": 53603,
+      "hash": "b31ed00f0efbb9f74fb8fd1811cfd9878f5ecc86",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/preprocess.py"
+    },
+    {
+      "name": "kittenml/repo.py",
+      "size": 1428,
+      "hash": "6e1bbd17fbe33c6b1df6de19b3d85d37b3f2f1d3",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/kittenml/repo.py"
+    },
+    {
+      "name": "pyproject.toml",
+      "size": 2043,
+      "hash": "71c8228b48e79f681c55d2ba515b89422f84c641",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/pyproject.toml"
+    },
+    {
+      "name": "setup.py",
+      "size": 1875,
+      "hash": "9ff27238c68a31e571ec22ac98ab7ad2071ee06b",
+      "algorithm": "sha1",
+      "url": "https://raw.githubusercontent.com/KittenML/KittenTTS/b9517e3050adced306219f8bea5f117d87ecfaa7/setup.py"
+    }
+  ]
+}

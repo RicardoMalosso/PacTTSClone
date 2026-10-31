@@ -14,3 +14,5 @@ Keep original voice references reusable where supported, separate engine-specifi
 
 ## Acceptance and release gate
 Adapter argument and lifecycle tests, unsupported-setting validation, cancellation/OOM/recovery, active selection persistence, queue/integration regressions; Chromium install/activate/generate/uninstall and language/settings flows. Real CUDA smoke on supported hardware with valid MP3, recorded model revision, latency and peak VRAM; report quality separately. Run full pytest/Ruff/Chromium and Windows/Linux/installer acceptance. Document hardware limitations honestly; do not call simulated inference a real test. Update docs/status/version and publish a separate immutable release with verified installer/update assets after gates pass. Then begin Task 3.
+
+Published separately as [v2.2.0-rc.1](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.2.0-rc.1). Real CUDA synthesis remains unmeasured; see integration limitations.

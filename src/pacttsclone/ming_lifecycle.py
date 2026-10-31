@@ -17,23 +17,40 @@ from .ming_install import MARKER, RUNTIME_RESERVE, manifests, python_path, recei
 
 
 class MingLifecycle:
+    profile = "ming"
+    engine_id = "ming-3"
+    display_name = "Ming"
+    worker_file = "ming_runtime_worker.py"
+    response_marker = "@@PACTTS_MING@@"
+
+    def assets(self):
+        return manifests() if self.profile == "ming" else manifests(self.profile)
+
+    def installed(self):
+        return (
+            receipt_valid(self.root)
+            if self.profile == "ming"
+            else receipt_valid(self.root, self.profile)
+        )
+
     def __init__(self, setup):
         self.setup = setup
         self.service = setup.service
-        self.root = self.service.settings.data_dir / "engines" / "ming-3"
+        self.root = self.service.settings.data_dir / "engines" / self.engine_id
         self.process = None
         self.thread = None
         self.cancelled = threading.Event()
-        self.state = dict(setup.state.get("ming", {}))
+        self.state = dict(setup.state.get(self.profile, {}))
         if self.state.get("status") == "running":
             self.update(
-                status="cancelled", error="Ming installation was interrupted. Retry to resume."
+                status="cancelled",
+                error=f"{self.display_name} installation was interrupted. Retry to resume.",
             )
-        self.service.ming_installed = lambda: receipt_valid(self.root)
+        setattr(self.service, f"{self.profile}_installed", self.installed)
 
     def update(self, **values):
         self.state.update(values)
-        self.setup.update(ming=dict(self.state))
+        self.setup.update(**{self.profile: dict(self.state)})
 
     def _idle(self):
         if self.service.setup_busy or self.service.pending() or self.service.active_id:
@@ -45,12 +62,14 @@ class MingLifecycle:
             self.service.setup_busy = True
             self.cancelled.clear()
             self.update(status="running", stage="prepare", error=None)
-            self.thread = threading.Thread(target=self._install, daemon=True, name="ming-install")
+            self.thread = threading.Thread(
+                target=self._install, daemon=True, name=f"{self.profile}-install"
+            )
             self.thread.start()
         return dict(self.state)
 
     def _install(self):
-        log = self.service.logs / "ming-install.log"
+        log = self.service.logs / f"{self.profile}-install.log"
         try:
             with log.open("a", encoding="utf-8") as output:
                 process = subprocess.Popen(
@@ -59,6 +78,8 @@ class MingLifecycle:
                         "-u",
                         "-m",
                         "pacttsclone.ming_install",
+                        "--profile",
+                        self.profile,
                         "--root",
                         str(self.root),
                     ],
@@ -81,11 +102,11 @@ class MingLifecycle:
                 process.stdout.close()
                 if self.cancelled.is_set():
                     self.update(status="cancelled", stage="cancelled")
-                elif code or not receipt_valid(self.root):
+                elif code or not self.installed():
                     self.update(
                         status="failed",
                         error=self.state.get("error")
-                        or "Ming installation failed. See the Ming installation log.",
+                        or f"{self.display_name} installation failed. See its installation log.",
                     )
                 else:
                     self.update(status="succeeded", stage="installed", error=None)
@@ -129,12 +150,12 @@ class MingLifecycle:
     def activate(self):
         with self.service._lock:
             self._idle()
-            if not receipt_valid(self.root):
-                raise UserError("Install and verify Ming before activation.")
+            if not self.installed():
+                raise UserError(f"Install and verify {self.display_name} before activation.")
             command = [
                 str(python_path(self.root)),
                 "-u",
-                str(Path(__file__).with_name("ming_runtime_worker.py")),
+                str(Path(__file__).with_name(self.worker_file)),
                 "--source",
                 str(self.root / "source"),
                 "--model",
@@ -159,9 +180,9 @@ class MingLifecycle:
                 )
             except (OSError, subprocess.TimeoutExpired) as exc:
                 raise UserError(
-                    "Ming activation preflight failed; previous engine retained."
+                    f"{self.display_name} activation preflight failed; previous engine retained."
                 ) from exc
-            from .ming_process import MARKER as response_marker
+            response_marker = self.response_marker
 
             messages = [
                 json.loads(line[len(response_marker) :])
@@ -170,41 +191,43 @@ class MingLifecycle:
             ]
             if result.returncode or not messages or not messages[-1].get("ok"):
                 raise UserError(
-                    messages[-1].get("error", "Ming preflight failed.")
+                    messages[-1].get("error", f"{self.display_name} preflight failed.")
                     if messages
-                    else "Ming preflight failed; check the isolated runtime."
+                    else f"{self.display_name} preflight failed; check the isolated runtime."
                 )
             self.service.runner.reset()
             settings = replace(
                 self.service.settings,
-                engine_id="ming-3",
-                model_revision=manifests()[1]["revision"],
+                engine_id=self.engine_id,
+                model_revision=self.assets()[1]["revision"],
                 model=str(self.root / "model"),
                 offline=True,
             )
             self.service.settings = self.service.runner.settings = settings
-            self.setup.update(active_engine="ming-3", engine_enabled=True)
+            self.setup.update(active_engine=self.engine_id, engine_enabled=True)
         return dict(self.state)
 
     def uninstall(self):
         with self.service._lock:
             self._idle()
-            if self.setup.state.get("active_engine") == "ming-3" and self.setup.state.get(
+            if self.setup.state.get("active_engine") == self.engine_id and self.setup.state.get(
                 "engine_enabled", True
             ):
-                raise UserError("Deactivate Ming before uninstalling it.")
+                raise UserError(f"Deactivate {self.display_name} before uninstalling it.")
             # Only this dedicated owned directory is removed. Never follow a replaced
             # directory/symlink into shared caches or user assets.
             if any(p.is_symlink() for p in [self.root, *self.root.parents]):
-                raise UserError("Unsafe Ming installation directory; no files removed.")
+                raise UserError(
+                    f"Unsafe {self.display_name} installation directory; no files removed."
+                )
             if self.root.exists():
                 shutil.rmtree(self.root)
             self.update(status="idle", stage="uninstalled", error=None)
         return dict(self.state)
 
     def row(self):
-        source, model = manifests()
-        installed = receipt_valid(self.root)
+        source, model = self.assets()
+        installed = self.installed()
         total = sum(e["size"] for m in (source, model) for e in m["files"])
         try:
             installed_bytes = json.loads((self.root / "installation.json").read_text()).get(
@@ -213,12 +236,12 @@ class MingLifecycle:
         except (OSError, ValueError, TypeError):
             installed_bytes = total
         return {
-            "id": "ming-3",
+            "id": self.engine_id,
             "name": "Ming 3.0 · 0.5B dense",
             "supported": True,
             "installed": installed,
             "active": installed
-            and self.setup.state.get("active_engine") == "ming-3"
+            and self.setup.state.get("active_engine") == self.engine_id
             and self.setup.state.get("engine_enabled", True),
             "installed_bytes": installed_bytes if installed else 0,
             "download_bytes": total,

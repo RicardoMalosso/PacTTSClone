@@ -107,7 +107,9 @@ def test_failed_activation_preserves_previous_engine(tmp_path, monkeypatch, engi
     from pacttsclone.app import create_app
 
     app = create_app(Settings(data_dir=tmp_path), engine)
-    monkeypatch.setattr("pacttsclone.ming_lifecycle.receipt_valid", lambda root: True)
+    monkeypatch.setattr(
+        "pacttsclone.ming_lifecycle.receipt_valid", lambda root, profile="ming": True
+    )
     monkeypatch.setattr(
         "pacttsclone.ming_lifecycle.subprocess.run",
         lambda *a, **kw: type(
@@ -224,7 +226,9 @@ def test_successful_activation_is_persisted_and_restored(tmp_path, monkeypatch, 
 
     from pacttsclone.app import create_app
 
-    monkeypatch.setattr("pacttsclone.ming_lifecycle.receipt_valid", lambda root: True)
+    monkeypatch.setattr(
+        "pacttsclone.ming_lifecycle.receipt_valid", lambda root, profile="ming": True
+    )
     monkeypatch.setattr(
         "pacttsclone.ming_lifecycle.subprocess.run",
         lambda *a, **kw: type(
@@ -307,7 +311,10 @@ def test_cached_runtime_does_not_require_another_installation_budget(tmp_path, m
     monkeypatch.setattr(
         ming_install,
         "manifests",
-        lambda: ({"revision": "a" * 40, "files": []}, {"revision": "b" * 40, "files": []}),
+        lambda profile="ming": (
+            {"revision": "a" * 40, "files": []},
+            {"revision": "b" * 40, "files": []},
+        ),
     )
     monkeypatch.setattr(ming_install.shutil, "disk_usage", lambda root: SimpleNamespace(free=0))
     commands = []

@@ -62,8 +62,10 @@ def test_busy_and_future_engines_cannot_be_changed(tmp_path):
     engines.service.setup_busy = True
     with pytest.raises(BusyError):
         engines.change("omnivoice", "deactivate")
-    with pytest.raises(UserError, match="not available"):
+    with pytest.raises(BusyError):
         engines.change("kittentts2", "install")
+    with pytest.raises(UserError, match="not available"):
+        engines.change("unknown-engine", "install")
     assert weight.exists()
 
 
@@ -78,7 +80,9 @@ def test_engines_api_requires_session_token(tmp_path, engine):
         assert client.get("/api/engines").status_code == 200
         assert client.post("/api/engines/omnivoice/deactivate").status_code == 403
         token = client.get("/api/session").json()["token"]
-        response = client.post("/api/engines/kittentts2/install", headers={"X-PacTTS-Token": token})
+        response = client.post(
+            "/api/engines/unknown-engine/install", headers={"X-PacTTS-Token": token}
+        )
         assert response.status_code == 422
 
 

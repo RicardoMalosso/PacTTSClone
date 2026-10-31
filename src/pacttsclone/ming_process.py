@@ -16,6 +16,10 @@ MARKER = "@@PACTTS_MING@@"
 
 
 class MingProcessEngine:
+    engine_id = "ming-3"
+    worker_file = "ming_runtime_worker.py"
+    marker = MARKER
+    label = "Ming"
     external_runtime = True
 
     def __init__(self, settings):
@@ -28,14 +32,14 @@ class MingProcessEngine:
 
     def _response(self):
         for line in self.process.stdout:
-            if line.startswith(MARKER):
-                value = json.loads(line[len(MARKER) :])
+            if line.startswith(self.marker):
+                value = json.loads(line[len(self.marker) :])
                 if not value.get("ok"):
                     self._close()
-                    raise UserError("Ming: " + value.get("error", "Runtime failed."))
+                    raise UserError(self.label + ": " + value.get("error", "Runtime failed."))
                 return value
         self._close()
-        raise UserError("Ming runtime stopped. Check the Ming installation log.")
+        raise UserError(f"{self.label} runtime stopped. Check the installation log.")
 
     def _close(self):
         if self.process is not None:
@@ -54,10 +58,10 @@ class MingProcessEngine:
     def _load(self):
         if self.process is not None and self.process.poll() is None:
             return
-        root = self.settings.data_dir / "engines" / "ming-3"
+        root = self.settings.data_dir / "engines" / self.engine_id
         python = root / "runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         if not python.is_file():
-            raise UserError("Install Ming from Engines before generation.")
+            raise UserError(f"Install {self.label} from Engines before generation.")
         env = {
             **os.environ,
             "PYTHONNOUSERSITE": "1",
@@ -90,7 +94,7 @@ class MingProcessEngine:
         return [
             str(python),
             "-u",
-            str(Path(__file__).with_name("ming_runtime_worker.py")),
+            str(Path(__file__).with_name(self.worker_file)),
             "--source",
             str(root / "source"),
             "--model",
@@ -114,8 +118,11 @@ class MingProcessEngine:
         self.process.stdin.flush()
         return self._response()["transcript"]
 
+    def arguments(self, reference, request):
+        return generation_arguments(reference, request)
+
     def synthesize(self, reference, request):
-        arguments = generation_arguments(reference, request)
+        arguments = self.arguments(reference, request)
         self._load()
         self.observer("inference", "cuda")
         with tempfile.TemporaryDirectory(prefix="ming-", dir=Path(reference).parent) as directory:
@@ -128,8 +135,8 @@ class MingProcessEngine:
                 self._response()
                 samples, rate = sf.read(output, dtype="float32")
                 if samples.ndim != 1 or not samples.size or not np.isfinite(samples).all():
-                    raise UserError("Ming returned invalid mono audio.")
+                    raise UserError(f"{self.label} returned invalid mono audio.")
                 return Waveform(samples, rate)
             except (OSError, ValueError) as exc:
                 self._close()
-                raise UserError("Ming output failed; CPU fallback is disabled.") from exc
+                raise UserError(f"{self.label} output failed; CPU fallback is disabled.") from exc
