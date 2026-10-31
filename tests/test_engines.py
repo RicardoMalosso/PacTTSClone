@@ -25,6 +25,7 @@ def manager(tmp_path):
     state = {"status": "succeeded", "models": {"files": [{"path": str(weight), "size": 7}]}}
     setup = SimpleNamespace(
         service=service,
+        model_ids=("k2-fsa/OmniVoice", "openai/whisper-small"),
         state=state,
         lock=threading.RLock(),
         snapshot=lambda: dict(state),
@@ -79,3 +80,39 @@ def test_engines_api_requires_session_token(tmp_path, engine):
         token = client.get("/api/session").json()["token"]
         response = client.post("/api/engines/ming-3/install", headers={"X-PacTTS-Token": token})
         assert response.status_code == 422
+
+
+def test_install_does_not_implicitly_activate(tmp_path):
+    engines, weight = manager(tmp_path)
+    weight.unlink()
+    engines.setup.start = Mock(return_value={})
+    engines.change("omnivoice", "install")
+    assert engines.setup.state["engine_enabled"] is False
+    engines.setup.start.assert_called_once_with("cuda")
+
+
+def test_catalog_uses_pinned_plan_and_handles_null_download(tmp_path):
+    import json
+
+    engines, weight = manager(tmp_path)
+    engines.setup.state["download"] = None
+    plan = {"revision": "a" * 40, "files": [{"size": 123}]}
+    (weight.parent / "k2-fsa--OmniVoice.json").write_text(json.dumps(plan))
+    row = engines.snapshot()["engines"][0]
+    assert row["download_bytes"] == 123
+    assert row["models"][0]["revision"] == "a" * 40
+    assert row["installed_bytes"] == 7
+
+
+def test_symlink_manifest_never_deletes_external_files(tmp_path):
+    engines, weight = manager(tmp_path)
+    external = tmp_path / "personal.mp3"
+    external.write_bytes(b"keep")
+    link = weight.parent / "link"
+    link.symlink_to(external)
+    engines.setup.state["models"]["files"].append({"path": str(link), "size": 4})
+    engines.change("omnivoice", "deactivate")
+    with pytest.raises(UserError, match="unsafe"):
+        engines.change("omnivoice", "uninstall")
+    assert external.read_bytes() == b"keep"
+    assert weight.exists()

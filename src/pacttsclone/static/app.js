@@ -1142,16 +1142,24 @@ refreshUpdates();
 async function renderEngines() {
   if (!session || session.remote_access || $('pane-engines').hidden) return;
   const data = await api('/api/engines');
-  const size = n => n == null ? 'Not verified' : `${(n / 1073741824).toFixed(2)} GiB`;
-  $('engine-storage').textContent = `${data.directory} · ${size(data.free_bytes)} free`;
+  const size = n => n == null ? t('Not verified') : `${(n / 1073741824).toFixed(2)} GiB`;
+  $('engine-hardware').textContent = (state.model_residency?.loaded ? t('Model loaded in memory') : t('Model unloaded')) + ' · ' + $('vram').textContent;
+  $('engine-storage').textContent = `${data.directory} · ${size(data.free_bytes)} ${t('free')}`;
   $('engine-rows').replaceChildren(...data.engines.map(engine => {
     const controls = el('td');
+    const details = el('details', {}, el('summary', {}, t('Requirements and features')));
+    const add = (label, value) => details.append(el('p', {}, `${t(label)}: ${t(value)}`));
+    add('Runtime', engine.runtime); add('System RAM', engine.ram);
+    add('Languages', engine.languages); add('License', engine.license);
+    for (const [name, value] of Object.entries(engine.capabilities)) add(name, value);
+    for (const model of engine.models) details.append(el('p', {}, `${model.repo}@${model.revision}`));
+    details.append(el('a', {href: engine.source, target: '_blank', rel: 'noopener noreferrer'}, t('Model documentation')));
     const run = operation => async () => {
       if (operation === 'uninstall' && !confirm('Remove installed engine model files? Saved voices and audio are retained.')) return;
       await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
       await renderEngines();
     };
-    if (!engine.supported) controls.textContent = 'Available in a later release';
+    if (!engine.supported) controls.textContent = t('Available in a later release');
     else if (data.busy) controls.append(button('Cancel setup', run('cancel')));
     else if (!engine.installed) controls.append(button('Install', run('install')));
     else {
@@ -1161,11 +1169,12 @@ async function renderEngines() {
       controls.append(remove);
     }
     return el('tr', {}, el('td', {}, engine.name),
-      el('td', {}, `${size(engine.installed_bytes)} installed / ${size(engine.download_bytes)} download; peak installation space: Not verified`),
-      el('td', {}, engine.vram), el('td', {}, engine.features),
-      el('td', {}, engine.active ? 'Active' : engine.status), controls);
+      el('td', {}, `${size(engine.installed_bytes)} ${t('installed')} / ${size(engine.download_bytes)} ${t('download')}; ${t('Peak installation space')}: ${t('Not verified')}`),
+      el('td', {}, t(engine.vram)), el('td', {}, t(engine.features), details),
+      el('td', {}, t(engine.active ? (data.loaded ? 'Active / loaded' : 'Active / unloaded') : engine.status)), controls);
   }));
   const download = data.setup.download;
   $('engine-progress').textContent = data.setup.error || (download ? `${download.phase || ''}: ${size(download.completed_bytes)} / ${size(download.total_bytes)}` : data.setup.stage);
 }
+window.addEventListener('localechange', () => renderEngines().catch(e => error(e.message)));
 setInterval(() => renderEngines().catch(e => error(e.message)), 2000);

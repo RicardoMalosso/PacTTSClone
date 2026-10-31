@@ -71,7 +71,14 @@ class Tunnel:
         if not capability:
             return False
         if path.startswith(
-            ("/api/tunnel", "/api/setup", "/api/twitch", "/api/import", "/api/discord")
+            (
+                "/api/tunnel",
+                "/api/setup",
+                "/api/twitch",
+                "/api/import",
+                "/api/discord",
+                "/api/engines",
+            )
         ):
             return False  # Tunnel lifecycle stays local, even for shared admins.
         if capability[0] == "admin":

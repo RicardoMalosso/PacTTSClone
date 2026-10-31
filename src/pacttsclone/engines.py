@@ -1,5 +1,6 @@
 """Host-owned engine catalogue and model lifecycle, sharing Initial Setup downloads."""
 
+import json
 import shutil
 from pathlib import Path
 
@@ -20,6 +21,22 @@ class EngineManager:
         files = setup.get("models", {}).get("files", [])
         installed = self.setup._models_present()
         enabled = setup.get("engine_enabled", True)
+        plans = []
+        for repo in self.setup.state.get("model_ids", self.setup.model_ids):
+            plan_file = (
+                self.service.settings.data_dir / "models" / (repo.replace("/", "--") + ".json")
+            )
+            try:
+                plan = json.loads(plan_file.read_text(encoding="utf-8"))
+                plans.append(
+                    {
+                        "repo": repo,
+                        "revision": plan["revision"],
+                        "bytes": sum(f["size"] for f in plan["files"]),
+                    }
+                )
+            except (OSError, ValueError, KeyError, TypeError):
+                pass
         rows = []
         for key, name in (
             ("omnivoice", "OmniVoice"),
@@ -34,8 +51,40 @@ class EngineManager:
                     "supported": supported,
                     "installed": installed if supported else False,
                     "active": bool(installed and enabled) if supported else False,
-                    "installed_bytes": sum(f["size"] for f in files) if supported else None,
-                    "download_bytes": (setup.get("download") or {}).get("total_bytes")
+                    "installed_bytes": sum(f["size"] for f in files if Path(f["path"]).is_file())
+                    if supported
+                    else None,
+                    "models": plans if supported else [],
+                    "license": "CC-BY-NC weights; Apache-2.0 code" if supported else "Not verified",
+                    "runtime": "NVIDIA CUDA; Python 3.12; Windows/Linux"
+                    if supported
+                    else "Not verified",
+                    "ram": "Not verified",
+                    "languages": "600+ upstream; Automatic/PT/EN exposed by this app"
+                    if supported
+                    else "Not verified",
+                    "source": "https://huggingface.co/k2-fsa/OmniVoice"
+                    if supported
+                    else (
+                        "https://github.com/inclusionAI/Ming-3.0-tts"
+                        if key == "ming-3"
+                        else "https://github.com/KittenML/KittenTTS"
+                    ),
+                    "capabilities": {
+                        "Voice cloning": "Supported" if supported else "Not verified",
+                        "Style / emotion": "Not exposed" if supported else "Not verified",
+                        "Vocal tags": "Upstream supports tags; results vary"
+                        if supported
+                        else "Not verified",
+                        "Streaming": "Not exposed" if supported else "Not verified",
+                        "Voice conversion": "Not exposed" if supported else "Not verified",
+                        "Singing": "Not verified",
+                    },
+                    "download_bytes": (
+                        sum(p["bytes"] for p in plans)
+                        if plans
+                        else (setup.get("download") or {}).get("total_bytes")
+                    )
                     if supported
                     else None,
                     "vram": "Not verified (varies with input and settings)",
@@ -50,6 +99,10 @@ class EngineManager:
             "directory": str(self.service.settings.data_dir / "models"),
             "free_bytes": shutil.disk_usage(self.service.settings.data_dir).free,
             "busy": self.service.setup_busy,
+            "loaded": bool(
+                self.service.runner.pid
+                and getattr(self.service.runner, "model_state", {}).get("loaded")
+            ),
             "setup": setup,
         }
 
@@ -57,7 +110,12 @@ class EngineManager:
         if engine_id != "omnivoice":
             raise UserError("This engine integration is not available yet.")
         if operation == "install":
-            return self.setup.start("cuda")
+            with self.service._lock:
+                if self.service.setup_busy or self.service.pending() or self.service.active_id:
+                    raise BusyError("Finish or cancel generation/setup before changing engines.")
+                if not self.setup._models_present():
+                    self.setup.update(engine_enabled=False)
+                return self.setup.start("cuda")
         if operation == "cancel":
             return self.setup.cancel()
         if operation not in {"activate", "deactivate", "uninstall"}:

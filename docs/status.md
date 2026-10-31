@@ -753,3 +753,15 @@ is in progress. Real CUDA and Windows installer acceptance are not claimed.
 Task 1 remains in progress: complete sourced hardware/features metadata, installation
 peak/runtime accounting, full EN/PT dynamic text and release validation before
 publishing. No release yet. Tasks 2/3 have not begun.
+
+### Engines follow-up — 2026-10-31
+
+Added pinned model/revision and download-plan totals, upstream documentation links,
+license/runtime/language and per-feature details. Unverified requirements remain
+explicitly unknown. Added dynamic PT translations, active versus resident status,
+and remote engine ACL exclusion. Fixed new installs activating implicitly: Engines
+installation now requires a separate Activate action. Initial Setup remains compatible.
+Added null-progress/pinned-plan, symlink containment and explicit-activation regressions.
+Full core suite: 242 passed. Focused engine/setup: 20 passed. Ruff and JS syntax passed.
+Previous full Chromium: 38 passed; new uninstall/retained-personal-file regression
+is being checked. Windows installer acceptance and a release remain pending.
