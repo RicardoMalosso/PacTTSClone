@@ -354,3 +354,8 @@ Preset mode uses packaged reference artifacts. Per-engine defaults persist under
 engine_generation_settings and are snapshotted into queued jobs. External runtime
 CPU/RAM is excluded from bridge-only metrics; no fabricated private allocator
 measurements are reported. Details: [integration](kitten-integration.md).
+
+Kitten's upstream reference caches use file paths as keys. Since app references
+are unique per-job temporary paths, the bridge clears both reference-conditioning
+caches after each completed generation while keeping the base model resident.
+This prevents unbounded retention across repeated requests.

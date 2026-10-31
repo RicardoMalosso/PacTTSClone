@@ -280,3 +280,80 @@ def test_shared_asr_path_survives_omni_removal_and_restart(tmp_path, engine, mon
         assert restored.state.service.settings.engine_id == "kittentts2"
         assert restored.state.service.settings.asr_model == str(asr.parent)
         assert client.get("/api/setup").json()["ready"]
+
+
+def test_standalone_worker_reuses_model_without_retaining_job_reference_caches(
+    tmp_path, monkeypatch, capsys
+):
+    # Exercise the actual bridge loop with explicit simulated CUDA/model objects.
+    # This verifies residency/cache lifecycle, never GPU audio quality.
+    import contextlib
+    import importlib.metadata
+    import io
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    from pacttsclone import kitten_runtime_worker
+
+    model_path = tmp_path / "model"
+    model_path.mkdir()
+    (model_path / "config.json").write_text('{"type":"KITTEN2"}')
+    instances = []
+
+    class SimulatedModel:
+        def __init__(self, *args, **kwargs):
+            assert kwargs["device"] == "cuda" and kwargs["backend"] == "torch"
+            assert kwargs["weights"] == "packed" and kwargs["decoder"] == "default"
+            self._reference_cache = {}
+            self.codec = SimpleNamespace(_ref_cache={})
+            self.calls = 0
+            instances.append(self)
+
+        def generate(self, **kwargs):
+            assert not self._reference_cache and not self.codec._ref_cache
+            self.calls += 1
+            self._reference_cache["job-reference"] = object()
+            self.codec._ref_cache["job-reference"] = object()
+            return np.zeros(24, dtype=np.float32)
+
+    cuda = SimpleNamespace(
+        is_available=lambda: True,
+        get_device_capability=lambda: (8, 0),
+        is_bf16_supported=lambda: True,
+        synchronize=lambda: None,
+    )
+    monkeypatch.setitem(
+        sys.modules, "torch", SimpleNamespace(cuda=cuda, inference_mode=contextlib.nullcontext)
+    )
+    monkeypatch.setitem(sys.modules, "kittenml", SimpleNamespace(KittenTTS2=SimulatedModel))
+    requirements = Path(kitten_runtime_worker.__file__).with_name("kitten_requirements.txt")
+    versions = dict(
+        line.split("==") for line in requirements.read_text().splitlines() if "==" in line
+    )
+    monkeypatch.setattr(importlib.metadata, "version", lambda package: versions[package])
+    monkeypatch.setattr(sys, "path", sys.path[:])
+    monkeypatch.setattr(
+        sys, "argv", ["worker", "--source", str(tmp_path), "--model", str(model_path)]
+    )
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(
+            "\n".join(
+                json.dumps(
+                    {"arguments": {"text": str(i)}, "output": str(tmp_path / f"output-{i}.wav")}
+                )
+                for i in range(2)
+            )
+            + "\n"
+        ),
+    )
+    kitten_runtime_worker.main()
+    assert len(instances) == 1 and instances[0].calls == 2
+    assert not instances[0]._reference_cache and not instances[0].codec._ref_cache
+    messages = [
+        json.loads(line.split("@@PACTTS_KITTEN@@")[1])
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("@@PACTTS_KITTEN@@")
+    ]
+    assert len(messages) == 3 and all(message["ok"] for message in messages)

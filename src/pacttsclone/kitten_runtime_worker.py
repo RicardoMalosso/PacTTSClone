@@ -83,6 +83,10 @@ def main():
                     samples = model.generate(**value["arguments"])
                 sf.write(value["output"], samples, 24000)
                 torch.cuda.synchronize()
+                # App references are per-job temporary paths. Upstream caches their
+                # GPU conditioning by path, which would otherwise grow every job.
+                model._reference_cache.clear()
+                model.codec._ref_cache.clear()
                 emit({"ok": True})
             except Exception as exc:
                 emit({"ok": False, "error": str(exc)[:1500]})

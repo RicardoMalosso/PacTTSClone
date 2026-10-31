@@ -31,4 +31,4 @@ request mapping, process transport, settings, rollback, persistence and safe rem
 No physical GPU synthesis, audio quality, latency or VRAM measurement is claimed.
 See [requirements and current validation](kitten-integration.md) for remaining gates.
 
-Local acceptance: 294 backend tests, 41 Chromium tests, Ruff, JavaScript/compilation and wheel checks passed. Full verified model/decoder download, offline cache reuse and structural artifact validation passed. Windows installer and final CI results are recorded by Actions.
+Local acceptance: 295 backend tests, 41 Chromium tests, Ruff, JavaScript/compilation and wheel checks passed. Full verified model/decoder download, offline cache reuse and structural artifact validation passed. Windows installer and final CI results are recorded by Actions.

@@ -49,7 +49,7 @@ Official sources:
 
 ## Validation status
 
-Implementation is complete. The final local suite passed **294 backend tests and
+Implementation is complete. The final local suite passed **295 backend tests and
 41 Chromium tests**, including preset generation from an unprepared profile with
 no ASR, independent engine settings, language switching and mobile layout. Ruff,
 JavaScript syntax, compilation, wheel contents and desktop/mobile visual checks passed.
@@ -72,4 +72,7 @@ acceptance and v2.3.0-rc.1 publication run through the release workflow.
 
 No physical CUDA synthesis, measured quality/latency/VRAM or minimum system RAM has
 been established. Do not treat an import or simulated audio test as real GPU
-generation. This remains a preview release.
+generation. The base model can remain resident, while per-job reference conditioning caches
+are cleared after successful generation to avoid accumulating temporary references.
+A two-request bridge regression verifies this lifecycle with simulated CUDA/model
+objects. This remains a preview release.
