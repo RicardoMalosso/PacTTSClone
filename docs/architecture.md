@@ -377,3 +377,12 @@ remains the baseline on reconnect and a five-second fallback. OBS ticks/leases,
 inference isolation, SQLite persistence and integration lifecycles are unchanged.
 See [protocol, deployment limits and measurements](realtime-communication.md).
 LAN hosting remains planned; the testing Quick Tunnel path retains REST fallback.
+
+## Frontend modules — 2026-11-01
+
+The dashboard entrypoint now uses native ES module imports. Feature modules own
+their rendering and event handlers; state.js holds shared values and snapshot
+subscriptions, and api.js owns REST/CSRF handling. Explicit feature initialization
+precedes asynchronous startup. REST and SSE snapshots use the same subscription
+path; existing updater bridge events and OBS contracts remain intact. No framework,
+bundler or npm runtime dependency is introduced. See [module guide](frontend.md).

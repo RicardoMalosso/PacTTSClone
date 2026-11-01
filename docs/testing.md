@@ -497,3 +497,17 @@ offline changes, reconnect/session-token refresh, no-EventSource fallback and st
 stream recovery. Existing browser/OBS/integration/updater tests remain required.
 See [benchmark method and results](realtime-communication.md). No physical GPU,
 live Cloudflare or native Windows installer execution is claimed by local checks.
+
+## Frontend module regression coverage — 2026-11-01
+
+The complete existing Chromium suite remains the behavior regression gate for the
+native-module split: generation, voice/settings drafts, language switches, Twitch
+rules/rewards, Discord webhooks, imports/setup, engine controls, history, OBS and
+updater bridge. SSE tests import shared state through a test-only browser handle;
+production no longer exposes dashboard lexical globals.
+`tests/browser/test_modules_ui.py` adds cold loading on `/playbackMain/control`,
+reload, relative module resolution/MIME checks, shared module-state identity,
+one live subscription per page and uncaught script-error checks. Module linking,
+JavaScript syntax and byte-for-byte wheel static-file inclusion are also checked.
+This refactor does not exercise real GPU inference, live external integrations or
+native Windows installer acceptance locally.

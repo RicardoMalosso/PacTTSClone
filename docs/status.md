@@ -875,3 +875,21 @@ legacy-bridge fallback correction. Ruff, JS syntax, Python compilation, diff
 checks and application wheel build passed. The wheel includes both new event
 modules. Cross-platform Actions is requested by the review PR; no live Cloudflare,
 physical GPU inference or native Windows installer acceptance is claimed.
+
+## Frontend modules — 2026-11-01
+
+Merged SSE PR #26 before starting this refactor. Replaced the 1,335-line/99 KB
+classic dashboard script with a native ES module entrypoint and feature modules
+for REST, shared state, voices/settings, channels/Twitch, Discord, engines,
+monitoring, configuration, studio/history, navigation/help, setup/imports and
+updates. app.js is now 137 lines / 8,424 bytes. Feature handlers initialize
+explicitly before asynchronous startup. REST and SSE use one snapshot subscription
+path; feature modules do not import the entrypoint. No framework, bundler, version
+change or release is included. [Frontend guide](frontend.md) maps responsibilities.
+
+Local validation: 308 backend tests passed. Ruff, Python compilation, JavaScript
+syntax, native linking of all 19 modules and wheel build passed. Wheel inspection
+verified exact static JavaScript contents and the module entrypoint. All 47 Chromium
+regressions passed, including the four SSE tests and new native-module smoke test. Tests use controlled inference
+and integration transports; no physical GPU, live Twitch/Discord/Cloudflare or
+native Windows installer acceptance is claimed.

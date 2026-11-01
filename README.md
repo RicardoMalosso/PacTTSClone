@@ -478,3 +478,6 @@ Portuguese, stable/expressive delivery and expression tags. Native BF16 NVIDIA
 GPUs (Ampere or newer) are required; upstream's roughly 8 GB free VRAM guidance
 is an estimate. Source installations must use Python 3.12. Saved settings are
 independent from OmniVoice and Ming. [Requirements, setup and validation](docs/kitten-integration.md).
+
+The vanilla JavaScript dashboard is organized into native browser modules; see
+[frontend module guide](docs/frontend.md) for the file map and initialization flow.
