@@ -823,3 +823,24 @@ another full runtime budget. Asset progress is rate limited while retaining real
 ## KittenTTS2 — v2.3.0-rc.1 preview
 
 Native CUDA adapter, verified asset manifests, isolated installer/lifecycle and engine-specific Local/Voices controls are implemented. See [validation status](kitten-integration.md). All 295 local backend and 41 Chromium tests passed; actual isolated runtime install/import/cache acceptance passed on Windows/Linux. The separate [v2.3.0-rc.1 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.3.0-rc.1) is published only after final CI/Windows acceptance; no physical GPU synthesis claim.
+
+## 2.2.1 updater channels and versions
+
+Restored implementation after transient workspace reset. Adds default-on experimental
+updates, publication-date ordering, persistent previous-version pins and rollback
+controls. Preserves the separately released 2.1.1 webhook fix. All 302 local backend
+and 42 Chromium tests passed. Actual installed-interpreter activation, rollback to
+the public 2.1.1 wheel, persistent pin and forward staging from that older app
+passed. Ruff, compilation, JS syntax, bridge RECORD/import validation and visual
+inspection passed. Native Windows acceptance and publication are tracked in PR #25;
+no physical GPU inference claim is added.
+
+Windows acceptance caught a preflight cleanup error: its temporary application
+kept SQLite open during directory deletion. The probe and historical acceptance
+now close the studio/service before cleanup; child stderr is retained on failure.
+Publication remains gated on a successful native rerun.
+
+Native Windows update/real 2.1.1 rollback/forward acceptance passed in run
+41272512271. Its final uninstall assertion caught acceptance-only fixture files
+outside the removable updates directory. Moved those fixtures under updates and
+retained the strict app-folder removal assertion, with remaining-file diagnostics.

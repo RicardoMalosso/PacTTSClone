@@ -213,3 +213,9 @@ Hide and reject unsupported OmniVoice controls. Target compatible NVIDIA native
 BF16 GPUs generally; the owner's hardware is not a requirement. Label upstream
 VRAM guidance as an estimate and unmeasured minima explicitly. See
 [requirements and validation record](kitten-integration.md).
+
+## Updater channels and versions
+
+Managed installations include RC releases by default and sort compatible releases
+by publication date. Local owners can pin a previous version or resume Latest.
+Persistent updater controls survive application rollback. See [update contract](auto-updates.md).

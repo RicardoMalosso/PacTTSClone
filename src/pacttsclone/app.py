@@ -21,7 +21,7 @@ from .service import GenerationService
 from .setup_runtime import RuntimeSetup
 from .studio import Studio
 from .tunnel import TUNNEL_HOST, Tunnel
-from .updater import Updater
+from .updater import Updater, attach_manager
 
 STATIC = Path(__file__).parent / "static"
 
@@ -744,4 +744,5 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         return FileResponse(STATIC / "obs.html")
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    attach_manager(app, updater)
     return app

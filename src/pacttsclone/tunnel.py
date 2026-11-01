@@ -78,6 +78,7 @@ class Tunnel:
                 "/api/import",
                 "/api/discord",
                 "/api/engines",
+                "/api/updates",
             )
         ):
             return False  # Tunnel lifecycle stays local, even for shared admins.

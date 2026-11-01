@@ -24,8 +24,8 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 
 ## Windows installer (preview)
 
-Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and choose
-`PacTTSClone-Setup-2.1.0.exe` in the [v2 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.1.0). The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases/latest) and choose
+`PacTTSClone-Setup-2.2.1.exe` in the latest release. The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -87,8 +87,9 @@ requests for package version/index checks.
 Installer installations automatically check GitHub releases at startup and every six
 hours. A verified application wheel downloads without the installer; close the app
 and reopen it to activate. Configuration → Application updates shows progress/errors
-and offers a manual check. Models, CUDA and user data stay in place. Stable versions
-ignore release candidates; RC installations follow newer RCs and stable releases.
+and offers a manual check. Models, CUDA and user data stay in place. Experimental RC releases are included by default. Configuration can disable them,
+pin a previous compatible version, or choose Latest to resume automatic updates.
+The version list follows publication date, newest first.
 The first version containing this updater must be installed once. Source checkouts
 continue to use Git. See [update protocol and recovery](docs/auto-updates.md).
 

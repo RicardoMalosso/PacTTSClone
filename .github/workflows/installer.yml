@@ -75,6 +75,8 @@ jobs:
         shell: powershell
         run: ./installer/test-wizard.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
       - name: Actual CPU install, HTTP launch, repeat setup and uninstall
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: powershell
         run: ./installer/test-install.ps1 -SetupExe (Get-Item dist/PacTTSClone-Setup-*.exe).FullName
       - name: Print setup failure detail
