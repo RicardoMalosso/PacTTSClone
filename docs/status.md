@@ -904,3 +904,20 @@ The existing release-on-merge workflow must run full tests, Windows installer an
 updater acceptance, and uploaded size/digest checks before publication. Latest
 follows publication date and preserves explicit version pins; existing RC migration
 bridges remain immutable. Publication/acceptance results are recorded in Actions.
+
+## Ming patch 2.2.3 — 2026-11-01
+
+Investigated the pinned upstream sampler, token contract, Aggregator and VAE
+before editing. Confirmed zero-budget empty concatenation, incorrect audio-patch
+versus LLM-position budget units and unreported non-stopping truncation. Added
+SHA-verified in-memory repairs, token-aware splitting with fixed clone conditioning,
+bounded missing-stop retries and rotating local tracebacks/diagnostics. Model and
+source manifests are unchanged. The reported identical-short-input intermittency
+is not reproduced on a real GPU here; diagnosis distinguishes confirmed defects
+from that remaining uncertainty. Local and CI results are recorded below.
+
+Local validation: 325 core tests passed; 47 Chromium tests passed; ruff, compileall,
+release identity and wheel build/helper inclusion passed. A subsequent focused
+run includes the added immutable-source loader regression. No NVIDIA GPU inference
+or native Windows installer execution is claimed locally; Actions supplies the
+existing cross-platform/installer release gates.

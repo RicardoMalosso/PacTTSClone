@@ -101,3 +101,11 @@ in Actions run 41232561493. Windows installer acceptance is in progress.
 Final core suite: 271 passed; full Chromium: 40 passed; targeted Ming/Engines UI: 3 passed.
 Desktop/mobile layout was visually inspected, with no horizontal overflow at 390 px. Release remains gated by the
 recorded results and Windows installer acceptance; no release is claimed here.
+
+## 2.2.3 inference repair
+
+The app now guards the pinned upstream sampler in memory, checks the real
+conditioned token budget, preserves clone conditioning across adaptive splits,
+and distinguishes learned stopping from exhausted decode budgets. See
+[diagnosis and local log details](ming-inference-diagnosis.md). Existing model
+and source assets and private dependencies are reused without downloads.

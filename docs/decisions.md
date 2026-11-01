@@ -330,3 +330,11 @@ shared mutable state explicit through state.js; route REST/SSE snapshots through
 one subscription path. Initialize handlers explicitly before startup requests,
 and avoid feature imports of the executable entrypoint. Flat static files retain
 the existing wheel packaging and direct FastAPI serving.
+
+## Ming 2.2.3: preserve verified assets
+
+Use a SHA-verified in-memory source repair instead of modifying installed Ming
+files or changing model manifests. This delivers the inference fix in an updater
+wheel without model downloads, source checksum churn or dependency reinstall.
+Keep 512 positions; fix units and detect missing stop signals rather than
+increasing the context ceiling. Never silently drop/crop paired clone conditioning.

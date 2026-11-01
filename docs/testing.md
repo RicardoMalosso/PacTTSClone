@@ -511,3 +511,13 @@ one live subscription per page and uncaught script-error checks. Module linking,
 JavaScript syntax and byte-for-byte wheel static-file inclusion are also checked.
 This refactor does not exercise real GPU inference, live external integrations or
 native Windows installer acceptance locally.
+
+## Ming 2.2.3 inference regressions
+
+tests/test_ming_inference.py executes the pinned upstream sampler/generator
+with simulated NumPy-backed tensors and checks actual token-contract assembly
+with a simulated tokenizer. It covers empty latent lists, patch/position units,
+learned stops versus limits, tag-safe long-text splits, retained clone conditioning,
+source drift, invalid audio and bounded non-stopping retries. This is not real
+model inference. Use a supported NVIDIA/BF16 GPU to repeat identical short cloned
+requests and long multilingual text, then compare local inference.log records.
