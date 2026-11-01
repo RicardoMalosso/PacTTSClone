@@ -1,4 +1,5 @@
 param([Parameter(Mandatory=$true)][string]$SetupExe)
+$env:PACTTS_DISABLE_UPDATES = '1'
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:RUNNER_TEMP 'PacTTSClone installation test'
 $parent = Join-Path $root 'PacTTSClone'

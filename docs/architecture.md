@@ -359,3 +359,9 @@ Kitten's upstream reference caches use file paths as keys. Since app references
 are unique per-job temporary paths, the bridge clears both reference-conditioning
 caches after each completed generation while keeping the base model resident.
 This prevents unbounded retention across repeated requests.
+
+## Updater channels and versions
+
+Managed installations include RC releases by default and sort compatible releases
+by publication date. Local owners can pin a previous version or resume Latest.
+Persistent updater controls survive application rollback. See [update contract](auto-updates.md).

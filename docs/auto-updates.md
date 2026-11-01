@@ -1,41 +1,43 @@
-# Application updates — v2
+# Application updates
 
-Managed Windows installations check public GitHub releases at startup and every
-six hours. Configuration includes status, errors and a manual check. Downloads
-are automatic; activation takes place only after closing and reopening the app.
-There is no forced restart during streaming. Source installations use Git.
-Install v2.0.0 once to enable future updates; older RCs do not contain the updater.
+Managed Windows installations check public GitHub releases at startup and every six
+hours. A verified compatible application wheel downloads automatically. Close and
+reopen the app to activate it. Source installs use Git.
 
-## Release contract
+Configuration → Application updates offers an experimental RC checkbox (on by
+default) and a previous-version selector. Latest follows publication time, newest
+first, including RCs when enabled. Selecting a specific version pins it until
+Latest is selected again. Compatible in-place rollback starts at 2.1.0, which
+introduced persistent engine selection. Older apps may lack newer engines.
 
-`pyproject.toml` is the version source: `X.Y.ZrcN` becomes `vX.Y.Z-rc.N`,
-`X.Y.Z` becomes `vX.Y.Z`. Runtime version must match. Release identity is derived
-and checked in CI, replacing hardcoded RC11 tags. Never replace published assets.
-The gated installer workflow continues to require full tests and Windows acceptance.
-Each release includes exactly one `pacttsclone-VERSION-py3-none-any.whl` with a
-GitHub SHA-256 asset digest. Drafts, malformed tags, missing digests and mismatched
-asset URLs are ignored. Stable installs ignore RCs; RC installs accept newer RCs
-and stable releases. Numeric version comparison prevents rc9/rc10 ordering errors.
+The catalogue rejects drafts, ambiguous tags, missing or duplicate canonical wheel
+assets, missing SHA-256 digests, unexpected URLs and oversized downloads. It checks
+the actual download length/hash, archive paths, identity and installed dependency
+compatibility, then smoke-imports the application before atomic next-launch
+activation. Failed updates leave the activation pointer in place and show an error.
+Dependencies, drivers and model weights are not upgraded by this mechanism.
 
-## Apply and recover
+Preferences live in app-root/updates/preferences.json independently of application
+overlays. A content-addressed updater controller and import hook preserve channel
+and version controls across rollback. No application is imported by that hook until
+normal app startup. Legacy stored voice defaults ignore newer optional fields on
+read; HTTP validation remains unchanged. Unsupported active engines are deactivated
+on rollback. No data/models are deleted. Each controller behavior change must bump
+CONTROL_VERSION, so a newer staged controller replaces an older running controller.
 
-The updater downloads only the wheel (bounded to 128 MiB), verifies size and SHA-256,
-rejects unsafe archive paths, verifies package identity and installed dependency
-compatibility, then imports the staged app in a separate process. It never installs
-CUDA, models or dependencies. Incompatible dependency changes report an actionable
-error and require runtime repair through normal setup. Automatic dependency
-migration is deliberately outside this application-only protocol.
+app-root/updates/rollback.pth identifies the previously running application. To
+recover manually, stop the app and restore that file as the managed Python
+site-packages/pacttsclone_update.pth; removing that pointer restores the base
+installed wheel. Reinstall with the same data directory for dependency repair.
+PACTTS_DISABLE_UPDATES=1 disables background checks for isolated acceptance tests.
 
-Application files are extracted under `app/updates/VERSION`. An atomic Python
-`.pth` file places the verified version ahead of the base package on the next
-launch. The running server's import path is unchanged. Failed download, extraction,
-dependency or import checks leave the active installation intact. Old versions
-are retained. Stop all application instances before reopening to activate.
+The 2.2.1 stable patch is discoverable by existing stable updaters. A one-time
+2.3.0-rc.2 wheel bridges existing 2.3.0-rc.1 numeric updaters. Releases bearing
+`<!-- pactts-update-bridge -->` are excluded from the new normal catalogue. The
+normal installer and GitHub Latest designation remain 2.2.1. Older published assets
+are immutable. GitHub controls its native release-history ordering; the app sorts
+its own list by published_at and uses /releases/latest for the installer link.
 
-To roll back, stop the app, find `pacttsclone_update.pth` in the active Python's
-`Lib/site-packages`, and replace its contents with `app/updates/rollback.pth`.
-Deleting `pacttsclone_update.pth` restores the installer-provided base version.
-Models, voices, database and output are untouched; database schema migrations in
-future releases must remain backward compatible with the retained base version.
-Hashes protect download integrity; trust remains in the GitHub repository and
-HTTPS, without a separate publisher signature. No downgrade or forced shutdown.
+Controls and endpoints are local-only, including shared administrators; writes
+require the existing same-origin CSRF token. The updater does not run inference,
+post messages or send telemetry.

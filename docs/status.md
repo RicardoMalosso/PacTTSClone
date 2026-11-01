@@ -823,3 +823,10 @@ another full runtime budget. Asset progress is rate limited while retaining real
 ## KittenTTS2 — v2.3.0-rc.1 preview
 
 Native CUDA adapter, verified asset manifests, isolated installer/lifecycle and engine-specific Local/Voices controls are implemented. See [validation status](kitten-integration.md). All 295 local backend and 41 Chromium tests passed; actual isolated runtime install/import/cache acceptance passed on Windows/Linux. The separate [v2.3.0-rc.1 release](https://github.com/RicardoMalosso/PacTTSClone/releases/tag/v2.3.0-rc.1) is published only after final CI/Windows acceptance; no physical GPU synthesis claim.
+
+## 2.2.1 updater channels and versions
+
+Restored implementation after transient workspace reset. Adds default-on experimental
+updates, publication-date ordering, persistent previous-version pins and rollback
+controls. Preserves the separately released 2.1.1 webhook fix. Full acceptance and
+publication are pending; no physical GPU inference claim is added.
