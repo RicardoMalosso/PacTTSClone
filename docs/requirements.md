@@ -229,3 +229,10 @@ fallback. Keep admin/player and host-only permission boundaries. Browsers must
 never own generation, Twitch, Discord or playback completion. Preserve OBS polling,
 leases and acknowledgements in this migration. LAN hosting is a separately planned
 feature; Quick Tunnel testing support must not constrain direct local SSE.
+
+## Frontend organization — 2026-11-01
+
+Keep vanilla JavaScript and split dashboard transport, shared state, voices,
+Twitch, engines, monitoring and configuration into feature modules. Preserve
+existing UI behavior, drafts, localization, SSE recovery, updater bridge and OBS
+controls. No React/Angular, bundler or new frontend installation step is required.

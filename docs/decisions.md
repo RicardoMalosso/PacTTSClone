@@ -321,3 +321,12 @@ slower fallback for unsupported or stale streams and the testing Quick Tunnel.
 Keep OBS polling/leases: WebSockets need a separate reconnect/ownership/watchdog
 protocol and a playback latency benchmark. No new framework, broker, database
 migration or integration dependency. LAN hosting remains separately planned.
+
+## Native frontend modules — 2026-11-01
+
+Split app.js by feature using browser ES modules. Retain vanilla JavaScript,
+existing renderers and server contracts. Keep private feature data local and make
+shared mutable state explicit through state.js; route REST/SSE snapshots through
+one subscription path. Initialize handlers explicitly before startup requests,
+and avoid feature imports of the executable entrypoint. Flat static files retain
+the existing wheel packaging and direct FastAPI serving.
