@@ -85,7 +85,10 @@ $uninstall = Start-Process (Join-Path $parent 'unins000.exe') -ArgumentList '/VE
 if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed.' }
 if (-not (Test-Path $marker)) { throw 'Uninstall removed user data.' }
 if (Test-Path $parentLauncher) { throw 'Uninstall left parent launcher shortcut.' }
-if (Test-Path $app) { throw 'Uninstall left app subfolder.' }
+if (Test-Path $app) {
+    Get-ChildItem -LiteralPath $app -Recurse | Select-Object FullName
+    throw 'Uninstall left app subfolder.'
+}
 if (-not (Test-Path $parent)) { throw 'Uninstall removed the root containing user data.' }
 Write-Host 'Minimal installer, real web CPU/model setup, launcher, repeat setup and uninstall smoke passed.'
 

@@ -839,3 +839,8 @@ Windows acceptance caught a preflight cleanup error: its temporary application
 kept SQLite open during directory deletion. The probe and historical acceptance
 now close the studio/service before cleanup; child stderr is retained on failure.
 Publication remains gated on a successful native rerun.
+
+Native Windows update/real 2.1.1 rollback/forward acceptance passed in run
+41272512271. Its final uninstall assertion caught acceptance-only fixture files
+outside the removable updates directory. Moved those fixtures under updates and
+retained the strict app-folder removal assertion, with remaining-file diagnostics.

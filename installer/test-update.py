@@ -19,7 +19,9 @@ builder_path = Path(__file__).parents[1] / 'scripts/build-update-bridge.py'
 spec = importlib.util.spec_from_file_location('builder', builder_path)
 builder = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(builder)
-fixture = root / 'fixture.whl'
+fixtures = root / 'updates' / 'acceptance-fixtures'
+fixtures.mkdir(parents=True, exist_ok=True)
+fixture = fixtures / 'fixture.whl'
 builder.build(wheel, fixture, __version__, '999.0.0')
 data = fixture.read_bytes()
 name = 'pacttsclone-999.0.0-py3-none-any.whl'
@@ -57,7 +59,7 @@ try:
     old_data = real_fetch(asset['browser_download_url'], updater.MAX_DOWNLOAD)
     assert len(old_data) == asset['size']
     assert 'sha256:' + hashlib.sha256(old_data).hexdigest() == asset['digest']
-    legacy = root / 'historical'
+    legacy = fixtures / 'historical'
     legacy.mkdir(exist_ok=True)
     updater.extract_wheel(old_data, legacy, Version('2.1.1'))
     spec = importlib.util.spec_from_file_location('pacttsclone.legacy_updater',
