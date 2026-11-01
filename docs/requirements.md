@@ -219,3 +219,13 @@ VRAM guidance as an estimate and unmeasured minima explicitly. See
 Managed installations include RC releases by default and sort compatible releases
 by publication date. Local owners can pin a previous version or resume Latest.
 Persistent updater controls survive application rollback. See [update contract](auto-updates.md).
+
+## Dashboard notifications — 2026-11-01
+
+Replace frequent local dashboard polling with SSE while preserving REST API
+compatibility and persistent state. Coalesce redundant progress, bound memory for
+slow consumers, reconnect/resynchronize after interruption and retain slower REST
+fallback. Keep admin/player and host-only permission boundaries. Browsers must
+never own generation, Twitch, Discord or playback completion. Preserve OBS polling,
+leases and acknowledgements in this migration. LAN hosting is a separately planned
+feature; Quick Tunnel testing support must not constrain direct local SSE.

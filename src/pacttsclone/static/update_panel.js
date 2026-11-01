@@ -44,6 +44,16 @@
     render();
   };
   window.addEventListener('localechange', render);
-  load();
-  setInterval(() => { if (!document.querySelector('#pane-config')?.hidden) load(); }, 5000);
+  window.addEventListener('studio-updates', event => { state = event.detail; error = ''; render(); });
+  window.addEventListener('studio-resync', () => { if (!card.hidden) load(); });
+  const start = () => {
+    if (!card.hidden) load();
+    // This panel is also shipped by the updater bridge to older app versions.
+    // Those dashboards do not emit studio events and still need their fallback.
+    if (typeof window.StudioEventStream !== 'function') {
+      setInterval(() => { if (!document.querySelector('#pane-config')?.hidden) load(); }, 5000);
+    }
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, {once: true});
+  else start();
 })();

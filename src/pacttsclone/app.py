@@ -7,7 +7,7 @@ from typing import Annotated
 from urllib.parse import unquote, urlsplit
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import ValidationError
 
@@ -15,6 +15,7 @@ from .config import MAX_BODY_BYTES, MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, Engine, GenerationRequest, GenerationSettings, UserError
 from .engine import dependencies_available
 from .engines import EngineManager
+from .events import DashboardEvents
 from .models import AppConfig, ChannelConfig, DiscordConfig
 from .playback import GENERAL_PLAYER
 from .service import GenerationService
@@ -135,9 +136,11 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     async def lifespan(app):
         studio.start()
         updater.start()
+        dashboard_events.start()
         try:
             yield
         finally:
+            await dashboard_events.close()
             updater.close()
             engines.ming.close()
             engines.kitten.close()
@@ -180,6 +183,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                 "max_upload_bytes": MAX_UPLOAD_BYTES,
                 "max_text": 2000,
                 "remote_access": request.state.remote_access,
+                "realtime": {"sse": not request.state.remote_access, "fallback_ms": 5000},
                 "setup_ready": service.setup_ready(),
             },
             headers={"Cache-Control": "no-store"},
@@ -491,6 +495,23 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             "hotkey_status": studio.hotkey.status,
             "panic_revision": studio.playback.panic_revision,
         }
+
+    dashboard_events = DashboardEvents(
+        service.events, state, resources, runtime_setup, studio, tunnel, updater
+    )
+    app.state.dashboard_events = dashboard_events
+
+    @app.get("/api/events")
+    async def dashboard_stream(request: Request):
+        # The current opt-in sharing mechanism is a Cloudflare Quick Tunnel,
+        # which does not support SSE. Remote admins use the advertised fallback;
+        # player capabilities are rejected by LocalBoundary before this route.
+        if request.state.remote_access:
+            return Response(status_code=204)
+        return StreamingResponse(
+            service.events.stream(request), media_type="text/event-stream",
+            headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/api/jobs/{job_id}/cancel")
     def cancel_job(job_id: str):

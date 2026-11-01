@@ -12,6 +12,7 @@ from pathlib import Path
 from .audio import AudioPipeline
 from .config import MAX_UPLOAD_BYTES, Settings
 from .domain import BusyError, UserError
+from .events import EventDispatcher
 from .models import AppConfig
 from .resources import Resources
 from .store import Store
@@ -34,7 +35,8 @@ class GenerationService:
     def __init__(self, settings: Settings, engine=None, runner=None):
         self.settings = settings
         self.engine = engine
-        self.store = Store(settings.data_dir)
+        self.events = EventDispatcher()
+        self.store = Store(settings.data_dir, self.events)
         identity = self.store.get("identity", "installation")
         if not identity:
             identity = self.store.put("identity", "installation", {"id": uuid.uuid4().hex})
