@@ -844,3 +844,34 @@ Native Windows update/real 2.1.1 rollback/forward acceptance passed in run
 41272512271. Its final uninstall assertion caught acceptance-only fixture files
 outside the removable updates directory. Moved those fixtures under updates and
 retained the strict app-folder removal assertion, with remaining-file diagnostics.
+
+## LAN hosting planned — 2026-11-01
+
+Owner clarified that the communication migration targets local use and, later,
+direct LAN/home-server hosting. Quick Tunnels are only a testing feature; their
+lack of SSE support does not constrain direct local/LAN streams. LAN hosting is
+not implemented: cli.py binds to loopback and LocalBoundary restricts hosts/origins.
+Added opt-in LAN hosting and its authentication boundaries to remaining feature
+work in known-issues.md. This is planning only; SSE implementation remains paused.
+
+## Dashboard SSE implementation — 2026-11-01
+
+Resumed the paused work. Added a shared bounded event dispatcher, committed Store
+invalidations, owner-local `/api/events`, coalesced state snapshots with cumulative
+section versions and shared monitoring/setup/status updates. The existing frontend
+uses one EventSource, affected-component rendering, reconnect/session-token
+resynchronization, offline recovery, stale-connection detection and five-second
+REST fallback. Older updater-bridge dashboards retain their standalone fallback.
+OBS polling/leases/acknowledgements, REST, SQLite and independent inference/Twitch/
+Discord execution are preserved. LAN hosting stays planned; Quick Tunnel testing
+uses REST. See [protocol and validation](realtime-communication.md).
+
+Local measured idle requests over ten seconds: original frontend 38, SSE frontend
+0 additional requests after connection establishment. One voice change reached the
+DOM in 0.381 seconds. This is a local request/notification measurement, not a GPU,
+throughput or bandwidth benchmark. Final full backend suite: 308 passed. All 42 existing Chromium tests and four
+new SSE browser tests passed; both updater browser tests passed again after the
+legacy-bridge fallback correction. Ruff, JS syntax, Python compilation, diff
+checks and application wheel build passed. The wheel includes both new event
+modules. Cross-platform Actions is requested by the review PR; no live Cloudflare,
+physical GPU inference or native Windows installer acceptance is claimed.

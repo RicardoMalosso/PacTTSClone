@@ -3,10 +3,11 @@ const t = window.Locale.t;
 let initialHealth = null;
 let runtimeSetup = {ready: false}, setupAvailable = true;
 let showSetupTab = false;
-let modelDownloaded = 0, modelSession = null, setupEventsConnected = false;
+let modelDownloaded = 0, modelSession = null;
 const $ = id => document.getElementById(id);
 new ResizeObserver(() => document.documentElement.style.setProperty('--status-bar-height', `${$('live-generation').offsetHeight}px`)).observe($('live-generation'));
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+let realtime = null, eventVersions = {};
 let session, state = {jobs: [], voices: [], channels: []}, config;
 let discordSnapshot = null, discordBusy = false;
 let selectedChannel = location.pathname.endsWith('/control') ? location.pathname.split('/')[1] : '';
@@ -220,6 +221,7 @@ function renderMonitor(job) {
   $('report').textContent = JSON.stringify({elapsed_seconds: job.elapsed_seconds, device: job.device, ...job.metrics}, null, 2);
 }
 setInterval(() => {
+  document.querySelectorAll('[data-countdown-until]').forEach(node => { node.textContent = t('Starts in {seconds} s', {seconds: Math.max(0, (Number(node.dataset.countdownUntil) - Date.now()) / 1000).toFixed(1)}); });
   if (runtimeSetup.status === 'running' && runtimeSetup.started_at) {
     $('live-generation-timer').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
     $('setup-elapsed').textContent = duration(Date.now() / 1000 - runtimeSetup.started_at);
@@ -234,7 +236,7 @@ setInterval(() => {
 }, 100);
 async function watch(id) {
   while (true) {
-    const job = await api('/api/jobs/' + id);
+    const job = (realtime?.healthy && state.jobs.find(j => j.id === id)) || await api('/api/jobs/' + id);
     if (job.status === 'running' || !lastMonitor || (lastMonitor.id === job.id && !state.active_job)) renderMonitor(job);
     if (job.status === 'failed' || job.status === 'cancelled') { currentJob = null; throw new Error(job.error || t('Generation cancelled.')); }
     if (job.status === 'succeeded') {
@@ -248,7 +250,12 @@ async function watch(id) {
       $('result-source').textContent = `${job.voice_title || t('Voice')} · ${job.requester_name || job.username || t('Local')} · ${t(job.origin || 'local')}`;
       completedJob = job.id; autoqueueNote(job); currentJob = null; return;
     }
-    await sleep(500);
+    if (realtime?.healthy) await new Promise(resolve => {
+      const done = () => { clearTimeout(timer); window.removeEventListener('studio-state', done); resolve(); };
+      const timer = setTimeout(done, 5000);
+      window.addEventListener('studio-state', done, {once: true});
+    });
+    else await sleep(5000);
   }
 }
 const defaultGenerationSettings = Object.freeze({language: 'auto', volume: 100, speed: 1, duration: null, steps: 32, denoise: true, guidance_scale: 2, preprocess_prompt: true, postprocess_output: true});
@@ -551,7 +558,7 @@ async function renderChannelState() {
   $('channel-player-status').textContent = `${snap.paused ? t('Playback paused') : t('Playback enabled')} · ${snap.player_connected ? t('OBS player connected') : t('No active OBS player')}`;
   const pending = snap.items.filter(i => ['queued', 'countdown', 'ready', 'playing'].includes(i.status));
   $('channel-queue').replaceChildren(...pending.map(i => el('div', {class: 'job-row'}, el('strong', {}, `${i.voice_title} · ${t(i.status)}`), el('p', {}, `${i.username || t('Replay')}: ${i.text}`),
-    i.deadline && i.status === 'countdown' ? el('p', {class: 'muted'}, t('Starts in {seconds} s', {seconds: Math.max(0, i.deadline - snap.server_time).toFixed(1)})) : null,
+    i.deadline && i.status === 'countdown' ? el('p', {class: 'muted', 'data-countdown-until': Date.now() + (i.deadline - snap.server_time) * 1000}, t('Starts in {seconds} s', {seconds: Math.max(0, i.deadline - snap.server_time).toFixed(1)})) : null,
     button('Cancel audio', async () => { await api(`/api/playback/${i.id}/cancel`, {method: 'POST'}); await renderChannelState(); }))));
   renderTwitchEvents(snap.events || []);
   $('chat-events').replaceChildren(...snap.chat.map(c => el('div', {class: 'event-row'}, el('strong', {}, `${c.username} · ${c.accepted ? t('accepted') : t('blocked') + ': ' + t(c.reason)}`), el('p', {}, c.text))));
@@ -562,7 +569,11 @@ $('config-form').addEventListener('submit', action(async event => {
   $('hotkey-status').textContent = t(saved.hotkey_status); $('health').textContent = t('Configuration saved. Model will load on the selected device for the next job.');
 }));
 async function refresh() {
-  state = await api('/api/state');
+  await applyState(await api('/api/state'));
+}
+async function applyState(value, sections = null) {
+  state = value;
+  window.dispatchEvent(new Event('studio-state'));
   if (session?.remote_access) await runtimeStatus();
   const monitored = state.active_job || state.jobs.find(j => j.status === 'running') || state.jobs.filter(j => j.status === 'queued').sort((a, b) => a.created_at - b.created_at)[0] || [...state.jobs].sort((a, b) => (b.finished_at || b.created_at) - (a.finished_at || a.created_at))[0];
   if (monitored) renderMonitor(monitored);
@@ -572,12 +583,17 @@ async function refresh() {
   if (completedJob) autoqueueNote(state.jobs.find(j => j.id === completedJob));
   if (panicRevision !== null && panicRevision !== state.panic_revision) stopAllAudio();
   panicRevision = state.panic_revision;
-  renderVoices(); renderJobs(); renderHistory(); renderChannels();
+  const changed = kinds => !sections || kinds.some(kind => sections.includes(kind));
+  if (changed(['voice', 'job'])) renderVoices();
+  if (changed(['job'])) renderJobs();
+  if (changed(['job', 'request'])) renderHistory();
+  if (changed(['channel', 'playback', 'connections'])) renderChannels();
   $('hotkey-status').textContent = t(state.hotkey_status);
-  await renderChannelState();
+  if (!sections || sections.some(k => ['connections', 'channel', 'playback', 'chat', 'twitch_event'].includes(k))) await renderChannelState();
 }
-async function resources() {
-  const data = await api('/api/resources'), r = data.live, gpu = r.gpus[0];
+async function resources(data = null) {
+  data = data || await api('/api/resources');
+  const r = data.live, gpu = r.gpus[0];
   $('gpu-pressure-warning').hidden = !data.gpu_warning;
   $('gpu-pressure-warning').textContent = data.gpu_warning ? t(data.gpu_warning.message) + ' ' + bytes(data.gpu_warning.free_bytes) + ' / ' + bytes(data.gpu_warning.threshold_bytes) : '';
   $('cpu').textContent = `${r.system_cpu_percent.toFixed(0)}%`;
@@ -662,14 +678,6 @@ async function init() {
     const health = await api('/api/health'); initialHealth = health;
     $('health').textContent = [health.ffmpeg_available ? t('FFmpeg ready') : t('FFmpeg missing from PATH'), health.inference_installed ? t('Inference dependencies installed') : t('Install inference dependencies'), t('Initial model download can take time')].join(' · ');
     await runtimeStatus();
-    if (!session?.remote_access && 'EventSource' in window) {
-      const setupEvents = new EventSource('/api/setup/stream');
-      setupEvents.onopen = () => { setupEventsConnected = true; };
-      setupEvents.onmessage = event => {
-        try { renderSetup(JSON.parse(event.data)); } catch (e) { console.warn('Setup stream:', e); }
-      };
-      setupEvents.onerror = () => { setupEventsConnected = false; };
-    }
     await refresh();
     if (!selectedChannel && !$('commands-list').children.length) commandRow();
     await resources(); await tunnelStatus();
@@ -682,8 +690,35 @@ async function init() {
       } else tab(runtimeSetup.ready ? 'studio' : 'setup');
     }
     $('generate').disabled = !runtimeSetup.ready;
-    const loop = async () => { try { if (!setupEventsConnected) await runtimeStatus(); await refresh(); } catch (e) { $('health').textContent = 'Connection interrupted: ' + e.message; } setTimeout(loop, document.hidden ? 2000 : 750); }; setTimeout(loop, 750);
-    const monitor = async () => { try { await resources(); await tunnelStatus(); await loadDiscord(); } catch { /* server may be restarting */ } setTimeout(monitor, 2000); }; setTimeout(monitor, 2000);
+    const synchronize = async () => {
+      // Server restarts rotate CSRF tokens. Reconnect refreshes that token too.
+      session = await api('/api/session');
+      eventVersions = {};
+      await refresh(); await runtimeStatus(); await resources();
+      await tunnelStatus(); await loadDiscord(); await refreshUpdates();
+      await renderEngines();
+      if (twitchAuthPending) await loadTwitchAuth();
+      window.dispatchEvent(new Event('studio-resync'));
+    };
+    realtime = new StudioEventStream({
+      enabled: session.realtime?.sse ?? !session.remote_access,
+      fallbackMs: session.realtime?.fallback_ms || 5000,
+      synchronize, fallback: synchronize,
+      handlers: {
+        state: data => {
+          const sections = Object.keys(data.versions).filter(k => eventVersions[k] !== data.versions[k]);
+          eventVersions = data.versions;
+          return applyState(data.value, sections);
+        },
+        resources: data => resources(data),
+        setup: async data => { renderSetup(data); await renderEngines(); },
+        discord: data => { if (!discordBusy) { discordSnapshot = data; renderDiscordStatus(); } },
+        tunnel: data => tunnelStatus(data),
+        updates: data => { renderUpdateStatus(data); window.dispatchEvent(new CustomEvent('studio-updates', {detail: data})); }
+      }
+    });
+    realtime.start();
+
   } catch (e) { error(e.message); $('health').textContent = t('Could not initialize. Refresh after checking the server terminal.'); }
 }
 window.addEventListener('localechange', () => {
@@ -700,10 +735,10 @@ window.addEventListener('localechange', () => {
 });
 init();
 
-async function tunnelStatus() {
+async function tunnelStatus(data = null) {
   if (session?.remote_access || !runtimeSetup.ready) { $('tunnel-card').hidden = true; return; }
   try {
-    const data = await api('/api/tunnel');
+    data = data || await api('/api/tunnel');
     $('tunnel-start').hidden = ['starting', 'downloading', 'running'].includes(data.status);
     $('tunnel-stop').hidden = !['starting', 'downloading', 'running'].includes(data.status);
     $('tunnel-status').textContent = data.error ? t('Tunnel failed') + ': ' + data.error : data.status === 'running' ? data.url : data.status === 'downloading' ? t('Downloading cloudflared…') : data.status === 'starting' ? t('Preparing tunnel…') : t('Tunnel stopped');
@@ -1082,7 +1117,7 @@ function renderTwitchEvents(events) {
   if (!panel) { panel = el('div', {id: 'twitch-event-history'}); $('chat-events').parentElement.append(panel); }
   panel.replaceChildren(...events.map(e => el('div', {class: 'event-row'}, el('strong', {}, `${t(eventNames[e.kind] || e.kind)} · ${e.username} · ${t(e.status)}`), el('p', {}, e.text), e.reason ? el('p', {class: 'error'}, t(e.reason)) : null, el('p', {class: 'muted'}, `${t('Redemption status')}: ${e.settlement}${e.settlement_error ? ' · ' + t(e.settlement_error) : ''}`))));
 }
-setInterval(() => { if (twitchAuthPending && twitchAuthChannel === selectedChannel && !session?.remote_access) loadTwitchAuth().catch(() => {}); }, 2000);
+setInterval(() => { if (twitchAuthPending && twitchAuthChannel === selectedChannel && !session?.remote_access) loadTwitchAuth().catch(() => {}); }, 5000);
 window.addEventListener('localechange', () => { refreshEventVoices(); });
 window.addEventListener('localechange', () => {
   for (const row of document.querySelectorAll('.event-rule')) {
@@ -1160,11 +1195,13 @@ async function refreshUpdates(check = false) {
   if (!session || session.remote_access) return;
   try {
     const value = await api('/api/updates' + (check ? '/check' : ''), check ? {method: 'POST'} : {});
-    $('update-status').textContent = `${value.version} · ${t(value.status)}${value.next_version ? ' · ' + value.next_version : ''}${value.error ? ' · ' + value.error : ''}`;
+    renderUpdateStatus(value);
   } catch (_) { /* Host-only controls are unavailable to shared administrators. */ }
 }
 $('update-check').onclick = () => refreshUpdates(true);
-setInterval(() => refreshUpdates(), 30000);
+function renderUpdateStatus(value) {
+  $('update-status').textContent = `${value.version} · ${t(value.status)}${value.next_version ? ' · ' + value.next_version : ''}${value.error ? ' · ' + value.error : ''}`;
+}
 refreshUpdates();
 
 async function renderEngines() {
@@ -1208,7 +1245,7 @@ async function renderEngines() {
   $('engine-progress').textContent = data.setup.error || (download ? `${download.phase || ''}: ${size(download.completed_bytes)} / ${size(download.total_bytes)}` : data.setup.stage);
 }
 window.addEventListener('localechange', () => renderEngines().catch(e => error(e.message)));
-setInterval(() => renderEngines().catch(e => error(e.message)), 2000);
+document.querySelector('[data-tab=engines]').addEventListener('click', () => renderEngines().catch(e => error(e.message)));
 
 function renderMingOptions(container, saved = {}) {
   container.querySelector('.ming-options')?.remove();

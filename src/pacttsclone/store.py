@@ -8,7 +8,8 @@ from pathlib import Path
 
 
 class Store:
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, events=None):
+        self.events = events
         data_dir.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         self.db = sqlite3.connect(data_dir / "pacttsclone.sqlite3", check_same_thread=False)
@@ -36,6 +37,8 @@ class Store:
                 (kind, key, json.dumps(data, ensure_ascii=False), time.time()),
             )
             self.db.commit()
+        if self.events:
+            self.events.invalidate(kind)
         return data
 
     def get(self, kind: str, key: str) -> dict | None:
@@ -81,6 +84,8 @@ class Store:
         with self.lock:
             self.db.execute("DELETE FROM records WHERE kind=? AND id=?", (kind, key))
             self.db.commit()
+        if self.events:
+            self.events.invalidate(kind)
 
     def close(self):
         with self.lock:

@@ -310,3 +310,14 @@ guild-only slash commands returning MP3 attachments, sharing the existing local
 queue and saved voice defaults. Voice-channel audio and automatic output
 forwarding are excluded from this first increment. This explicit request permits
 Discord posting while preserving Twitch's no-chat-posting behavior.
+
+## SSE for dashboard notifications — 2026-11-01
+
+Use one native EventSource per local dashboard and existing REST for commands.
+A process-local dispatcher holds the latest topic values, and a shared sampler
+combines committed changes/progress. Reconnection uses an authoritative baseline
+instead of a durable event replay log; SQLite remains the source of truth. Retain
+slower fallback for unsupported or stale streams and the testing Quick Tunnel.
+Keep OBS polling/leases: WebSockets need a separate reconnect/ownership/watchdog
+protocol and a playback latency benchmark. No new framework, broker, database
+migration or integration dependency. LAN hosting remains separately planned.

@@ -484,3 +484,16 @@ Follow-up regressions cover Gateway resume status (including a late resume after
 stop), cancellation during threaded submission and while waiting for generation,
 and a failed Discord upload retaining the completed local MP3. All run against
 simulated Discord; cancellation tests control thread timing explicitly.
+
+## Dashboard SSE regression coverage — 2026-11-01
+
+`tests/test_events.py` covers bounded/coalesced immutable notifications, concurrent
+Store commits, multiple streams, cancellation cleanup, reconnect baselines,
+cumulative section versions, admin/player/origin restrictions and no-browser local
+and Twitch generation with playback/Discord completion callbacks. Those callbacks
+and inference are simulated; actual FFmpeg processing is exercised.
+`tests/browser/test_events_ui.py` covers independent browser subscriptions, missed
+offline changes, reconnect/session-token refresh, no-EventSource fallback and stale
+stream recovery. Existing browser/OBS/integration/updater tests remain required.
+See [benchmark method and results](realtime-communication.md). No physical GPU,
+live Cloudflare or native Windows installer execution is claimed by local checks.

@@ -24,6 +24,12 @@ by the automated and source-level checks below, not a claim that no bugs exist.
 
 ## Remaining feature work
 
+- LAN / home-server hosting (planned, 2026-11-01): configurable listening address
+  and trusted LAN hosts/origins, authenticated admin/player access and SSE over
+  direct LAN connections. The current launcher binds to 127.0.0.1 and the HTTP
+  boundary accepts loopback or an authorized tunnel; changing the bind alone is
+  insufficient. Keep loopback as the default and preserve host-only controls.
+  Cloudflare Quick Tunnels are a testing feature, not a prerequisite for this work.
 - Deterministic punctuation pauses/prosody are not implemented. Text punctuation
   is forwarded unchanged to OmniVoice; the model does not guarantee pause lengths.
   This remains the explicitly deferred feature in decisions.md, not a completed fix.

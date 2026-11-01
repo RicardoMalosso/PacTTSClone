@@ -58,7 +58,7 @@ by discarding keys. Quick Tunnel URLs are temporary and have no uptime guarantee
 
 ## UI and locale
 
-Generate, Voices, Twitch & OBS, History and Configuration tabs share polling state.
+Generate, Voices, Twitch & OBS, History and Configuration tabs share server state.
 /channel/control selects its channel; /channel loads the transparent audio page.
 Locale module detects preferred browser language, supports en-CA/pt-BR and persists
 manual override. Static UI and explicit dynamic labels translate; user content and
@@ -365,3 +365,15 @@ This prevents unbounded retention across repeated requests.
 Managed installations include RC releases by default and sort compatible releases
 by publication date. Local owners can pin a previous version or resume Latest.
 Persistent updater controls survive application rollback. See [update contract](auto-updates.md).
+
+## Dashboard SSE migration — 2026-11-01
+
+The local dashboard now receives shared SSE notifications from `/api/events`.
+Committed Store changes invalidate document kinds; one application-level sampler
+combines state/progress updates and samples resources/in-memory statuses for all
+subscribed browsers. Latest values per topic and cumulative section versions bound
+buffering and let existing components update without a frontend rewrite. REST
+remains the baseline on reconnect and a five-second fallback. OBS ticks/leases,
+inference isolation, SQLite persistence and integration lifecycles are unchanged.
+See [protocol, deployment limits and measurements](realtime-communication.md).
+LAN hosting remains planned; the testing Quick Tunnel path retains REST fallback.

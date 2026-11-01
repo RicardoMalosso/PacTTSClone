@@ -171,6 +171,11 @@ samples are unchanged. Original uploaded files are not modified. Sample quality
 
 ## Studio workflow
 
+The local dashboard receives live status/progress through SSE, with automatic
+reconnection and slower REST polling as a fallback. OBS playback retains its
+existing polling and lease system. LAN hosting is planned separately. See
+[real-time communication](docs/realtime-communication.md) for the protocol and measurements.
+
 1. Open **http://127.0.0.1:7860**. In **Voices**, add an MP3 (1–30 s, recommended
    3–10 s, <=20 MiB), title and optionally thumbnail and exact transcript. A blank
    transcript creates a preparation job; wait until the voice is ready.
