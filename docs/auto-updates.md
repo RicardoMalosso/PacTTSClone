@@ -34,10 +34,19 @@ PACTTS_DISABLE_UPDATES=1 disables background checks for isolated acceptance test
 The 2.2.1 stable patch is discoverable by existing stable updaters. A one-time
 2.3.0-rc.2 wheel bridges existing 2.3.0-rc.1 numeric updaters. Releases bearing
 `<!-- pactts-update-bridge -->` are excluded from the new normal catalogue. The
-normal installer and GitHub Latest designation remain 2.2.1. Older published assets
+normal installer and GitHub Latest designation advance with each stable release. Older published assets
 are immutable. GitHub controls its native release-history ordering; the app sorts
 its own list by published_at and uses /releases/latest for the installer link.
 
 Controls and endpoints are local-only, including shared administrators; writes
 require the existing same-origin CSRF token. The updater does not run inference,
 post messages or send telemetry.
+
+## Stable maintenance release 2.2.2
+
+2.2.2 packages dashboard SSE and native frontend modules as a stable patch release.
+Its wheel uses the canonical name pacttsclone-2.2.2-py3-none-any.whl and an uploaded
+SHA-256 digest. Latest selects this newer publication for both stable-only and
+experimental-enabled channels. A pinned version remains pinned. Existing
+2.3.0-rc.1 numeric updaters first take the published 2.3.0-rc.2 bridge, then the new
+publication-date controller selects 2.2.2. No second bridge is required.

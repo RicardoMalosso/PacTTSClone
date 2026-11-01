@@ -893,3 +893,14 @@ verified exact static JavaScript contents and the module entrypoint. All 47 Chro
 regressions passed, including the four SSE tests and new native-module smoke test. Tests use controlled inference
 and integration transports; no physical GPU, live Twitch/Discord/Cloudflare or
 native Windows installer acceptance is claimed.
+
+## Stable release 2.2.2 preparation — 2026-11-01
+
+User authorized merging PR #27 and publishing the cumulative changes. Its full
+GitHub test workflow passed before merge. Version 2.2.2 is the next stable patch
+after 2.2.1: it packages dashboard SSE and frontend modularization without changing
+model dependencies. Package/runtime/installer identities and the README agree.
+The existing release-on-merge workflow must run full tests, Windows installer and
+updater acceptance, and uploaded size/digest checks before publication. Latest
+follows publication date and preserves explicit version pins; existing RC migration
+bridges remain immutable. Publication/acceptance results are recorded in Actions.
