@@ -44,7 +44,7 @@ ACTIVE_INSTANCE = None
 def release_catalog(releases, include_experimental=True):
     candidates = []
     for release in releases:
-        if release.get("draft") or "<!-- pactts-update-bridge -->" in release.get("body", ""):
+        if release.get("draft") or "<!-- pactts-update-bridge -->" in (release.get("body") or ""):
             continue
         tag = release.get("tag_name", "")
         if not re.fullmatch(r"v\d+\.\d+\.\d+(?:-rc\.\d+)?", tag):

@@ -158,6 +158,8 @@ def test_publication_order_pin_and_bridge():
     assert select_release(rows, '2.2.1', target='v2.3.0-rc.1')[0] == Version('2.3.0rc1')
     assert select_release(rows, '2.3.0rc1', target='v2.3.0-rc.1') is None
     assert select_release(rows, '2.2.1', False, 'v2.3.0-rc.1') is None
+    patch['body'] = None
+    assert select_release([patch], '2.1.1')[0] == Version('2.2.1')
     patch['prerelease'] = True
     assert select_release([patch], '2.1.1', False) is None
 

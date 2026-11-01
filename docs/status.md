@@ -828,5 +828,9 @@ Native CUDA adapter, verified asset manifests, isolated installer/lifecycle and 
 
 Restored implementation after transient workspace reset. Adds default-on experimental
 updates, publication-date ordering, persistent previous-version pins and rollback
-controls. Preserves the separately released 2.1.1 webhook fix. Full acceptance and
-publication are pending; no physical GPU inference claim is added.
+controls. Preserves the separately released 2.1.1 webhook fix. All 302 local backend
+and 42 Chromium tests passed. Actual installed-interpreter activation, rollback to
+the public 2.1.1 wheel, persistent pin and forward staging from that older app
+passed. Ruff, compilation, JS syntax, bridge RECORD/import validation and visual
+inspection passed. Native Windows acceptance and publication are tracked in PR #25;
+no physical GPU inference claim is added.
