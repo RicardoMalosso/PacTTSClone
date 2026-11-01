@@ -104,6 +104,7 @@ with TemporaryDirectory(dir={str(root)!r}) as d:
     updater.fetch=lambda target, limit: (json.dumps({release!r}).encode() if target == updater.API
                                         else Path({str(fixture)!r}).read_bytes())
     assert manager.check()['status']=='restart_required', manager.state
+    app.state.studio.close()
 print('Historical application kept updater, honored pin and staged Latest')
 '''
     print(probe(code))

@@ -283,7 +283,7 @@ class Updater:
                          f"d=TemporaryDirectory(dir={str(self.root)!r}); "
                          "a=create_app(Settings(data_dir=Path(d.name))); "
                          "assert any(r.path == '/api/updates/manager' for r in a.routes); "
-                         "d.cleanup()")
+                         "a.state.studio.close(); d.cleanup()")
                 subprocess.run([sys.executable, "-c", probe], cwd=staging,
                                check=True, timeout=60, capture_output=True)
                 if target.exists():
@@ -294,7 +294,11 @@ class Updater:
                 shutil.rmtree(staging, ignore_errors=True)
             self.state.update(status="restart_required")
         except Exception as exc:
-            self.state.update(status="failed", error=str(exc), next_version=previous)
+            detail = getattr(exc, "stderr", b"") or ""
+            if isinstance(detail, bytes):
+                detail = detail.decode(errors="replace")
+            self.state.update(status="failed", error=detail.strip()[-4000:] or str(exc),
+                              next_version=previous)
         finally:
             self.lock.release()
         return dict(self.state)

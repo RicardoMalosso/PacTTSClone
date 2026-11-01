@@ -834,3 +834,8 @@ the public 2.1.1 wheel, persistent pin and forward staging from that older app
 passed. Ruff, compilation, JS syntax, bridge RECORD/import validation and visual
 inspection passed. Native Windows acceptance and publication are tracked in PR #25;
 no physical GPU inference claim is added.
+
+Windows acceptance caught a preflight cleanup error: its temporary application
+kept SQLite open during directory deletion. The probe and historical acceptance
+now close the studio/service before cleanup; child stderr is retained on failure.
+Publication remains gated on a successful native rerun.
