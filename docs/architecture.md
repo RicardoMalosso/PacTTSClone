@@ -386,3 +386,11 @@ subscriptions, and api.js owns REST/CSRF handling. Explicit feature initializati
 precedes asynchronous startup. REST and SSE snapshots use the same subscription
 path; existing updater bridge events and OBS contracts remain intact. No framework,
 bundler or npm runtime dependency is introduced. See [module guide](frontend.md).
+
+## Ming inference repair — 2.2.3
+
+The private worker verifies the pinned modeling source and compiles narrow
+in-memory budget/stop/empty-output repairs before importing MingTTS. A wrapper
+counts the trained prompt contract and splits text while retaining the original
+clone conditioning. Model/source caches remain immutable. Per-job reference
+caches are released; base weights stay resident. See ming-inference-diagnosis.md.
