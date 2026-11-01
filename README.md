@@ -25,7 +25,7 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 ## Windows installer (preview)
 
 Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases/latest) and choose
-`PacTTSClone-Setup-2.2.1.exe` in the latest release. The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+`PacTTSClone-Setup-2.2.2.exe` in the latest release. The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
