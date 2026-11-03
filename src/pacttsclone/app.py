@@ -144,6 +144,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             updater.close()
             engines.ming.close()
             engines.kitten.close()
+            engines.singing.close()
             runtime_setup.close()
             tunnel.close()
             studio.close()
