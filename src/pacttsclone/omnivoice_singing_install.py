@@ -22,9 +22,24 @@ def emit(**values):
 
 
 def install(root: Path, hf_cache: Path):
+    # Reject redirects into the original OmniVoice installation or shared caches.
+    # The lifecycle always supplies a dedicated data/engines/omnivoice-singing root.
+    if root.name != "omnivoice-singing" or root.parent.name != "engines":
+        raise ValueError("Singing requires its dedicated engines/omnivoice-singing folder.")
+    if any(path.is_symlink() for path in [root, *root.parents]):
+        raise ValueError("Unsafe Singing installation directory.")
     root.mkdir(parents=True, exist_ok=True)
     # Keep partial downloads for cancellation/retry, separate from base OmniVoice.
     staging = root / "download"
+    if staging.is_symlink():
+        raise ValueError("Unsafe Singing download directory.")
+    model = root / "model"
+    previous = root / "previous-model"
+    if previous.is_symlink():
+        raise ValueError("Unsafe previous-model directory.")
+    if previous.exists() and not model.exists():
+        # Repair interrupted replacement without losing the last installed weights.
+        previous.rename(model)
     result = download_models(staging, [MODEL_REPO], hf_cache)
     plan = json.loads((staging / f"{MODEL_KEY}.json").read_text(encoding="utf-8"))
     source = Path(result["paths"][MODEL_REPO])
@@ -42,8 +57,6 @@ def install(root: Path, hf_cache: Path):
         "files": [{"name": item["name"], "size": item["size"]} for item in plan["files"]],
         "installed_bytes": sum(item["size"] for item in plan["files"]),
     }
-    model = root / "model"
-    previous = root / "previous-model"
     if previous.exists() or previous.is_symlink():
         raise ValueError("Unexpected previous-model directory. Remove it manually before repair.")
     if model.is_symlink() or any(p.is_symlink() for p in [root, *root.parents]):

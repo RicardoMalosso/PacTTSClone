@@ -9,10 +9,19 @@ from unittest.mock import Mock
 import pytest
 
 from pacttsclone.config import Settings
-from pacttsclone.domain import UserError
+from pacttsclone.domain import BusyError, UserError
 from pacttsclone.engines import EngineManager
 from pacttsclone.ming_lifecycle import MingLifecycle
 from pacttsclone.omnivoice_singing_install import MODEL_KEY, MODEL_REPO, install
+
+
+@pytest.fixture(autouse=True)
+def mock_shared_inference_runtime(monkeypatch):
+    """Unit tests must not require the heavy CUDA/OmniVoice packages."""
+    monkeypatch.setattr(
+        "pacttsclone.omnivoice_singing_lifecycle.dependencies_available", lambda: True
+    )
+    monkeypatch.setattr("pacttsclone.engines.dependencies_available", lambda: True)
 
 
 def make_manager(tmp_path):
@@ -204,4 +213,145 @@ def test_original_installation_does_not_get_singing_model(tmp_path):
     assert manager.snapshot()["engines"][0]["name"] == "OmniVoice"
     assert manager.snapshot()["engines"][3]["id"] == "omnivoice-singing"
     assert manager.snapshot()["engines"][3]["installed"] is False
+    assert original.read_bytes() == b"original weights"
+
+
+def test_original_configuration_and_setup_manifest_are_untouched(tmp_path):
+    manager, original = make_manager(tmp_path)
+    baseline_model = manager.service.settings.model
+    baseline_asr = manager.service.settings.asr_model
+    baseline_manifest = json.dumps(manager.setup.state["models"], sort_keys=True)
+    baseline_bytes = original.read_bytes()
+    baseline_ready = manager.service.setup_ready()
+    assert baseline_ready
+
+    # Discovering, installing, and listing the optional variant must not activate it.
+    write_singing_receipt(manager.singing.root)
+    rows = manager.snapshot()["engines"]
+    assert rows[0]["active"]
+    assert rows[3]["installed"]
+    assert not rows[3]["active"]
+    assert manager.service.settings.engine_id == "omnivoice"
+    assert manager.service.settings.model == baseline_model
+    assert manager.service.settings.asr_model == baseline_asr
+    assert manager.service.setup_ready() == baseline_ready
+    assert json.dumps(manager.setup.state["models"], sort_keys=True) == baseline_manifest
+    assert original.read_bytes() == baseline_bytes
+    manager.service.runner.reset.assert_not_called()
+
+
+def test_switching_back_restores_base_model_and_asr_without_reinstall(tmp_path):
+    manager, original = make_manager(tmp_path)
+    original_model = manager.service.settings.model
+    original_asr = manager.service.settings.asr_model
+    original_manifest = json.dumps(manager.setup.state["models"], sort_keys=True)
+    write_singing_receipt(manager.singing.root)
+    manager.setup.start = Mock(side_effect=AssertionError("Unexpected setup/reinstall"))
+    manager.change("omnivoice-singing", "activate")
+    assert manager.service.setup_ready()
+    assert manager.service.settings.model != original_model
+    assert manager.service.settings.asr_model == original_asr
+    manager.change("omnivoice", "activate")
+    assert manager.service.setup_ready()
+    assert manager.service.settings.model == original_model
+    assert manager.service.settings.asr_model == original_asr
+    assert manager.service.settings.engine_id == "omnivoice"
+    assert json.dumps(manager.setup.state["models"], sort_keys=True) == original_manifest
+    assert original.read_bytes() == b"original weights"
+    assert manager.service.runner.reset.call_count == 2
+    manager.setup.start.assert_not_called()
+
+
+def test_failed_or_busy_singing_activation_preserves_original(tmp_path, monkeypatch):
+    manager, original = make_manager(tmp_path)
+    write_singing_receipt(manager.singing.root)
+    manager.service.setup_busy = True
+    with pytest.raises(BusyError):
+        manager.change("omnivoice-singing", "activate")
+    manager.service.setup_busy = False
+    monkeypatch.setattr(
+        "pacttsclone.omnivoice_singing_lifecycle.dependencies_available", lambda: False
+    )
+    with pytest.raises(UserError, match="runtime is unavailable"):
+        manager.change("omnivoice-singing", "activate")
+    assert manager.service.settings.engine_id == "omnivoice"
+    assert manager.setup.state["active_engine"] == "omnivoice"
+    assert manager.setup.state["engine_enabled"] is True
+    assert original.read_bytes() == b"original weights"
+    manager.service.runner.reset.assert_not_called()
+
+
+def test_original_uninstall_retains_shared_whisper_and_singing_weights(tmp_path):
+    manager, original = make_manager(tmp_path)
+    write_singing_receipt(manager.singing.root)
+    whisper = tmp_path / "models" / "whisper-small" / "weights.bin"
+    whisper.parent.mkdir()
+    whisper.write_bytes(b"shared ASR")
+    manager.service.settings = replace(
+        manager.service.settings, asr_model=str(whisper.parent)
+    )
+    manager.setup.state["models"]["files"].append(
+        {"path": str(whisper), "size": whisper.stat().st_size}
+    )
+    manager.change("omnivoice", "deactivate")
+    manager.change("omnivoice", "uninstall")
+    assert not original.exists()
+    assert whisper.read_bytes() == b"shared ASR"
+    assert manager.singing.installed()
+    assert manager.setup.state["shared_asr"]["files"]
+
+
+def test_singing_uninstall_requires_deactivation_and_preserves_base(tmp_path):
+    manager, original = make_manager(tmp_path)
+    write_singing_receipt(manager.singing.root)
+    manager.change("omnivoice-singing", "activate")
+    with pytest.raises(UserError, match="Deactivate"):
+        manager.change("omnivoice-singing", "uninstall")
+    assert manager.singing.installed()
+    assert original.read_bytes() == b"original weights"
+    manager.change("omnivoice-singing", "deactivate")
+    assert manager.service.settings.engine_id == "omnivoice"
+    manager.change("omnivoice-singing", "uninstall")
+    assert not manager.singing.root.exists()
+    assert original.read_bytes() == b"original weights"
+
+
+def test_missing_singing_model_on_restart_disables_only_selection(tmp_path):
+    manager, original = make_manager(tmp_path)
+    manager.setup.state.update(
+        active_engine="omnivoice-singing", engine_enabled=True
+    )
+    new_manager = EngineManager(manager.setup)
+    assert new_manager.setup.state["active_engine"] == "omnivoice"
+    assert new_manager.setup.state["engine_enabled"] is False
+    assert original.read_bytes() == b"original weights"
+    assert new_manager.service.settings.model == str(original.parent)
+
+
+def test_installer_refuses_path_alias_to_original_models(tmp_path, monkeypatch):
+    manager, original = make_manager(tmp_path)
+    monkeypatch.setattr(
+        "pacttsclone.omnivoice_singing_install.download_models",
+        Mock(side_effect=AssertionError("Must reject path before download")),
+    )
+    with pytest.raises(ValueError, match="dedicated"):
+        install(tmp_path / "models", tmp_path / "hf-cache")
+    assert original.read_bytes() == b"original weights"
+
+
+def test_installer_rejects_symlink_to_original_before_download(tmp_path, monkeypatch):
+    manager, original = make_manager(tmp_path)
+    parent = tmp_path / "engines"
+    parent.mkdir()
+    disguised = parent / "omnivoice-singing"
+    try:
+        disguised.symlink_to(original.parent, target_is_directory=True)
+    except (NotImplementedError, OSError):
+        pytest.skip("Directory symlinks are unavailable on this platform.")
+    monkeypatch.setattr(
+        "pacttsclone.omnivoice_singing_install.download_models",
+        Mock(side_effect=AssertionError("Must reject symlink before download")),
+    )
+    with pytest.raises(ValueError, match="Unsafe"):
+        install(disguised, tmp_path / "hf-cache")
     assert original.read_bytes() == b"original weights"
