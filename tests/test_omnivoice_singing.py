@@ -355,3 +355,20 @@ def test_installer_rejects_symlink_to_original_before_download(tmp_path, monkeyp
     with pytest.raises(ValueError, match="Unsafe"):
         install(disguised, tmp_path / "hf-cache")
     assert original.read_bytes() == b"original weights"
+
+
+def test_installer_rejects_download_symlink_before_writing(tmp_path, monkeypatch):
+    manager, original = make_manager(tmp_path)
+    staging = manager.singing.root / "download"
+    staging.mkdir(parents=True)
+    try:
+        (staging / MODEL_KEY).symlink_to(original.parent, target_is_directory=True)
+    except (NotImplementedError, OSError):
+        pytest.skip("Directory symlinks are unavailable on this platform.")
+    monkeypatch.setattr(
+        "pacttsclone.omnivoice_singing_install.download_models",
+        Mock(side_effect=AssertionError("Must reject symlink before download")),
+    )
+    with pytest.raises(ValueError, match="Unsafe"):
+        install(manager.singing.root, tmp_path / "hf-cache")
+    assert original.read_bytes() == b"original weights"

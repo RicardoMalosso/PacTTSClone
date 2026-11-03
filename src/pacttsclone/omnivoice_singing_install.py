@@ -31,7 +31,7 @@ def install(root: Path, hf_cache: Path):
     root.mkdir(parents=True, exist_ok=True)
     # Keep partial downloads for cancellation/retry, separate from base OmniVoice.
     staging = root / "download"
-    if staging.is_symlink():
+    if staging.is_symlink() or (staging / MODEL_KEY).is_symlink():
         raise ValueError("Unsafe Singing download directory.")
     model = root / "model"
     previous = root / "previous-model"
