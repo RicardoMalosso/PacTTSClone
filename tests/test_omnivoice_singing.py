@@ -3,7 +3,6 @@
 import json
 import threading
 from dataclasses import replace
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
