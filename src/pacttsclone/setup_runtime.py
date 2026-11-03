@@ -303,7 +303,9 @@ class RuntimeSetup:
             self.thread.join(5)
 
     def start(self, device, search_roots=None, move_weights=False):
-        if self.service.settings.engine_id in {"ming-3", "kittentts2"}:
+        if self.service.settings.engine_id in {
+            "ming-3", "kittentts2", "omnivoice-singing"
+        }:
             raise UserError(
                 "Deactivate the active engine before repairing the shared OmniVoice setup."
             )
