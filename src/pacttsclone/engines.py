@@ -8,6 +8,7 @@ from pathlib import Path
 from .domain import BusyError, UserError
 from .kitten_lifecycle import KittenLifecycle
 from .ming_lifecycle import MingLifecycle
+from .omnivoice_singing_lifecycle import OmniVoiceSingingLifecycle
 
 
 class EngineManager:
@@ -16,7 +17,12 @@ class EngineManager:
         self.service = setup.service
         self.ming = MingLifecycle(setup)
         self.kitten = KittenLifecycle(setup)
-        self.managed = {"ming-3": self.ming, "kittentts2": self.kitten}
+        self.singing = OmniVoiceSingingLifecycle(setup)
+        self.managed = {
+            "ming-3": self.ming,
+            "kittentts2": self.kitten,
+            "omnivoice-singing": self.singing,
+        }
         selected = self.managed.get(setup.state.get("active_engine"))
         if selected:
             if selected.installed():
@@ -127,6 +133,7 @@ class EngineManager:
         )
         rows[1] = self.ming.row()
         rows[2] = self.kitten.row()
+        rows.append(self.singing.row())
         return {
             "engines": rows,
             "directory": str(self.service.settings.data_dir),
