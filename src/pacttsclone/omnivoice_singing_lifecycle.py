@@ -181,7 +181,10 @@ class OmniVoiceSingingLifecycle(MingLifecycle):
             "runtime_reserve_bytes": None,
             "models": ([{"repo": MODEL_REPO, "revision": receipt["revision"]}]
                        if receipt.get("revision") else []),
-            "license": "Apache-2.0 model card; training datasets include noncommercial restrictions",
+            "license": (
+                "Apache-2.0 model card; training datasets include "
+                "noncommercial restrictions"
+            ),
             "runtime": "Uses the existing OmniVoice/PyTorch CUDA runtime; no new dependencies",
             "ram": "Not verified",
             "languages": "Multilingual; non-English singing quality varies (publisher claim)",
@@ -195,7 +198,10 @@ class OmniVoiceSingingLifecycle(MingLifecycle):
                 "Singing": "[singing] (melodic voice, not musical accompaniment)",
             },
             "vram": "6 GB compatibility unverified; one model resident at a time",
-            "features": "Optional Singing/Emotion checkpoint; shared cloned voices and generation settings",
+            "features": (
+                "Optional Singing/Emotion checkpoint; shared cloned voices "
+                "and generation settings"
+            ),
             "status": self.state.get("status", "idle"),
             "installation": dict(self.state),
         }
