@@ -211,6 +211,15 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(404, "No Ming installation log yet.")
         return FileResponse(path, media_type="text/plain", filename="ming-install.log")
 
+    @app.get("/api/engines/omnivoice-singing/log")
+    def singing_install_log(request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "Engine management requires local access.")
+        path = service.logs / "omnivoice_singing-install.log"
+        if not path.is_file():
+            raise HTTPException(404, "No Singing installation log yet.")
+        return FileResponse(path, media_type="text/plain", filename=path.name)
+
     @app.get("/api/engines")
     def engine_status(request: Request):
         if request.state.remote_access:
