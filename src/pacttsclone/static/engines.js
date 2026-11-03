@@ -25,9 +25,9 @@ async function renderEngines() {
       await api(`/api/engines/${engine.id}/${operation}`, {method: 'POST'});
       await refresh(); await runtimeStatus(); await renderEngines();
     };
-    if (['ming-3','kittentts2'].includes(engine.id)) controls.append(el('a', {href: `/api/engines/${engine.id}/log`, download: ''}, t('Installation log')));
+    if (['ming-3','kittentts2','omnivoice-singing'].includes(engine.id)) controls.append(el('a', {href: `/api/engines/${engine.id}/log`, download: ''}, t('Installation log')));
     if (!engine.supported) controls.textContent = t('Available in a later release');
-    else if (data.busy && ((['ming-3','kittentts2'].includes(engine.id) && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
+    else if (data.busy && ((['ming-3','kittentts2','omnivoice-singing'].includes(engine.id) && engine.installation?.status === 'running') || (engine.id === 'omnivoice' && data.setup.status === 'running'))) controls.append(button('Cancel setup', run('cancel')));
     else if (data.busy) controls.append(el('span', {}, t('Wait for installation')));
     else if (!engine.installed) controls.append(button('Install', run('install')));
     else {
