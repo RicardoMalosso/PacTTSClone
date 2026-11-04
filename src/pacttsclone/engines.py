@@ -6,8 +6,10 @@ from dataclasses import replace
 from pathlib import Path
 
 from .domain import BusyError, UserError
+from .engine import dependencies_available
 from .kitten_lifecycle import KittenLifecycle
 from .ming_lifecycle import MingLifecycle
+from .omnivoice_singing_lifecycle import OmniVoiceSingingLifecycle
 
 
 class EngineManager:
@@ -16,7 +18,12 @@ class EngineManager:
         self.service = setup.service
         self.ming = MingLifecycle(setup)
         self.kitten = KittenLifecycle(setup)
-        self.managed = {"ming-3": self.ming, "kittentts2": self.kitten}
+        self.singing = OmniVoiceSingingLifecycle(setup)
+        self.managed = {
+            "ming-3": self.ming,
+            "kittentts2": self.kitten,
+            "omnivoice-singing": self.singing,
+        }
         selected = self.managed.get(setup.state.get("active_engine"))
         if selected:
             if selected.installed():
@@ -31,15 +38,21 @@ class EngineManager:
             else:
                 setup.update(active_engine="omnivoice", engine_enabled=False)
         original_ready = self.service.setup_ready
-        self.service.setup_ready = lambda: (
-            (
-                getattr(
-                    self.service,
-                    f"{self.managed[self.service.settings.engine_id].profile}_installed",
+
+        def selected_ready():
+            engine_id = self.service.settings.engine_id
+            if engine_id == self.singing.engine_id:
+                # The Singing checkpoint can work independently once its shared
+                # inference dependencies are installed.
+                return self.singing.installed() and dependencies_available()
+            if engine_id in self.managed:
+                return getattr(
+                    self.service, f"{self.managed[engine_id].profile}_installed"
                 )()
-                if self.service.settings.engine_id in self.managed
-                else original_ready()
-            )
+            return original_ready()
+
+        self.service.setup_ready = lambda: (
+            selected_ready()
             and self.setup.state.get("engine_enabled", True)
             and not self.service.setup_busy
         )
@@ -127,6 +140,7 @@ class EngineManager:
         )
         rows[1] = self.ming.row()
         rows[2] = self.kitten.row()
+        rows.append(self.singing.row())
         return {
             "engines": rows,
             "directory": str(self.service.settings.data_dir),

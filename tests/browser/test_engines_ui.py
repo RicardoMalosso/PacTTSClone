@@ -7,9 +7,12 @@ def test_engines_catalog_has_honest_future_controls(page, live_server, tmp_path)
     url, app = live_server
     page.goto(url)
     page.locator('[data-tab="engines"]').click()
-    expect(page.locator("#engine-rows tr")).to_have_count(3)
-    omni = page.locator("#engine-rows tr").filter(has_text="OmniVoice")
+    expect(page.locator("#engine-rows tr")).to_have_count(4)
+    omni = page.locator("#engine-rows tr").first
+    expect(omni.locator("td").first).to_have_text("OmniVoice")
     expect(omni.get_by_role("button", name="Install", exact=True)).to_be_visible()
+    singing = page.locator("#engine-rows tr").last
+    expect(singing.locator("td").first).to_contain_text("Singing + Emotion")
     ming = page.locator("#engine-rows tr").filter(has_text="Ming 3.0")
     expect(ming.get_by_role("button", name="Install", exact=True)).to_be_visible()
     expect(page.locator("#engine-rows tr").filter(has_text="KittenTTS2")).to_contain_text(
@@ -22,7 +25,7 @@ def test_engines_catalog_has_honest_future_controls(page, live_server, tmp_path)
     expect(page.locator('[data-tab="engines"]')).to_have_text("Motores")
     page.reload()
     page.locator('[data-tab="engines"]').click()
-    expect(page.locator("#engine-rows tr")).to_have_count(3)
+    expect(page.locator("#engine-rows tr")).to_have_count(4)
     page.screenshot(path=str(tmp_path / "engines-desktop.png"), full_page=True)
     page.set_viewport_size({"width": 390, "height": 844})
     assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
@@ -41,7 +44,8 @@ def test_deactivate_uninstall_preserves_voice_and_requires_activation(page, live
     setup.update(models={"files": [{"path": str(model), "size": 7}]})
     page.goto(url)
     page.locator('[data-tab="engines"]').click()
-    row = page.locator("#engine-rows tr").filter(has_text="OmniVoice")
+    row = page.locator("#engine-rows tr").first
+    expect(row.locator("td").first).to_have_text("OmniVoice")
     expect(row.get_by_role("button", name="Uninstall", exact=True)).to_be_disabled()
     row.get_by_role("button", name="Deactivate", exact=True).click()
     expect(row.get_by_role("button", name="Activate", exact=True)).to_be_visible()
