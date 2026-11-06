@@ -16,6 +16,7 @@ import {autoqueueNote, initStudio, showSharedResult} from './studio.js';
 import {initTwitch, loadTwitchAuth} from './twitch.js';
 import {initUpdates, refreshUpdates, renderUpdateStatus} from './updates.js';
 import {initVoices, renderVoices} from './voices.js';
+import {initSfx, renderSfx} from './sfx.js';
 
 let initialHealth = null;
 
@@ -36,6 +37,7 @@ async function applyState(value, sections = null) {
   panicRevision = dashboard.state.panic_revision;
   const changed = kinds => !sections || kinds.some(kind => sections.includes(kind));
   if (changed(['voice', 'job'])) renderVoices();
+  if (changed(['sfx'])) renderSfx();
   if (changed(['job'])) renderJobs();
   if (changed(['job', 'request'])) renderHistory();
   if (changed(['channel', 'playback', 'connections'])) renderChannels();
@@ -125,6 +127,7 @@ initGenerationSettings();
 initStudio();
 initMonitor();
 initVoices();
+initSfx();
 initChannels();
 initConfig();
 initDiscord();

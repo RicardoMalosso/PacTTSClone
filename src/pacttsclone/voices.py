@@ -203,7 +203,7 @@ class Voices:
                     error=job.get("error"),
                 )
 
-    def generate(self, voice_id, request, channel=None, username=None, identity=None):
+    def resolve_request(self, voice_id, request):
         voice = self.store.get("voice", voice_id)
         if not voice:
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
@@ -230,6 +230,10 @@ class Voices:
         preset = engine_id == "kittentts2" and request.kitten.mode == "preset"
         if voice["status"] != "ready" and not preset:
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
+        return voice, request
+
+    def generate(self, voice_id, request, channel=None, username=None, identity=None):
+        voice, request = self.resolve_request(voice_id, request)
         with self.service._lock:
             with (self.root / voice_id / "reference.mp3").open("rb") as reference:
                 result = self.service.submit(

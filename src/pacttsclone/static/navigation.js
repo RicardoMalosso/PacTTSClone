@@ -16,6 +16,7 @@ function tab(name) {
   if (name === 'bugs' && !dashboard.bugPlayerReady) { openBugVideo(); return; }
   window.Locale.apply();
   if (name !== 'bugs') stopBugVideo();
+  if (name !== 'sfx') $('sfx-list').querySelectorAll('audio').forEach(audio => audio.pause());
   const general = name === 'studio';
   if (general) dashboard.selectedChannel = 'playbackMain';
   else if (name === 'channels' && dashboard.selectedChannel === 'playbackMain') fillChannel('');

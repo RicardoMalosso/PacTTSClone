@@ -106,9 +106,13 @@ def test_remote_player_cannot_access_admin_other_channels_or_audio(shared_app):
             ).status_code
             == 403
         )
-        for path in ["/api/config", "/api/state", "/api/voices", "/api/logs", "/api/channels"]:
+        for path in [
+            "/api/config", "/api/state", "/api/voices", "/api/logs", "/api/channels",
+            "/api/sfx", "/api/sfx/missing/audio",
+        ]:
             assert client.get(path).status_code == 403
         assert client.post("/api/cancel-all", headers=headers).status_code == 403
+        assert client.post("/api/script/preview", headers=headers, json={}).status_code == 403
         job_id = "a" * 32
         shared_app.state.service.store.put(
             "job", job_id, {"id": job_id, "status": "succeeded", "channel": "channeltwo"}

@@ -236,3 +236,13 @@ Keep vanilla JavaScript and split dashboard transport, shared state, voices,
 Twitch, engines, monitoring and configuration into feature modules. Preserve
 existing UI behavior, drafts, localization, SSE recovery, updater bridge and OBS
 controls. No React/Angular, bundler or new frontend installation step is required.
+
+## Multi-voice messages and SFX — 2026-11-06
+
+Support whitespace-separated command switches (`!pac something !lula somethingelse`)
+and configurable uploaded SFX (`[fart]`, `****`). Place SFX next to Voices in the
+main navigation. Preserve whole utterances where validated word timestamps permit
+insertion; otherwise fall back to separate phrases and record the mode/reason.
+One bounded, cancellable job and MP3 per message, with snapshots of voice/effect
+assets/settings, one cooldown, moderation across segments and existing playback/
+Discord behavior. See [implementation contract](multi-voice-sfx.md).

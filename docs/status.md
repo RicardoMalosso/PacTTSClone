@@ -921,3 +921,43 @@ release identity and wheel build/helper inclusion passed. A subsequent focused
 run includes the added immutable-source loader regression. No NVIDIA GPU inference
 or native Windows installer execution is claimed locally; Actions supplies the
 existing cross-platform/installer release gates.
+
+## Multi-voice messages and configurable SFX — 2026-11-06
+
+Implemented the owner's exact `!pac something !lula somethingelse` syntax and a
+separate SFX tab immediately beside Voices. Supports uploaded sounds/aliases,
+volume/duration/enabled settings, per-channel limits, a saved-command sequence
+preview, and inline effects in Local generation. Whole voice utterances are
+synthesized first, then split at validated cached-Whisper word timestamps for
+insertion. Missing/mismatched alignment falls back to phrase generation and records
+its reason. Prefix/suffix SFX need no ASR. Ming/Kitten alignment uses their existing
+private-runtime protocol; weights/runtime manifests are unchanged.
+
+Composite jobs snapshot voice settings/reference files and SFX PCM/settings before
+queue publication. One MP3/OBS item/optional Discord attachment per message;
+moderation across boundaries, requester identity, autoqueue, cancellation and
+worker recovery are retained. Partial MP3 cleanup also covers hard cancellation.
+SFX files persist under the existing data root. Optional import does not yet carry
+SFX between installations. See [implementation contract](multi-voice-sfx.md).
+
+Validation: full local backend suite 363 passed. Final focused API/SFX suite
+46 passed; scoped-access regressions 10 passed. Full Chromium: 47 passed, one
+existing looping-video timing test timed out; that test and an SFX job wait that
+also timed out during concurrent checks both passed in an isolated two-test rerun.
+The new SFX Chromium test passed, including upload/edit/delete/reload and command
+preview. Ruff, compilation, JS syntax, diff checks and wheel build/helper inclusion
+passed. Desktop/mobile screenshots inspected; no horizontal overflow at 390px.
+Tests use controlled speech and timestamps with real FFmpeg and actual process
+cancellation, not real TTS/Whisper inference. CUDA voice quality, actual word-cut
+accuracy, live Twitch/Discord and Windows acceptance remain unverified locally.
+No version bump, merge or release is included.
+
+## Multi-voice/SFX release 2.3.0-rc.4 preparation — 2026-11-06
+
+The owner authorized publication after implementation. PR #31's original feature
+commit passed GitHub Tests run 42270342346. Package/runtime identities now advance
+together to 2.3.0rc4, retaining the existing RC channel and updater behavior. Release
+notes document the word-alignment/fallback behavior and real-hardware limitations.
+Publication uses the existing publish-release merge workflow and remains gated by
+full cross-platform tests, native Windows installation/updater acceptance and
+uploaded asset digest checks. Existing published releases remain immutable.

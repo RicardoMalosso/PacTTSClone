@@ -156,6 +156,8 @@ class GenerationService:
         kind="speech",
         original_filename=None,
         identity=None,
+        segments=None,
+        voice_titles=None,
     ):
         with self._lock:
             if self.setup_busy:
@@ -188,6 +190,21 @@ class GenerationService:
                         target.write(chunk)
                 if not total:
                     raise UserError("Selecione um MP3 não vazio.")
+                snapshots = []
+                for index, segment in enumerate(segments or [], 1):
+                    segment = copy.deepcopy(segment)
+                    reference_path = segment.pop("reference_path", None)
+                    if reference_path:
+                        filename = f"reference-{index}.mp3"
+                        shutil.copyfile(reference_path, workspace / filename)
+                        segment["reference"] = filename
+                    for part_index, part in enumerate(segment["parts"]):
+                        asset_path = part.pop("asset_path", None)
+                        if asset_path:
+                            filename = f"sfx-{index}-{part_index}.wav"
+                            shutil.copyfile(asset_path, workspace / filename)
+                            part["asset"] = filename
+                    snapshots.append(segment)
                 job_id = uuid.uuid4().hex
                 job = {
                     **(
@@ -217,6 +234,10 @@ class GenerationService:
                     "engine_revision": self.settings.model_revision,
                     "request": request.model_dump(),
                     "voice_id": voice_id,
+                    "voice_ids": list(dict.fromkeys(s["voice_id"] for s in snapshots))
+                    or ([voice_id] if voice_id else []),
+                    **({"voice_title": " / ".join(voice_titles)} if voice_titles else {}),
+                    "segments": snapshots,
                     "channel": channel,
                     "username": username,
                     "original_filename": original_filename,
@@ -363,6 +384,10 @@ class GenerationService:
         def on_event(event):
             if event["type"] == "transcript":
                 self.store.patch("job", job_id, transcript=event["text"])
+            elif event["type"] == "composition":
+                self.store.patch(
+                    "job", job_id, stage="align", stage_elapsed_seconds=0,
+                )
             elif event["type"] == "progress":
                 self.check_gpu_pressure(event["resources"])
                 self.log_generation_vram(
@@ -395,6 +420,7 @@ class GenerationService:
                 "request": job["request"],
                 "output": str(self.output_path(job_id)),
                 "kind": job["kind"],
+                "segments": job.get("segments", []),
             }
             result = self.runner.execute(task, job["config"], on_event, self.cancel_event)
             if self.cancel_event.is_set():
@@ -423,6 +449,7 @@ class GenerationService:
                 else "Unexpected generation error. See terminal.",
             )
         finally:
+            self.output_path(job_id).with_suffix(".partial.mp3").unlink(missing_ok=True)
             shutil.rmtree(job["workspace"], ignore_errors=True)
             metrics = result.get("metrics", {})
             if not metrics and last_progress:

@@ -181,7 +181,9 @@ class DiscordIntegration:
                     return
             elif not config.include_local:
                 return
-            if config.voice_ids and job.get("voice_id") not in config.voice_ids:
+            if config.voice_ids and not set(config.voice_ids).intersection(
+                job.get("voice_ids") or [job.get("voice_id")]
+            ):
                 return
             if self.store.get("discord_delivery", job["id"]):
                 return
@@ -189,7 +191,10 @@ class DiscordIntegration:
             entry = {
                 "id": job["id"],
                 "status": "queued",
-                "content": webhook_content(job, (voice or {}).get("title")),
+                "content": webhook_content(
+                    job, job.get("voice_title") if job.get("segments")
+                    else (voice or {}).get("title"),
+                ),
             }
             self.store.put("discord_delivery", job["id"], entry)
             try:

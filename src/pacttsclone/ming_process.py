@@ -118,6 +118,21 @@ class MingProcessEngine:
         self.process.stdin.flush()
         return self._response()["transcript"]
 
+    def align_words(self, waveform):
+        if not Path(self.settings.asr_model).is_dir():
+            raise UserError("Install the shared Whisper model for whole-speech SFX alignment.")
+        self._load()
+        with tempfile.TemporaryDirectory(
+            prefix="align-", dir=getattr(self, "alignment_workspace", self.settings.data_dir)
+        ) as directory:
+            audio = Path(directory) / "speech.wav"
+            sf.write(audio, waveform.samples, waveform.sample_rate)
+            self.process.stdin.write(json.dumps({
+                "kind": "align", "reference": str(audio), "asr_model": self.settings.asr_model,
+            }) + "\n")
+            self.process.stdin.flush()
+            return self._response()["chunks"]
+
     def arguments(self, reference, request):
         return generation_arguments(reference, request)
 
