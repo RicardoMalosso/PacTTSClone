@@ -951,3 +951,13 @@ Tests use controlled speech and timestamps with real FFmpeg and actual process
 cancellation, not real TTS/Whisper inference. CUDA voice quality, actual word-cut
 accuracy, live Twitch/Discord and Windows acceptance remain unverified locally.
 No version bump, merge or release is included.
+
+## Multi-voice/SFX release 2.3.0-rc.4 preparation — 2026-11-06
+
+The owner authorized publication after implementation. PR #31's original feature
+commit passed GitHub Tests run 42270342346. Package/runtime identities now advance
+together to 2.3.0rc4, retaining the existing RC channel and updater behavior. Release
+notes document the word-alignment/fallback behavior and real-hardware limitations.
+Publication uses the existing publish-release merge workflow and remains gated by
+full cross-platform tests, native Windows installation/updater acceptance and
+uploaded asset digest checks. Existing published releases remain immutable.
