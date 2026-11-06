@@ -119,3 +119,49 @@ def test_save_rejection_is_visible_in_form_and_keeps_upload(page, live_server, m
     page.reload()
     page.locator('[data-tab="sfx"]').click()
     expect(page.locator(".sfx-card")).to_have_count(1)
+
+
+def test_rejected_audio_replacement_preserves_saved_effect_and_draft(page, live_server, mp3):
+    from pacttsclone.sfx import SfxSettings
+
+    url, app = live_server
+    with mp3.open("rb") as stream:
+        effect = app.state.studio.sfx.save(SfxSettings(title="Bell", triggers=["[bell]"]), stream)
+    page.goto(url)
+    page.locator('[data-tab="sfx"]').click()
+    card = page.locator(".sfx-card")
+    card.get_by_role("button", name="Edit sound effect").click()
+    card.get_by_label("Sound effect name").fill("Edited bell")
+    upload = card.get_by_label("Replace audio")
+    upload.set_input_files({"name": "broken.mp3", "mimeType": "audio/mpeg", "buffer": b"bad"})
+    card.get_by_role("button", name="Save sound effect", exact=True).click()
+    expect(card.get_by_role("status")).to_have_class("error")
+    assert app.state.service.store.get("sfx", effect["id"]) == effect
+    expect(card.get_by_label("Sound effect name")).to_have_value("Edited bell")
+    upload.set_input_files(mp3)
+    card.get_by_role("button", name="Save sound effect", exact=True).click()
+    expect(card.get_by_role("heading", name="Edited bell")).to_be_visible()
+
+
+def test_create_requires_saved_effect_in_catalogue_before_confirming(page, live_server, mp3):
+    url, _ = live_server
+    page.goto(url)
+    page.locator('[data-tab="sfx"]').click()
+    page.locator("#sfx-add-toggle").click()
+    form = page.locator("#sfx-form")
+    form.locator('[name="title"]').fill("Bell")
+    form.locator('[name="audio"]').set_input_files(mp3)
+    form.locator('[name="triggers"]').fill("[bell]")
+
+    def missing_from_readback(route):
+        if route.request.method == "GET":
+            route.fulfill(json=[])
+        else:
+            route.continue_()
+
+    page.route("**/api/sfx", missing_from_readback)
+    form.get_by_role("button", name="Save new sound effect").click()
+    expect(page.locator("#sfx-save-status")).to_contain_text("missing from the saved list")
+    expect(form.locator('[name="title"]')).to_have_value("Bell")
+    assert form.locator('[name="audio"]').evaluate("input => input.files.length") == 1
+    expect(page.locator("#sfx-feedback")).to_be_hidden()

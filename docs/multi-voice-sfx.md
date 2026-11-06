@@ -28,6 +28,8 @@ it does not discover, remove or automatically censor spoken words.
 Uploads are limited to 10 MiB and 0.05–15 seconds, converted to mono 48 kHz PCM,
 and stored under the chosen data directory's `sfx/` folder. Up to 100 effects and
 10 aliases per effect; duplicate aliases and reserved model tags are rejected.
+When editing an effect, replacement audio and settings are validated together. A rejected
+replacement leaves the saved effect intact and the editor open for retry.
 Files and settings survive app upgrades, rollback and restart. Existing optional
 personal-data import does not yet import SFX from another installation.
 

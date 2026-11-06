@@ -971,3 +971,17 @@ mirror repairs are preserved for review. A concrete stale-CSRF permanent-halt bu
 was found; the user's actual save failure and real speech omission remain
 unreproduced. See [full handoff](bug-handoff-sfx-obs.md) for files, evidence, test
 limitations and focused next steps. The prepared rc.5 identity is not a release.
+
+## SFX create and OBS restart follow-up
+
+On the published v2.3.0-rc.4 source, Chromium submitted three new MP3 effects
+through the form. Each POST returned 201, each saved card appeared, and all
+three remained after a reload. The reported missing upload remains unreproduced
+with these fixtures. On the repair branch, the create form checks for the
+returned ID in the freshly loaded catalogue before confirming or clearing
+the upload. Rejected replacement audio also preserves the original settings.
+
+Local checks: 367 backend tests passed. The Chromium suite passed 56 tests
+before the final create-readback assertion was added. The real process restart
+test kept the same player page open and recovered with the original saved
+audio. Windows OBS and real model/Whisper output still require verification.

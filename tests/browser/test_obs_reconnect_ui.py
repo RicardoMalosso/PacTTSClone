@@ -80,3 +80,71 @@ def test_mirror_keeps_new_clip_start_and_seeks_only_for_late_join(
     page.wait_for_function("seekRequests.length > 0")
     assert page.evaluate("seekRequests[0]") == pytest.approx(expected_offset)
     assert page.evaluate("halted") is False
+
+
+def test_idle_obs_source_reconnects_after_app_process_restart(page, tmp_path, mp3):
+    import socket
+    import subprocess
+    import sys
+    import time
+    from contextlib import contextmanager
+
+    import httpx
+
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
+
+    @contextmanager
+    def running_app():
+        process = subprocess.Popen([
+            sys.executable, "-c", "from pacttsclone.cli import main; main()",
+            "--offline", "--no-browser", "--data-dir", str(tmp_path), "--port", str(port),
+        ])
+        try:
+            deadline = time.monotonic() + 15
+            with httpx.Client(trust_env=False) as client:
+                while time.monotonic() < deadline:
+                    assert process.poll() is None
+                    try:
+                        if client.get(url + "/api/session").is_success:
+                            break
+                    except httpx.ConnectError:
+                        pass
+                    time.sleep(0.1)
+                else:
+                    pytest.fail("Application did not start")
+            yield
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
+
+    def successful_tick(response):
+        return response.url.endswith("/player/tick") and response.status == 200
+
+    with running_app():
+        with page.expect_response(successful_tick):
+            page.goto(url + "/playbackMain")
+        document_id = page.evaluate("client")
+        response = page.request.post(
+            url + "/api/sfx",
+            headers={"X-PacTTS-Token": page.evaluate("token")},
+            multipart={
+                "title": "Restart test", "triggers": "[bell]",
+                "audio": {"name": "bell.mp3", "mimeType": "audio/mpeg", "buffer": mp3.read_bytes()},
+            },
+        )
+        assert response.status == 201, response.text()
+        effect = response.json()
+        audio_url = url + effect["audio_url"]
+        saved_audio = page.request.get(audio_url).body()
+        assert saved_audio.startswith(b"RIFF")
+    expect(page.locator("#message")).to_be_visible(timeout=10000)
+    with page.expect_response(successful_tick, timeout=20000), running_app():
+        expect(page.locator("#message")).to_be_hidden(timeout=20000)
+        assert page.evaluate("client") == document_id
+        assert page.request.get(url + "/api/sfx").json() == [effect]
+        assert page.request.get(audio_url).body() == saved_audio
+        assert page.url == url + "/playbackMain"
+        assert page.evaluate("halted") is False

@@ -56,16 +56,20 @@ function createCard(effect) {
     const submit = editor.querySelector('[type=submit]'); submit.disabled = true;
     feedback(saveStatus, t('Saving sound effect…'));
     try {
-    await api(`/api/sfx/${effect.id}`, {method: 'PUT', body: {
-      title: title.value, triggers: triggers(aliases.value), volume: Number(volume.value),
-      duration: duration.value ? Number(duration.value) : null, enabled: enabled.checked,
-    }});
-    if (replacement) {
-      const body = new FormData(); body.append('audio', replacement);
-      await api(`/api/sfx/${effect.id}/audio`, {method: 'POST', body});
-    }
-    await reloadSfx();
-    feedback($('sfx-feedback'), t('Sound effect saved.'));
+      const settings = {
+        title: title.value, triggers: triggers(aliases.value), volume: Number(volume.value),
+        duration: duration.value ? Number(duration.value) : null, enabled: enabled.checked,
+      };
+      if (replacement) {
+        const body = new FormData();
+        body.append('audio', replacement);
+        body.append('settings', JSON.stringify(settings));
+        await api(`/api/sfx/${effect.id}/audio`, {method: 'POST', body});
+      } else {
+        await api(`/api/sfx/${effect.id}`, {method: 'PUT', body: settings});
+      }
+      await reloadSfx();
+      feedback($('sfx-feedback'), t('Sound effect saved.'));
     } catch (error) { feedback(saveStatus, error.message, true); feedback($('sfx-feedback'), error.message, true); }
     finally { submit.disabled = false; }
   }));
@@ -112,16 +116,20 @@ export function initSfx() {
     const body = new FormData(form); if (!body.get('duration')) body.delete('duration');
     const submit = form.querySelector('[type=submit]'); submit.disabled = true;
     const status = $('sfx-save-status'); feedback(status, t('Saving sound effect…'));
-    let saved = false;
+    let accepted = false;
     try {
-      const effect = await api('/api/sfx', {method: 'POST', body}); saved = true;
+      const effect = await api('/api/sfx', {method: 'POST', body}); accepted = true;
       await reloadSfx();
+      const card = [...$('sfx-list').children].find(node => node.dataset.sfxId === effect.id);
+      if (!card) {
+        feedback(status, t('The uploaded sound was missing from the saved list. Reload saved effects to check again.'), true);
+        return;
+      }
       form.reset(); $('sfx-search').value = ''; showCreate(false); filterSfx();
       feedback($('sfx-feedback'), `${t('Sound effect saved.')}: ${effect.title}`);
-      const card = [...$('sfx-list').children].find(node => node.dataset.sfxId === effect.id);
-      card?.scrollIntoView({block: 'nearest'});
+      card.scrollIntoView({block: 'nearest'});
     } catch (error) {
-      feedback(status, (saved ? t('Saved, but the list could not refresh. Use Reload saved effects.') + ' ' : '') + error.message, true);
+      feedback(status, (accepted ? t('Upload accepted. Could not verify the saved list. Use Reload saved effects.') + ' ' : '') + error.message, true);
     } finally { submit.disabled = false; }
   }));
   window.addEventListener('localechange', renderSfx);

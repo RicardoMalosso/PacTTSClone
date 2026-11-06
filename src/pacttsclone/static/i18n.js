@@ -12,7 +12,8 @@
     "Saving sound effect…": "Salvando efeito sonoro…",
     "Reload saved effects": "Recarregar efeitos salvos",
     "Saved effects reloaded.": "Efeitos salvos recarregados.",
-    "Saved, but the list could not refresh. Use Reload saved effects.": "Salvo, mas a lista não pôde ser atualizada. Use Recarregar efeitos salvos.",
+    "Upload accepted. Could not verify the saved list. Use Reload saved effects.": "Envio aceito. Não foi possível verificar a lista. Use Recarregar efeitos salvos.",
+    "The uploaded sound was missing from the saved list. Reload saved effects to check again.": "O som enviado não apareceu na lista de efeitos salvos. Recarregue a lista para verificar novamente.",
 
     "SFX": "SFX",
     "Sound effects": "Efeitos sonoros",

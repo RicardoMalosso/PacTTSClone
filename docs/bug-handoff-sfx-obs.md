@@ -119,3 +119,28 @@ covered by `tests/browser/test_studio_ui.py` and `tests/test_tunnel.py`.
 5. Run final suites sequentially if resource contention obscures failures. Do not
    repeatedly rerun all CI jobs after tiny commits. No model redownloads. Release
    only after the actual repair and existing acceptance gates are validated.
+
+## Follow-up on the repair branch
+
+The local player now clears its disconnected message as soon as a tick succeeds,
+including when the queue is idle. A Chromium regression stops and restarts the
+production CLI on the same port and data directory, keeps the same player
+document open, and verifies both the saved SFX metadata and the decoded file
+bytes after restart. This exercises a real process restart on Linux.
+
+Editing settings and replacing audio used to send two writes. A rejected
+replacement could therefore leave new settings saved with old audio. The editor
+now sends them together. A Chromium regression rejects an invalid replacement,
+checks the original record and draft title, then retries with valid audio.
+
+The isolated SFX/composition suite passed all 24 tests, including the prior
+onset timeout. The original user's upload, generated MP3, exact script and
+engine settings are still needed to diagnose that recording. The restart check
+does not cover Windows OBS Studio. Keep real inference quality and installed
+OBS acceptance open.
+
+A separate reproduction on the published rc.4 source created three named MP3
+effects through Chromium. All POSTs returned 201, each card became visible,
+and all three records and cards remained after reload. The repair branch only
+confirms success when the returned ID appears in the catalogue readback and
+keeps the form populated if that verification fails.

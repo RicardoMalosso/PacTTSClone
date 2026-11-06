@@ -3,6 +3,7 @@ const t = window.Locale.t;
 const channel = location.pathname.split('/')[1], client = crypto.randomUUID();
 const audio = document.getElementById('audio'), message = document.getElementById('message'), enable = document.getElementById('enable');
 let shareKey = null, authRetried = false, halted = false, retryDelay = 250;
+let connectionNotice = false;
 let upcomingId = null, stagedId = null;
 let token, active = null, starting = false, lastTick = performance.now(), recovering = false, owner = false, finishedId = null, blocked = false;
 async function request(path, body) {
@@ -15,11 +16,12 @@ audio.addEventListener('ended', async () => { finishedId = active?.id; try { awa
 audio.addEventListener('error', async () => { if (active) { try { await ack('error'); } catch { /* lease expired */ } stop(); message.hidden = false; message.textContent = t('Playback failed. Check the control page.'); } });
 enable.addEventListener('click', () => { blocked = false; enable.hidden = true; message.hidden = false; message.textContent = t('Resume playback in the channel control page.'); });
 // A lost server cannot tell this page to stop; enforce a local heartbeat watchdog too.
-setInterval(() => { if (!halted && performance.now() - lastTick > 2500) { stop(); message.hidden = false; message.textContent = t('Server disconnected; playback stopped.'); } }, 250);
+setInterval(() => { if (!halted && performance.now() - lastTick > 2500) { stop(); connectionNotice = true; message.hidden = false; message.textContent = t('Server disconnected; playback stopped.'); } }, 250);
 async function tick() {
   if (halted) return;
   try {
     const result = await request('tick', {}); retryDelay = 250; authRetried = false; lastTick = performance.now(); const item = result.item;
+    if (connectionNotice) { message.hidden = true; connectionNotice = false; }
     owner = result.owner;
     if (item && ['queued', 'countdown', 'ready'].includes(item.status)) upcomingId = item.id;
     if (result.paused) { stop(); }
@@ -49,7 +51,7 @@ async function tick() {
       }
     }
   } catch (error) {
-    stop(); message.hidden = false;
+    stop(); connectionNotice = true; message.hidden = false;
     if (error.status === 403) {
       if (!authRetried) {
         authRetried = true;
@@ -91,7 +93,7 @@ async function refreshSession() {
  await refreshSession(); tick(); })().catch(error => {
  if (error.status === 403) haltExpired();
  else {
-   message.hidden = false; message.textContent = t('Server unavailable. Waiting to reconnect…');
+   connectionNotice = true; message.hidden = false; message.textContent = t('Server unavailable. Waiting to reconnect…');
    setTimeout(tick, retryDelay);
  }
 });

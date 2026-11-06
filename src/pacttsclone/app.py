@@ -627,13 +627,22 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         return studio.sfx.save(value, effect_id=effect_id)
 
     @app.post("/api/sfx/{effect_id}/audio")
-    def replace_sfx(effect_id: str, audio: Annotated[UploadFile, File()]):
+    def replace_sfx(
+        effect_id: str, audio: Annotated[UploadFile, File()], settings: str | None = Form(None)
+    ):
         try:
-            old = service.store.get("sfx", effect_id)
-            if not old:
-                raise HTTPException(404, "Sound effect not found.")
-            value = SfxSettings(**{k: old[k] for k in SfxSettings.model_fields})
-            return studio.sfx.save(value, audio.file, effect_id)
+            with service._lock:
+                old = service.store.get("sfx", effect_id)
+                if not old:
+                    raise HTTPException(404, "Sound effect not found.")
+                try:
+                    value = (
+                        SfxSettings.model_validate_json(settings) if settings is not None
+                        else SfxSettings(**{k: old[k] for k in SfxSettings.model_fields})
+                    )
+                except ValueError as exc:
+                    raise HTTPException(422, str(exc)) from exc
+                return studio.sfx.save(value, audio.file, effect_id)
         finally:
             audio.file.close()
 
