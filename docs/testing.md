@@ -521,3 +521,13 @@ learned stops versus limits, tag-safe long-text splits, retained clone condition
 source drift, invalid audio and bounded non-stopping retries. This is not real
 model inference. Use a supported NVIDIA/BF16 GPU to repeat identical short cloned
 requests and long multilingual text, then compare local inference.log records.
+
+## Multi-voice/SFX coverage
+
+`tests/test_message_script.py` covers parser/limits/moderation, real FFmpeg
+assembly and inserted duration, fake timestamp alignment/fallback, immutable
+queued assets/settings, local overrides/autoqueue, API persistence/validation,
+and actual spawned-worker cancellation/recovery.
+`tests/browser/test_sfx_ui.py` exercises the dedicated tab, upload/edit/delete,
+reload and command sequence preview. Controlled speech/timestamps do not prove
+real Whisper alignment or voice quality. See multi-voice-sfx.md for limitations.

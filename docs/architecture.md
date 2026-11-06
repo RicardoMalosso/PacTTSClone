@@ -394,3 +394,15 @@ in-memory budget/stop/empty-output repairs before importing MingTTS. A wrapper
 counts the trained prompt contract and splits text while retaining the original
 clone conditioning. Model/source caches remain immutable. Per-job reference
 caches are released; base weights stay resident. See ming-inference-diagnosis.md.
+
+## Multi-voice scripts and custom SFX — 2026-11-06
+
+`message_script.py` parses ordered voice sections and SFX references. `sfx.py`
+validates/stores normalized uploads. Studio resolves voice settings and service
+submission copies immutable inputs into the job workspace before queueing. The
+existing isolated worker executes `composition.py`: synthesize whole sections,
+align internal insertions with cached CPU Whisper when available, conservatively
+fall back to separate phrases, assemble PCM and encode one final MP3. Ming/Kitten
+reuse their subprocess protocol for word timestamps. SFX has a dedicated native
+JS module/tab and participates in existing Store/SSE notifications. No model or
+installer dependency change. [Detailed behavior](multi-voice-sfx.md).

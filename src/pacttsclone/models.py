@@ -103,6 +103,9 @@ class ChannelConfig(BaseModel):
     delay_seconds: float = Field(default=5, ge=0, le=120)
     user_cooldown_seconds: float = Field(default=15, ge=0, le=600)
     max_message_chars: int = Field(default=300, ge=1, le=2000)
+    sfx_enabled: bool = True
+    max_voice_sections: int = Field(default=4, ge=1, le=10)
+    max_sfx: int = Field(default=8, ge=0, le=20)
 
     @field_validator("transport")
     @classmethod

@@ -481,3 +481,14 @@ independent from OmniVoice and Ming. [Requirements, setup and validation](docs/k
 
 The vanilla JavaScript dashboard is organized into native browser modules; see
 [frontend module guide](docs/frontend.md) for the file map and initialization flow.
+
+## Multi-voice chat and custom SFX
+
+Use `!pac something !lula somethingelse` to switch between configured voices in
+one Twitch message. Add uploaded sounds inline, for example
+`!pac Hello, my [fart] name is Pac !lula hello ****`. Manage sounds, triggers,
+volume and optional duration in **SFX**, next to **Voices**. Local generation also
+accepts inline SFX. Whole speech is generated first and split using cached CPU
+Whisper word timestamps; unavailable/ambiguous alignment falls back to separate
+phrases and records the reason. One request produces one MP3/OBS item.
+[Syntax, limits and continuity behavior](docs/multi-voice-sfx.md).

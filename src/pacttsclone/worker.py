@@ -11,7 +11,9 @@ import traceback
 from dataclasses import asdict
 from pathlib import Path
 
+import numpy as np
 import psutil
+import soundfile as sf
 
 from .audio import AudioPipeline
 from .config import Settings
@@ -137,6 +139,10 @@ class Reporter:
 
 
 def execute_task(engine, settings, task, emit):
+    if task.get("segments"):
+        from .composition import execute_composition
+
+        return execute_composition(engine, settings, task, emit)
     if hasattr(engine, "last_gpu_seconds"):
         engine.last_gpu_seconds = None
     report = Reporter(emit, engine)
@@ -186,7 +192,17 @@ def execute_task(engine, settings, task, emit):
                 report.stage("inference", "test/cpu")
             waveform = engine.synthesize(str(reference), request)
             report.stage("encode")
-            pipeline.encode(waveform, workspace, Path(task["output"]), volume=request.volume)
+            if task.get("pcm_only"):
+                samples = np.asarray(waveform.samples, dtype=np.float32)
+                if (samples.ndim != 1 or not samples.size or not np.isfinite(samples).all()
+                        or not 8000 <= waveform.sample_rate <= 192000
+                        or samples.size > waveform.sample_rate * 600):
+                    raise UserError("The model returned invalid audio or more than 10 minutes.")
+                sf.write(workspace / "generated.wav",
+                         np.clip(samples * request.volume / 100, -1, 1),
+                         waveform.sample_rate, subtype="PCM_16")
+            else:
+                pipeline.encode(waveform, workspace, Path(task["output"]), volume=request.volume)
         return {
             "type": "result",
             "ok": True,

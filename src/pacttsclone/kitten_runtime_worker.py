@@ -60,14 +60,14 @@ def main():
         for line in sys.stdin:
             try:
                 value = json.loads(line)
-                if value.get("kind") == "transcribe":
+                if value.get("kind") in {"transcribe", "align"}:
                     from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
                     processor = AutoProcessor.from_pretrained(
                         value["asr_model"], local_files_only=True
                     )
                     asr_model = AutoModelForSpeechSeq2Seq.from_pretrained(
-                        value["asr_model"], local_files_only=True
+                        value["asr_model"], local_files_only=True, attn_implementation="eager"
                     )
                     asr = pipeline(
                         "automatic-speech-recognition",
@@ -76,7 +76,12 @@ def main():
                         feature_extractor=processor.feature_extractor,
                         device=-1,
                     )
-                    emit({"ok": True, "transcript": asr(value["reference"])["text"]})
+                    if value["kind"] == "align":
+                        emit({"ok": True, "chunks": asr(
+                            value["reference"], return_timestamps="word",
+                        )["chunks"]})
+                    else:
+                        emit({"ok": True, "transcript": asr(value["reference"])["text"]})
                     del asr, asr_model, processor
                     continue
                 with torch.inference_mode():

@@ -14,7 +14,7 @@ function stopAllAudio() { stopBugVideo(); document.querySelectorAll('audio').for
 function renderMonitor(job) {
   dashboard.lastMonitor = job; lastMonitorAt = performance.now();
   const voice = dashboard.state.voices.find(v => v.id === job.voice_id);
-  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : job.origin === 'cloudflare' ? null : job.origin === 'discord' ? t('Discord request') : t('Local request'), voice?.title || job.voice_title || job.original_filename, job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
+  const source = [job.requester_name && !job.channel ? job.requester_name : null, job.origin === 'cloudflare' ? t('Cloudflare request') : null, job.channel ? `Twitch · #${job.channel}${job.username ? ' · ' + job.username : ''}` : job.origin === 'cloudflare' ? null : job.origin === 'discord' ? t('Discord request') : t('Local request'), (job.segments?.length ? job.voice_title : voice?.title || job.voice_title || job.original_filename), job.kind === 'transcribe' ? t('Voice preparation') : t('Generate speech')].filter(Boolean).join(' · ');
   $('monitor-source').textContent = source; $('live-generation-source').textContent = source;
   $('live-generation').hidden = false;
   $('status').textContent = job.error || (job.status === 'succeeded' ? (job.kind === 'transcribe' ? t('Voice preparation ready') : t('MP3 ready · {seconds} s elapsed', {seconds: job.elapsed_seconds})) : `${t(job.stage)} · ${job.device || job.config?.device || t('pending device selection')}`);

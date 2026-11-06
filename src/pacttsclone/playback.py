@@ -35,6 +35,11 @@ class Playback:
             job["request"]["text"], channel["filter_level"], channel["custom_filters"]
         ):
             raise UserError("The current channel filter blocks this text.")
+        if job.get("segments"):
+            spoken = " ".join(p["text"] for section in job["segments"]
+                              for p in section["parts"] if "text" in p)
+            if blocked_reason(spoken, channel["filter_level"], channel["custom_filters"]):
+                raise UserError("The current channel filter blocks this text.")
         with self.lock:
             if sum(i["status"] in PENDING for i in self.items(channel["name"])) >= 100:
                 raise UserError("Playback queue is full.")

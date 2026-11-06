@@ -338,3 +338,15 @@ files or changing model manifests. This delivers the inference fix in an updater
 wheel without model downloads, source checksum churn or dependency reinstall.
 Keep 512 positions; fix units and detect missing stop signals rather than
 increasing the context ceiling. Never silently drop/crop paired clone conditioning.
+
+## Multi-voice/SFX continuity — 2026-11-06
+
+The owner explicitly requested a dedicated SFX tab beside Voices and command
+switches using `!pac text !lula text`. Inline effects should preserve full-utterance
+prosody where possible. Generate full speech first, then use exact word-sequence
+matching and finite monotonic Whisper word timestamps to choose insertion points.
+Do not guess timestamps by text length or send unsupported timed-pause tokens.
+If alignment is unavailable/ambiguous, discard the first render and synthesize
+phrases separately, documenting the extra work and fallback. Uploaded PCM effects
+are independent of TTS engines. One composite job preserves queue fairness,
+atomic playback/cancellation and single Discord delivery. No weights are downloaded.

@@ -41,6 +41,9 @@ function fillChannel(name) {
   $('event-rules').replaceChildren(); for (const rule of c?.event_rules || []) eventRuleRow(rule); updateTwitchMode();
   $('channel-paused').checked = c?.paused || false; $('channel-delay').value = c?.delay_seconds ?? 5;
   $('channel-cooldown').value = c?.user_cooldown_seconds ?? 15; $('channel-limit').value = c?.max_message_chars ?? 300;
+  $('channel-voice-sections').value = c?.max_voice_sections ?? 4;
+  $('channel-max-sfx').value = c?.max_sfx ?? 8;
+  $('channel-sfx-enabled').checked = c?.sfx_enabled ?? true;
   $('channel-filter').value = c?.filter_level || 'slurs'; $('channel-custom').value = (c?.custom_filters || []).join('\n');
   $('commands-list').replaceChildren(); for (const [key, id] of Object.entries(c?.commands || {})) commandRow(key, id);
   if (!c) commandRow();
@@ -133,6 +136,14 @@ function renderChannelDashboard() {
 }
 
 export function initChannels() {
+  $('script-preview').addEventListener('click', action(async () => {
+    const result = await api('/api/script/preview', {method: 'POST', body: {
+      channel: $('channel-name').value.trim().toLowerCase(), message: $('script-preview-text').value,
+    }});
+    $('script-preview-result').replaceChildren(...result.sections.map(section =>
+      el('div', {class: 'event-row'}, el('strong', {}, section.voice_title),
+        ...section.parts.map(part => el('p', {}, part.text ?? `${t('SFX')}: ${part.title}`)))));
+  }));
   $('add-command').addEventListener('click', () => commandRow());
   $('channel-select').addEventListener('change', () => fillChannel($('channel-select').value));
   $('channel-form').addEventListener('submit', action(async event => {
@@ -140,7 +151,7 @@ export function initChannels() {
     document.querySelectorAll('.command-row').forEach(row => { const key = row.querySelector('input').value.trim().toLowerCase(); if (commands[key]) throw new Error(t('Duplicate command keyword.')); commands[key] = row.querySelector('select').value; });
     await api(`/api/channels/${name}`, {method: 'PUT', body: {name, enabled: dashboard.state.channels.find(c => c.name === name)?.enabled ?? true, paused: $('channel-paused').checked,
       transport: $('channel-transport').value, event_rules: $('channel-transport').value === 'oauth' ? readEventRules() : (dashboard.state.channels.find(c => c.name === name)?.event_rules || []), commands, filter_level: $('channel-filter').value, custom_filters: $('channel-custom').value.split('\n').map(s => s.trim()).filter(Boolean),
-      delay_seconds: Number($('channel-delay').value), user_cooldown_seconds: Number($('channel-cooldown').value), max_message_chars: Number($('channel-limit').value)}});
+      delay_seconds: Number($('channel-delay').value), user_cooldown_seconds: Number($('channel-cooldown').value), max_message_chars: Number($('channel-limit').value), max_voice_sections: Number($('channel-voice-sections').value), max_sfx: Number($('channel-max-sfx').value), sfx_enabled: $('channel-sfx-enabled').checked}});
     dashboard.selectedChannel = name; channelKey = ''; await refresh(); fillChannel(name); $('channel-save-status').textContent = t('Channel saved');
   }));
   $('pause-channel').addEventListener('click', action(async () => { if (dashboard.selectedChannel) { await api(`/api/channels/${dashboard.selectedChannel}/pause`, {method: 'POST', body: {paused: !dashboard.latestChannelState?.paused}}); await refresh(); } }));

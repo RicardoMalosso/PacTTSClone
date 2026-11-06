@@ -500,6 +500,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
                 "worker_pid": service.runner.pid,
             },
             "voices": service.store.all("voice"),
+            "sfx": service.store.all("sfx"),
             "channels": studio.channels(),
             "general_playback": service.store.get("channel", GENERAL_PLAYER),
             "hotkey_status": studio.hotkey.status,
@@ -569,6 +570,84 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             raise HTTPException(404, "No request log yet.")
         return FileResponse(path, media_type="application/x-ndjson", filename="requests.jsonl")
 
+    from .sfx import SfxSettings
+
+    @app.post("/api/script/preview")
+    def preview_script(value: dict):
+        from .message_script import parse_script
+
+        name, message = value.get("channel"), value.get("message")
+        if not isinstance(name, str) or not isinstance(message, str):
+            raise HTTPException(422, "Provide a saved channel and message.")
+        config = service.store.get("channel", name)
+        if not config or config.get("kind") == "general":
+            raise HTTPException(404, "Save a Twitch channel first.")
+        if len(message) > config["max_message_chars"] + 32:
+            raise HTTPException(422, "Message exceeds this channel's text limit.")
+        sections = parse_script(
+            message, config["commands"],
+            service.store.all("sfx") if config.get("sfx_enabled", True) else [],
+            max_sections=config.get("max_voice_sections", 4),
+            max_effects=config.get("max_sfx", 8),
+        )
+        return {"sections": [{
+            **section,
+            "voice_title": (service.store.get("voice", section["voice_id"]) or {}).get(
+                "title", "Unavailable voice"
+            ),
+            "parts": [{**part, "title": (service.store.get("sfx", part.get("sfx_id")) or {}).get(
+                "title", ""
+            )} for part in section["parts"]],
+        } for section in sections]}
+
+    @app.get("/api/sfx")
+    def sound_effects():
+        return service.store.all("sfx")
+
+    @app.post("/api/sfx", status_code=201)
+    def add_sfx(
+        audio: Annotated[UploadFile, File()],
+        title: str = Form(...),
+        triggers: str = Form(...),
+        volume: float = Form(100),
+        duration: float | None = Form(None),
+    ):
+        try:
+            try:
+                value = SfxSettings(title=title, triggers=triggers.splitlines(),
+                                    volume=volume, duration=duration)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
+            return studio.sfx.save(value, audio.file)
+        finally:
+            audio.file.close()
+
+    @app.put("/api/sfx/{effect_id}")
+    def edit_sfx(effect_id: str, value: SfxSettings):
+        return studio.sfx.save(value, effect_id=effect_id)
+
+    @app.post("/api/sfx/{effect_id}/audio")
+    def replace_sfx(effect_id: str, audio: Annotated[UploadFile, File()]):
+        try:
+            old = service.store.get("sfx", effect_id)
+            if not old:
+                raise HTTPException(404, "Sound effect not found.")
+            value = SfxSettings(**{k: old[k] for k in SfxSettings.model_fields})
+            return studio.sfx.save(value, audio.file, effect_id)
+        finally:
+            audio.file.close()
+
+    @app.get("/api/sfx/{effect_id}/audio")
+    def sfx_audio(effect_id: str):
+        if not service.store.get("sfx", effect_id):
+            raise HTTPException(404, "Sound effect not found.")
+        return FileResponse(studio.sfx.root / f"{effect_id}.wav", media_type="audio/wav")
+
+    @app.delete("/api/sfx/{effect_id}")
+    def delete_sfx(effect_id: str):
+        studio.sfx.delete(effect_id)
+        return {"ok": True}
+
     @app.get("/api/voices")
     def voices():
         return service.store.all("voice")
@@ -629,7 +708,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.post("/api/voices/{voice_id}/generate", status_code=202)
     def generate_voice(voice_id: str, value: GenerationRequest, request: Request):
-        return studio.voices.generate(voice_id, value, identity=request_identity(request, value))
+        return studio.generate_voice(voice_id, value, identity=request_identity(request, value))
 
     @app.get("/api/voices/{voice_id}/{asset}")
     def voice_asset(voice_id: str, asset: str):

@@ -5,9 +5,11 @@ import uuid
 from .discord_integration import DiscordIntegration
 from .domain import GenerationRequest, UserError
 from .hotkey import GlobalHotkey
+from .message_script import parse_script
 from .models import AppConfig, ChannelConfig
 from .moderation import blocked_reason
 from .playback import GENERAL_PLAYER, Playback
+from .sfx import SoundEffects
 from .twitch import TwitchClient
 from .twitch_actions import TwitchActions
 from .twitch_events import EventSubClient
@@ -19,6 +21,7 @@ class Studio:
     def __init__(self, service, twitch_factory=TwitchClient):
         self.service, self.store = service, service.store
         self.voices = Voices(service)
+        self.sfx = SoundEffects(service)
         self.voices.seed_defaults()
         if not self.store.get("channel", GENERAL_PLAYER):
             general = ChannelConfig(name="general").model_dump()
@@ -211,12 +214,31 @@ class Studio:
             job = None
             if not reason:
                 try:
-                    job = self.voices.generate(
-                        config["commands"][parts[0].casefold()],
-                        GenerationRequest(text=text),
-                        channel,
-                        username,
+                    effects = self.store.all("sfx") if config.get("sfx_enabled", True) else []
+                    sections = parse_script(
+                        message.strip(), config["commands"], effects,
+                        max_sections=config.get("max_voice_sections", 4),
+                        max_effects=config.get("max_sfx", 8),
                     )
+                    spoken = " ".join(
+                        p["text"] for section in sections for p in section["parts"] if "text" in p
+                    )
+                    spoken_reason = blocked_reason(
+                        spoken, config["filter_level"], config["custom_filters"]
+                    )
+                    if spoken_reason:
+                        raise UserError(spoken_reason)
+                    if len(sections) == 1 and all(
+                        "text" in p for p in sections[0]["parts"]
+                    ):
+                        job = self.voices.generate(
+                            sections[0]["voice_id"],
+                            GenerationRequest(text=" ".join(
+                                p["text"] for p in sections[0]["parts"]
+                            )), channel, username,
+                        )
+                    else:
+                        job = self.generate_script(sections, text, channel, username)
                     self.cooldowns[key] = now
                 except (UserError, OSError) as exc:
                     reason = str(exc)
@@ -250,6 +272,67 @@ class Studio:
             if len(self.cooldowns) > 5000:
                 self.cooldowns = {k: v for k, v in self.cooldowns.items() if now - v < 600}
             return job
+
+    def generate_voice(self, voice_id, request, identity=None):
+        effects = self.store.all("sfx")
+        # Ordinary local requests retain their exact text and existing behavior.
+        if not any(t.casefold() in request.text.casefold()
+                   for e in effects if e["enabled"] for t in e["triggers"]):
+            return self.voices.generate(voice_id, request, identity=identity)
+        with self.service._lock:
+            sections = parse_script("!voice " + request.text, {"!voice": voice_id}, effects)
+            if not any("sfx_id" in p for s in sections for p in s["parts"]):
+                literal = " ".join(p["text"] for s in sections for p in s["parts"])
+                return self.voices.generate(
+                    voice_id, request.model_copy(update={"text": literal}), identity=identity,
+                )
+            return self.generate_script(
+                sections, request.text, None, None, request=request, identity=identity,
+            )
+
+    def generate_script(self, sections, text, channel, username, request=None, identity=None):
+        snapshots, titles = [], []
+        for index, section in enumerate(sections, 1):
+            section_text = " ".join(p["text"] for p in section["parts"] if "text" in p)
+            section_request = (
+                request.model_copy(update={"text": section_text or "Sound effect"})
+                if request else GenerationRequest(text=section_text or "Sound effect")
+            )
+            voice, effective_request = self.voices.resolve_request(
+                section["voice_id"], section_request,
+            )
+            if self.service.settings.engine_id == "ming-3":
+                from .ming_engine import generation_arguments
+
+                generation_arguments("reference.wav", effective_request)
+            elif self.service.settings.engine_id == "kittentts2":
+                from .kitten_engine import generation_arguments
+
+                generation_arguments("reference.wav", effective_request)
+            parts = []
+            for part in section["parts"]:
+                if "sfx_id" in part:
+                    effect = self.store.get("sfx", part["sfx_id"])
+                    if not effect or not effect["enabled"]:
+                        raise UserError("Sound effect unavailable.")
+                    parts.append({
+                        **part, "asset_path": str(self.sfx.root / f"{effect['id']}.wav"),
+                        "volume": effect["volume"], "duration": effect["duration"],
+                    })
+                else:
+                    parts.append(part)
+            snapshots.append({
+                "index": index, "voice_id": voice["id"], "voice_title": voice["title"],
+                "request": effective_request.model_dump(), "parts": parts,
+                "reference_path": str(self.voices.root / voice["id"] / "reference.mp3"),
+            })
+            titles.append(voice["title"])
+        with open(snapshots[0]["reference_path"], "rb") as reference:
+            return self.service.submit(
+                reference, request or GenerationRequest(text=text), allow_queue=True,
+                voice_id=sections[0]["voice_id"], channel=channel, username=username,
+                segments=snapshots, voice_titles=titles, identity=identity,
+            )
 
     def completed(self, job):
         self.voices.completed(job)
