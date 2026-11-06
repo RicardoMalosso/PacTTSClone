@@ -6,9 +6,9 @@ import soundfile as sf
 from fastapi.testclient import TestClient
 
 from pacttsclone.app import create_app
-from pacttsclone.composition import insertion_points
+from pacttsclone.composition import insertion_points, quiet_insertion_points
 from pacttsclone.config import Settings
-from pacttsclone.domain import GenerationRequest, GenerationSettings, UserError
+from pacttsclone.domain import GenerationRequest, GenerationSettings, UserError, Waveform
 from pacttsclone.message_script import parse_script
 from pacttsclone.models import ChannelConfig
 from pacttsclone.service import GenerationService
@@ -82,6 +82,16 @@ def test_parser_rejects_invalid_or_excess_work(text):
 
 def test_whole_speech_once_then_insert_at_word_boundary(script_studio, engine):
     studio = script_studio
+    original = engine.synthesize
+
+    def paused_speech(reference, request):
+        waveform = original(reference, request)
+        waveform.samples[
+            round(0.31 * waveform.sample_rate) : round(0.39 * waveform.sample_rate)
+        ] = 0
+        return waveform
+
+    engine.synthesize = paused_speech
     engine.align_words = lambda waveform: [
         {"text": "Hello", "timestamp": (0.0, 0.15)},
         {"text": "my", "timestamp": (0.15, 0.3)},
@@ -93,7 +103,10 @@ def test_whole_speech_once_then_insert_at_word_boundary(script_studio, engine):
     result = wait_job(studio.service, job["id"])
     assert result["status"] == "succeeded", result["error"]
     assert [call[1].text for call in engine.calls] == ["Hello, my name is Pac"]
-    assert result["metrics"]["composition"] == [{"section": 1, "mode": "whole_utterance"}]
+    details = result["metrics"]["composition"][0]
+    assert details["mode"] == "whole_utterance"
+    assert details["boundary_check"] == "quiet_gap"
+    assert details["placements"][0]["speech_seconds"] == pytest.approx(0.35, abs=0.002)
     # Decode the actual final MP3 to verify inserted time and SFX placement.
     decoded = studio.service.outputs / "check.wav"
     studio.service.audio._run(
@@ -264,6 +277,10 @@ def test_sfx_api_validation_replacement_persistence_and_csrf(tmp_path, engine):
         assert (
             client.put("/api/sfx/" + effect["id"], headers=headers, json=value).status_code == 200
         )
+        preview = client.get("/api/sfx/" + effect["id"] + "/preview")
+        samples, rate = sf.read(io.BytesIO(preview.content))
+        assert len(samples) / rate == pytest.approx(.1)
+        assert np.mean(samples) == pytest.approx(.2, abs=.0001)
         assert (
             client.post(
                 "/api/sfx/" + effect["id"] + "/audio",
@@ -318,3 +335,118 @@ def test_active_composite_cancellation_kills_worker_and_recovers(tmp_path, mp3):
         assert wait_job(service, recovered["id"])["status"] == "succeeded"
     finally:
         studio.close()
+
+
+def test_matching_words_without_a_quiet_gap_cannot_cut_a_syllable():
+    parts = [{"text": "hello"}, {"sfx_id": "sound"}, {"text": "world"}]
+    chunks = [{"text": "hello", "timestamp": (0, 0.4)}, {"text": "world", "timestamp": (0.6, 1)}]
+    samples = np.full(48000, 0.2, dtype=np.float32)
+    with pytest.raises(UserError, match="No verified quiet gap"):
+        quiet_insertion_points(parts, chunks, samples, 48000)
+    samples[22000:26000] = 0
+    assert quiet_insertion_points(parts, chunks, samples, 48000) == [0.5]
+
+
+def test_multiple_effects_preserve_start_and_every_speech_sample(script_studio, engine):
+    original = engine.synthesize
+
+    def paused_speech(reference, request):
+        waveform = original(reference, request)
+        rate = waveform.sample_rate
+        for left, right in ((0.31, 0.39), (0.61, 0.69)):
+            waveform.samples[round(left * rate) : round(right * rate)] = 0
+        return waveform
+
+    engine.synthesize = paused_speech
+    engine.align_words = lambda waveform: [
+        {"text": "one", "timestamp": (0, 0.3)},
+        {"text": "two", "timestamp": (0.4, 0.6)},
+        {"text": "three", "timestamp": (0.7, 1)},
+    ]
+    job = script_studio.receive("test", "viewer", "!pac one [fart] two **** three")
+    result = wait_job(script_studio.service, job["id"])
+    assert result["status"] == "succeeded"
+    details = result["metrics"]["composition"][0]
+    assert details["speech_samples"] == 48000
+    assert [p["output_seconds"] for p in details["placements"]] == pytest.approx(
+        [0.35, 0.9], abs=0.002
+    )
+    assert len(engine.calls) == 1
+    decoded = script_studio.service.outputs / "multiple-check.wav"
+    script_studio.service.audio._run(
+        "ffmpeg",
+        [
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(script_studio.service.output_path(job["id"])),
+            str(decoded),
+        ],
+    )
+    samples, rate = sf.read(decoded)
+    assert len(samples) / rate == pytest.approx(1.5, abs=0.02)
+    expected = 0.1 * np.sin(2 * np.pi * 440 * np.arange(len(samples)) / rate)
+    # First word's onset and body are retained; effects extend rather than replace speech.
+    assert (
+        np.corrcoef(
+            samples[round(0.01 * rate) : round(0.15 * rate)],
+            expected[round(0.01 * rate) : round(0.15 * rate)],
+        )[0, 1]
+        > 0.99
+    )
+
+
+def test_multiple_voices_keep_each_voice_onset_in_the_mp3(script_studio, engine):
+    def speech(reference, request):
+        frequency = 330 if request.ref_text.startswith("Pac") else 660
+        engine.calls.append((reference, request))
+        return Waveform(0.1 * np.sin(2 * np.pi * frequency * np.arange(24000) / 24000), 24000)
+
+    engine.synthesize = speech
+    job = script_studio.receive("test", "viewer", "!pac first !lula second")
+    assert wait_job(script_studio.service, job["id"])["status"] == "succeeded"
+    decoded = script_studio.service.outputs / "voices-check.wav"
+    script_studio.service.audio._run(
+        "ffmpeg",
+        [
+            "-v",
+            "error",
+            "-y",
+            "-i",
+            str(script_studio.service.output_path(job["id"])),
+            str(decoded),
+        ],
+    )
+    samples, rate = sf.read(decoded)
+    assert len(samples) / rate == pytest.approx(2, abs=0.02)
+    for offset, frequency in ((0, 330), (1, 660)):
+        actual = samples[round((offset + 0.01) * rate) : round((offset + 0.15) * rate)]
+        time = np.arange(len(actual)) / rate + 0.01
+        assert np.corrcoef(actual, np.sin(2 * np.pi * frequency * time))[0, 1] > 0.99
+
+
+def test_many_saved_effect_records_and_audio_survive_application_restart(tmp_path, engine):
+    settings = Settings(data_dir=tmp_path / "data")
+    app = create_app(settings, engine)
+    ids = []
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        headers = {"x-pactts-token": client.get("/api/session").json()["token"]}
+        for title in ("Fart", "Bleep", "Bell"):
+            response = client.post(
+                "/api/sfx",
+                headers=headers,
+                data={"title": title, "triggers": "[" + title.lower() + "]"},
+                files={"audio": ("effect.wav", effect_audio(), "audio/wav")},
+            )
+            assert response.status_code == 201, response.text
+            ids.append(response.json()["id"])
+        assert len(set(ids)) == 3
+    assert all((settings.data_dir / "sfx" / (key + ".wav")).is_file() for key in ids)
+    restarted = create_app(settings, engine)
+    with TestClient(restarted, base_url="http://127.0.0.1") as client:
+        records = client.get("/api/sfx").json()
+        assert {record["id"] for record in records} == set(ids)
+        assert {record["title"] for record in records} == {"Fart", "Bleep", "Bell"}
+        for record in records:
+            assert client.get(record["audio_url"]).status_code == 200

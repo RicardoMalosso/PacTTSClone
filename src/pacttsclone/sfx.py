@@ -1,5 +1,6 @@
 """Persistent, bounded audio uploads. Queued scripts copy assets before publication."""
 
+import io
 import shutil
 import tempfile
 import uuid
@@ -8,6 +9,7 @@ from pathlib import Path
 import soundfile as sf
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .audio import sound_effect_samples
 from .domain import UserError
 from .message_script import RESERVED
 
@@ -119,6 +121,17 @@ class SoundEffects:
                     "audio_url": f"/api/sfx/{effect_id}/audio?v={uuid.uuid4().hex}",
                 },
             )
+
+    def preview(self, effect_id):
+        with self.service._lock:
+            effect = self.store.get("sfx", effect_id)
+            if not effect:
+                raise UserError("Sound effect not found.")
+            samples, rate = sf.read(self.root / f"{effect_id}.wav", dtype="float32")
+            samples = sound_effect_samples(samples, rate, effect["volume"], effect["duration"])
+            output = io.BytesIO()
+            sf.write(output, samples, rate, format="WAV", subtype="PCM_16")
+            return output.getvalue()
 
     def delete(self, effect_id):
         with self.service._lock:

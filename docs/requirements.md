@@ -246,3 +246,14 @@ insertion; otherwise fall back to separate phrases and record the mode/reason.
 One bounded, cancellable job and MP3 per message, with snapshots of voice/effect
 assets/settings, one cooldown, moderation across segments and existing playback/
 Discord behavior. See [implementation contract](multi-voice-sfx.md).
+
+## SFX management and OBS restart repair
+
+Make saved effects visibly editable as a searchable catalogue, confirm saves, show
+validation failures at the form, retain failed uploads, and apply saved settings to
+previews. Verify multiple metadata/audio assets survive process recreation.
+Require acoustic quiet-gap validation before mid-speech SFX insertion. Preserve
+all speech samples when assembling multiple effects/voices and record positions.
+Existing local OBS URLs must reconnect after session-token rotation/startup
+unavailability; do not mistake a stale token for a revoked capability. Queued
+mirrors must hear clip beginnings; genuine late joins may seek for synchronization.

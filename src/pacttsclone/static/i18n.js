@@ -1,6 +1,20 @@
 'use strict';
 (() => {
   const pt = {
+    "Saved sound effects": "Efeitos sonoros salvos",
+    "Search sound effects": "Buscar efeitos sonoros",
+    "Name or trigger": "Nome ou gatilho",
+    "No matching sound effects.": "Nenhum efeito encontrado.",
+    "No sound effects yet. Add one to get started.": "Nenhum efeito salvo. Adicione um para começar.",
+    "Edit sound effect": "Editar efeito sonoro",
+    "Save new sound effect": "Salvar novo efeito sonoro",
+    "Sound effect saved.": "Efeito sonoro salvo.",
+    "Saving sound effect…": "Salvando efeito sonoro…",
+    "Reload saved effects": "Recarregar efeitos salvos",
+    "Saved effects reloaded.": "Efeitos salvos recarregados.",
+    "Upload accepted. Could not verify the saved list. Use Reload saved effects.": "Envio aceito. Não foi possível verificar a lista. Use Recarregar efeitos salvos.",
+    "The uploaded sound was missing from the saved list. Reload saved effects to check again.": "O som enviado não apareceu na lista de efeitos salvos. Recarregue a lista para verificar novamente.",
+
     "SFX": "SFX",
     "Sound effects": "Efeitos sonoros",
     "Sound effect name": "Nome do efeito sonoro",
