@@ -38,3 +38,4 @@ body{padding-top:calc(var(--status-bar-height,130px) + 16px)}.live-generation{po
 .generation-setting small{display:block;line-height:1.5;font-weight:400;margin-top:6px}
 .check.generation-setting{flex-wrap:wrap;align-content:start}
 .check.generation-setting small{flex-basis:100%}
+.sfx-toolbar{justify-content:space-between;margin:8px 0 16px}.sfx-toolbar h2{margin:0}.sfx-card h3{margin:0 0 8px}.sfx-card audio{margin:4px 0 8px}.sfx-card form{border-top:1px solid var(--line);margin-top:16px;padding-top:8px}.sfx-card{align-self:start}

@@ -961,3 +961,13 @@ notes document the word-alignment/fallback behavior and real-hardware limitation
 Publication uses the existing publish-release merge workflow and remains gated by
 full cross-platform tests, native Windows installation/updater acceptance and
 uploaded asset digest checks. Existing published releases remain immutable.
+
+## SFX/OBS repair paused for handoff — 2026-11-06
+
+The user reported missing saved effects, misplaced SFX, clipped beginnings and OBS
+expiration after app restart, then requested a handoff if diagnosis remained
+uncertain. Proposed catalogue/save-feedback/preview, acoustic-gap and OBS session/
+mirror repairs are preserved for review. A concrete stale-CSRF permanent-halt bug
+was found; the user's actual save failure and real speech omission remain
+unreproduced. See [full handoff](bug-handoff-sfx-obs.md) for files, evidence, test
+limitations and focused next steps. The prepared rc.5 identity is not a release.

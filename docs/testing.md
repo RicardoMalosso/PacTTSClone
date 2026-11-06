@@ -531,3 +531,12 @@ and actual spawned-worker cancellation/recovery.
 `tests/browser/test_sfx_ui.py` exercises the dedicated tab, upload/edit/delete,
 reload and command sequence preview. Controlled speech/timestamps do not prove
 real Whisper alignment or voice quality. See multi-voice-sfx.md for limitations.
+
+## SFX/OBS repair regression checks
+
+New coverage verifies multiple saved audio assets/records across app recreation,
+inline save errors/retry with the same upload, independent card edits, configured
+preview gain/duration, quiet-gap rejection and decoded MP3 onset preservation for
+multiple voices/effects. Browser tests exercise stale CSRF recovery, server-offline
+startup retries and queued-versus-late mirror offsets. These controlled fixtures
+do not reproduce the owner's real TTS output or establish ASR boundary accuracy.

@@ -10,6 +10,17 @@ from .config import Settings
 from .domain import UserError, Waveform
 
 
+def sound_effect_samples(samples, rate, volume=100, duration=None):
+    """Use the same saved sound processing for previews and generated scripts."""
+    samples = np.asarray(samples, dtype=np.float32)
+    if rate != 48000 or samples.ndim != 1 or not samples.size or not np.isfinite(samples).all():
+        raise UserError("Sound effect PCM is missing or invalid.")
+    if duration is not None:
+        length = round(duration * rate)
+        samples = np.tile(samples, max(1, int(np.ceil(length / len(samples)))))[:length]
+    return np.clip(samples * volume / 100, -1, 1)
+
+
 class AudioPipeline:
     def __init__(self, settings: Settings):
         self.settings = settings

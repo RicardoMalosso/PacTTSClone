@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from .audio import AudioPipeline
+from .audio import AudioPipeline, sound_effect_samples
 from .domain import UserError, Waveform
 
 
@@ -53,6 +53,45 @@ def insertion_points(parts, chunks, duration):
                 point = (spans[count - 1][1] + spans[count][0]) / 2
             points.append(point)
     return points
+
+
+def quiet_insertion_points(parts, chunks, samples, rate):
+    """Require a real quiet interval inside the estimated inter-word boundary.
+
+    A matching ASR transcript alone cannot establish a safe cut: a timestamp can
+    land on a syllable. If there is no quiet gap, use the explicit phrase fallback.
+    """
+    points = insertion_points(parts, chunks, len(samples) / rate)
+    spans = [chunk["timestamp"] for chunk in chunks]
+    minimum = round(0.02 * rate)
+    threshold = max(0.00001, float(np.max(np.abs(samples))) * 0.015)
+    count = 0
+    safe = []
+    for part in parts:
+        if "text" in part:
+            count += len(words(part["text"]))
+            continue
+        proposed = points[len(safe)]
+        if not count or count == len(spans):
+            safe.append(proposed)
+            continue
+        left = int(np.ceil(spans[count - 1][1] * rate))
+        right = int(np.floor(spans[count][0] * rate))
+        quiet = np.abs(samples[left:right]) <= threshold
+        edges = np.diff(np.r_[False, quiet, False].astype(np.int8))
+        starts, ends = np.flatnonzero(edges == 1), np.flatnonzero(edges == -1)
+        candidates = [
+            (left + (start + end) / 2) / rate
+            for start, end in zip(starts, ends, strict=True)
+            if end - start >= minimum
+        ]
+        if not candidates:
+            raise UserError(
+                "No verified quiet gap between the requested words; "
+                "using separate phrases to avoid cutting a syllable."
+            )
+        safe.append(min(candidates, key=lambda seconds: abs(seconds - proposed)))
+    return safe
 
 
 def align_words(engine, settings, waveform):
@@ -151,12 +190,7 @@ def execute_composition(engine, settings, task, emit):
 
     def effect(part):
         samples, rate = sf.read(root / part["asset"], dtype="float32")
-        if rate != 48000 or samples.ndim != 1 or not samples.size:
-            raise UserError("Sound effect PCM is missing or invalid.")
-        if part.get("duration") is not None:
-            length = round(part["duration"] * rate)
-            samples = np.tile(samples, max(1, int(np.ceil(length / len(samples)))))[:length]
-        return np.clip(samples * part["volume"] / 100, -1, 1)
+        return sound_effect_samples(samples, rate, part["volume"], part.get("duration"))
 
     try:
         for section in task["segments"]:
@@ -169,6 +203,17 @@ def execute_composition(engine, settings, task, emit):
                 continue
             speech = synthesize(section, text, f"section-{section['index']}")
             if not effects:
+                notes.append(
+                    {
+                        "section": section["index"],
+                        "mode": "whole_utterance",
+                        "speech_start_seconds": total_samples / 48000,
+                        "speech_samples": len(speech),
+                        "speech_sample_rate": 48000,
+                        "placements": [],
+                        "boundary_check": "no_effects",
+                    }
+                )
                 append(speech)
                 continue
             has_internal_effect = any(
@@ -183,7 +228,7 @@ def execute_composition(engine, settings, task, emit):
                     if getattr(engine, "external_runtime", False):
                         engine.alignment_workspace = root
                     chunks = align_words(engine, settings, Waveform(speech, 48000))
-                    points = insertion_points(parts, chunks, len(speech) / 48000)
+                    points = quiet_insertion_points(parts, chunks, speech, 48000)
                 else:
                     points = []
                     seen_text = False
@@ -213,13 +258,34 @@ def execute_composition(engine, settings, task, emit):
                     )
                 continue
             cursor = 0
+            placements = []
+            speech_start = total_samples / 48000
             for part, seconds in zip(effects, points, strict=True):
                 position = round(seconds * 48000)
                 append(speech[cursor:position])
-                append(effect(part))
+                sound = effect(part)
+                placements.append(
+                    {
+                        "sfx_id": part["sfx_id"],
+                        "speech_seconds": seconds,
+                        "output_seconds": total_samples / 48000,
+                        "duration_seconds": len(sound) / 48000,
+                    }
+                )
+                append(sound)
                 cursor = position
             append(speech[cursor:])
-            notes.append({"section": section["index"], "mode": "whole_utterance"})
+            notes.append(
+                {
+                    "section": section["index"],
+                    "mode": "whole_utterance",
+                    "speech_start_seconds": speech_start,
+                    "speech_samples": len(speech),
+                    "speech_sample_rate": 48000,
+                    "placements": placements,
+                    "boundary_check": "quiet_gap" if has_internal_effect else "edge",
+                }
+            )
         pipeline.encode(Waveform(np.concatenate(assembled), 48000), root, Path(task["output"]))
         metrics = {
             "stages": [s for r in reports for s in r.get("stages", [])],

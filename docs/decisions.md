@@ -350,3 +350,15 @@ If alignment is unavailable/ambiguous, discard the first render and synthesize
 phrases separately, documenting the extra work and fallback. Uploaded PCM effects
 are independent of TTS engines. One composite job preserves queue fairness,
 atomic playback/cancellation and single Discord delivery. No weights are downloaded.
+
+## SFX/OBS repair — 2026-11-06
+
+A matched ASR word sequence does not validate a phoneme boundary. Require at least
+20 ms of quiet PCM inside the estimated inter-word interval; otherwise retain the
+explicit phrase fallback. Do not claim that preserved PCM proves the model spoke
+every requested word. Existing mirrors should not skip clip starts merely because
+server acknowledgements precede buffered playback; keep timestamp seeking for
+late joins. CSRF rotation on app restart is recoverable through `/api/session` and
+does not itself prove a shared link was revoked. A fresh invalid capability still
+stops retries. Visible save feedback and configured previews distinguish failed
+validation, hidden catalogue entries and unchanged original-audio previews.

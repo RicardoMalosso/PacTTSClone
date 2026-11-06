@@ -21,7 +21,7 @@ removed before synthesis. Common model tags cannot be registered as SFX.
 **SFX** is a separate tab immediately after **Voices**. Upload MP3, WAV, OGG,
 FLAC or M4A, choose a name and aliases such as `[fart]` and `****`, and set volume,
 optional duration and enabled state. No sound recordings are bundled. Previews
-play the original upload, before configured volume/duration. A duration override
+apply the saved volume and duration, using the same processing as generated scripts. A duration override
 repeats or trims the sound. `****` inserts the configured sound at that position;
 it does not discover, remove or automatically censor spoken words.
 
@@ -48,8 +48,8 @@ No unsupported model pause token or invented character-to-time ratio is used.
 
 For internal SFX, cached Whisper runs on CPU with word timestamps. Insertion is
 allowed only when the complete normalized word sequence matches and timestamps
-are finite, monotonic and within the waveform. The cut is between the previous
-word's end and next word's start. All speech samples are retained and the SFX
+are finite, monotonic and within the waveform. The cut must fall in a verified quiet interval of at least 20 ms between the previous
+word's end and next word's start. Matching words without a quiet gap is insufficient. All speech samples are retained and the SFX
 adds its full configured duration. Prefix/suffix effects need no alignment.
 
 Word timestamps are estimates, not phoneme-accurate guarantees. If local ASR is
@@ -115,3 +115,18 @@ upload/edit/delete/reload and the saved-command preview.
 
 Real CUDA synthesis, real Whisper word-boundary accuracy, subjective prosody,
 live Twitch/Discord and Windows installer acceptance are not established locally.
+
+## Management and restart repair
+
+Saved effects appear first in a searchable grid with an effect count and explicit
+Edit buttons. Add opens a separate form. Saving rereads the catalogue from the
+server, shows confirmation and preserves the selected upload on failure. Errors
+appear beside the form; edits to other unchanged cards survive catalogue updates.
+The configured preview is available at `GET /api/sfx/{id}/preview`; raw uploaded
+PCM remains at `/audio`. Both remain within the existing admin boundary.
+
+Local OBS sources refresh session tokens after app restart and retry startup
+connection failures without requiring a new URL. Revoked shared capabilities
+still stop. Queued clips preload during countdown; mirrors that observed a clip
+queue play it from zero instead of seeking past its first word. A genuinely late
+mirror joining an already playing clip still seeks for synchronization.

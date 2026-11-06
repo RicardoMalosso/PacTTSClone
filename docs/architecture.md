@@ -406,3 +406,14 @@ fall back to separate phrases, assemble PCM and encode one final MP3. Ming/Kitte
 reuse their subprocess protocol for word timestamps. SFX has a dedicated native
 JS module/tab and participates in existing Store/SSE notifications. No model or
 installer dependency change. [Detailed behavior](multi-voice-sfx.md).
+
+## SFX boundaries and OBS reconnection repair
+
+Composition requires both complete word-timestamp matching and a 20 ms quiet PCM
+interval before slicing at an internal effect; otherwise use phrase fallback.
+Reports retain insertion positions and source sample counts. The SFX preview
+endpoint shares PCM volume/duration processing with composition. The catalogue
+reconciles saved cards by ID/content to preserve unrelated edits and reads back
+saves from the server. OBS token rotation and startup network failure refresh/retry
+authorization; genuine invalid capabilities stop. Countdown preloading and
+queue-observing mirrors preserve clip onsets; late joins keep timestamp seeking.

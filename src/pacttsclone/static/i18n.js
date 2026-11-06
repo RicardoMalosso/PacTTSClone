@@ -1,6 +1,19 @@
 'use strict';
 (() => {
   const pt = {
+    "Saved sound effects": "Efeitos sonoros salvos",
+    "Search sound effects": "Buscar efeitos sonoros",
+    "Name or trigger": "Nome ou gatilho",
+    "No matching sound effects.": "Nenhum efeito encontrado.",
+    "No sound effects yet. Add one to get started.": "Nenhum efeito salvo. Adicione um para começar.",
+    "Edit sound effect": "Editar efeito sonoro",
+    "Save new sound effect": "Salvar novo efeito sonoro",
+    "Sound effect saved.": "Efeito sonoro salvo.",
+    "Saving sound effect…": "Salvando efeito sonoro…",
+    "Reload saved effects": "Recarregar efeitos salvos",
+    "Saved effects reloaded.": "Efeitos salvos recarregados.",
+    "Saved, but the list could not refresh. Use Reload saved effects.": "Salvo, mas a lista não pôde ser atualizada. Use Recarregar efeitos salvos.",
+
     "SFX": "SFX",
     "Sound effects": "Efeitos sonoros",
     "Sound effect name": "Nome do efeito sonoro",

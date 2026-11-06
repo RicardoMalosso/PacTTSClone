@@ -637,6 +637,13 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
         finally:
             audio.file.close()
 
+    @app.get("/api/sfx/{effect_id}/preview")
+    def sfx_preview(effect_id: str):
+        from fastapi.responses import Response
+
+        return Response(studio.sfx.preview(effect_id), media_type="audio/wav",
+                        headers={"Cache-Control": "no-store"})
+
     @app.get("/api/sfx/{effect_id}/audio")
     def sfx_audio(effect_id: str):
         if not service.store.get("sfx", effect_id):

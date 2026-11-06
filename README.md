@@ -492,3 +492,12 @@ accepts inline SFX. Whole speech is generated first and split using cached CPU
 Whisper word timestamps; unavailable/ambiguous alignment falls back to separate
 phrases and records the reason. One request produces one MP3/OBS item.
 [Syntax, limits and continuity behavior](docs/multi-voice-sfx.md).
+
+### SFX and OBS repair in 2.3.0-rc.5
+
+Saved sound effects now appear first as searchable cards with Edit controls. Save
+confirmation/errors are visible, uploads remain selected after failure, and previews
+reflect saved volume/duration. Inline insertion additionally requires a quiet gap
+at the timestamp boundary; otherwise phrases are generated separately to avoid
+cutting a syllable. Local OBS sources automatically refresh sessions after app
+restarts, and queued mirrors preserve the start of each clip.
