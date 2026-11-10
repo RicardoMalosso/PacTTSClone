@@ -73,6 +73,17 @@ def test_extract_identity_and_dependencies(tmp_path):
         extract_wheel(wheel(entries), tmp_path, Version("2.2.0rc12"))
 
 
+def test_extract_rejects_incompatible_python(tmp_path):
+    data = wheel({
+        "pacttsclone/cli.py": "",
+        "pacttsclone-2.2.0rc12.dist-info/METADATA": (
+            "Name: pacttsclone\nVersion: 2.2.0rc12\nRequires-Python: >=99\n"
+        ),
+    })
+    with pytest.raises(ValueError, match="compatible Python runtime"):
+        extract_wheel(data, tmp_path, Version("2.2.0rc12"))
+
+
 @pytest.mark.parametrize(
     "name",
     [
@@ -88,7 +99,7 @@ def test_archive_paths(tmp_path, name):
         extract_wheel(wheel({name: "bad"}), tmp_path, Version("2.2.0rc12"))
 
 
-def test_stage_and_next_launch_activation(tmp_path, monkeypatch):
+def test_fresh_install_stages_update_for_first_launch(tmp_path, monkeypatch, capsys):
     import json
 
     from pacttsclone import updater
@@ -113,9 +124,10 @@ def test_stage_and_next_launch_activation(tmp_path, monkeypatch):
         "fetch",
         lambda url, limit: json.dumps([item]).encode() if url == updater.API else data,
     )
-    instance = updater.Updater()
-    instance.enabled = True
-    assert instance.check()["status"] == "restart_required"
+    monkeypatch.setattr(updater.sys, "platform", "win32")
+    monkeypatch.delenv("PACTTS_DISABLE_UPDATES", raising=False)
+    updater.update_fresh_install()
+    assert "Application 2.2.0rc12 is ready for first launch." in capsys.readouterr().out
     pth = packages / "pacttsclone_update.pth"
     assert "2.2.0rc12" in pth.read_text()
     assert (tmp_path / "updates/2.2.0rc12/pacttsclone/cli.py").exists()

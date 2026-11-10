@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 from . import __version__
@@ -37,7 +38,7 @@ def fetch(url, limit):
     return data
 
 
-CONTROL_VERSION = 1
+CONTROL_VERSION = 2
 ACTIVE_INSTANCE = None
 
 
@@ -111,6 +112,9 @@ def extract_wheel(data, destination, version):
         info = Parser().parsestr(metadata[0])
         if info["Name"] != "pacttsclone" or Version(info["Version"]) != version:
             raise ValueError("Update identity mismatch")
+        python = ".".join(map(str, sys.version_info[:3]))
+        if python not in SpecifierSet(info.get("Requires-Python", "")):
+            raise ValueError(f"Update needs a compatible Python runtime: {python}")
         for value in info.get_all("Requires-Dist", []):
             requirement = Requirement(value)
             if requirement.marker and not requirement.marker.evaluate({"extra": ""}):
@@ -302,6 +306,16 @@ class Updater:
         finally:
             self.lock.release()
         return dict(self.state)
+
+
+def update_fresh_install():
+    """Stage the update before the launcher starts a new interpreter."""
+    updater = Updater()
+    state = updater.check()
+    if state["status"] == "failed":
+        print(f'Application update deferred: {state["error"]}')
+    elif state["status"] == "restart_required":
+        print(f'Application {state["next_version"]} is ready for first launch.')
 
 
 def attach_manager(app, updater):

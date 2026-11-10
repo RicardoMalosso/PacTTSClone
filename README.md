@@ -24,8 +24,10 @@ Local **MP3 reference + text → MP3 voice cloning** using the official
 
 ## Windows installer (preview)
 
-Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases/latest) and choose
-`PacTTSClone-Setup-2.2.2.exe` in the latest release. The unsigned setup includes verified FFmpeg binaries. Release downloads are publicly accessible. Publication is gated by the full Windows acceptance workflow.
+Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases) and download
+`PacTTSClone-Setup-*.exe` from the newest release that includes a Windows installer.
+Routine app releases contain a wheel and can be newer than the installer. The unsigned
+setup includes verified FFmpeg binaries and goes through full Windows acceptance.
 
 1. Run setup on Windows 10/11 x64. No existing Python, FFmpeg or Git is required.
 2. Choose the installation **root**. For example, selecting `foo/PacTTSClone`
@@ -36,7 +38,9 @@ Open [Releases](https://github.com/RicardoMalosso/PacTTSClone/releases/latest) a
 3. The installer downloads private Python and the base web packages. It bundles
    SHA-256-verified FFmpeg Essentials from the Gyan distribution linked by FFmpeg; it installs **no PyTorch,
    CUDA packages or model weights**. Native setup logs: `data/logs/setup.log`.
-4. Double-click **PacTTSClone.lnk** inside your selected root, or the Start Menu
+4. A fresh install checks for the newest app release before the first launch. If the
+   check fails or the release needs a newer runtime, setup keeps the bundled app.
+   Double-click **PacTTSClone.lnk** inside your selected root, or the Start Menu
    shortcut. Open **Initial Setup** in the browser and choose CPU or NVIDIA GPU.
    A compatible NVIDIA driver is required; setup never installs drivers.
 5. Click **Install / verify setup**. The web interface installs the selected inference
