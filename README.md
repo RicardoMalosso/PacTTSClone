@@ -508,13 +508,21 @@ restarts, and queued mirrors preserve the start of each clip.
 
 ### Local audio tournaments
 
-Open **TTS Tourney** and pick an audio pool. **Bracket** is the local mode.
-**Community Voting (INDEV)** requires public voting and is disabled. **Today** starts at local midnight,
-**Last week** covers the past seven days, and **Date picker** includes both
-selected dates. **Previous Winners** takes the current top clip from each saved
-tournament with a recorded choice. **All** includes all eligible MP3s.
-Play Clip A and Clip B, then
-pick one or skip. Votes and the leaderboard survive app restarts.
+Open **TTS Tourney** and pick an audio pool. **Single elimination** is the default.
+Each host pick advances one clip and eliminates the other. Unpaired clips get a
+bye. The final winner becomes champion. **Local comparisons (INDEV)** and
+**Community Voting (INDEV)** are disabled for new tournaments.
+
+**Today** starts at local midnight, **Last week** covers the past seven days,
+and **Date picker** includes both dates. **Previous Winners** uses champions from
+completed tournaments. **All** includes all eligible MP3s. **Random draft** draws
+up to 4, 8, 16, 32, or 64 clips. It prioritizes clips with fewer past draft
+appearances and randomizes ties. Repeat entries fill the remaining slots when
+needed. Drafts count appearances across sizes and require two distinct MP3s. Clips
+tagged **Terrible horrible** are excluded from future drafts.
+
+Play Clip A and Clip B, then pick the winner. The bracket and votes survive
+app restarts.
 
 To let viewers weigh in, authorize **Tournament polls** for your broadcaster in
 **Twitch & OBS**, then select that channel in **TTS Tourney**. Click **Start Twitch
@@ -524,8 +532,12 @@ Twitch Affiliate or Partner channel. If a poll is already active, wait for it to
 end and start the current matchup's poll manually. The local pick controls the
 leaderboard.
 
-Open **Bracket** to see every clip and its recorded head-to-head matchups, or
-**Ranking** to play clips in leaderboard order. One local **Terrible horrible**
-report removes a clip from that tournament and tags it **shit from a butt** in
-the bracket roster. The original MP3 remains available. Public voting and
+Open **Bracket** to see the rounds and enrolled clips, or **Ranking** to play
+clips in leaderboard order. Clip cards use available voice pictures and show
+career wins and losses from host picks. Completed elimination brackets award gold
+to the champion, silver to the final loser and bronze to both semifinal losers
+when those matches were played. Medal icons appear only for clips with a win.
+Older pairwise tournaments retain **Match history**. **Terrible horrible** tags a clip
+as **shit from a butt** in the tournament roster. You can tag both clips and
+then pick the winner separately. Public voting and
 Cloudflare links are INDEV.

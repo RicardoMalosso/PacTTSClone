@@ -16,7 +16,7 @@ class Playback:
         self.lock = threading.RLock()
         self.leases = {}
         self.panic_revision = 0
-        for item in self.store.all("playback", 100000):
+        for item in self.store.pending_playback():
             if item["status"] in PENDING:
                 self.store.patch("playback", item["id"], status="interrupted")
 
@@ -41,7 +41,7 @@ class Playback:
             if blocked_reason(spoken, channel["filter_level"], channel["custom_filters"]):
                 raise UserError("The current channel filter blocks this text.")
         with self.lock:
-            if sum(i["status"] in PENDING for i in self.items(channel["name"])) >= 100:
+            if len(self.store.pending_playback(channel["name"])) >= 100:
                 raise UserError("Playback queue is full.")
             key = uuid.uuid4().hex
             item = {
@@ -67,8 +67,11 @@ class Playback:
                 raise UserError("Channel not found.")
             lease = self.leases.get(channel)
             now = self.clock()
+            pending = self.store.pending_playback(channel)
+            history = [item for item in self.items(channel) if item["status"] not in PENDING]
             return {
-                "items": self.items(channel)[-100:],
+                "items": history[-(100 - len(pending)):] + pending
+                if len(pending) < 100 else pending,
                 "paused": config["paused"],
                 "player_connected": bool(lease and lease["until"] > now),
                 "server_time": now,
@@ -78,7 +81,7 @@ class Playback:
         with self.lock:
             self.store.patch("channel", channel, paused=paused)
             if paused:
-                for item in self.items(channel):
+                for item in self.store.pending_playback(channel):
                     if item["status"] == "playing":
                         self.cancel(item["id"])
                     elif item["status"] in {"countdown", "ready"}:
@@ -97,14 +100,14 @@ class Playback:
             self.panic_revision += 1
             for channel in self.store.all("channel"):
                 self.store.patch("channel", channel["name"], paused=True)
-                for item in self.items(channel["name"]):
+                for item in self.store.pending_playback(channel["name"]):
                     if item["status"] in {"countdown", "ready", "playing"}:
                         self.cancel(item["id"])
 
     def cancel_all(self):
         with self.lock:
             self.panic()
-            for item in self.store.all("playback", 100000):
+            for item in self.store.pending_playback():
                 self.cancel(item["id"])
 
     def tick(self, channel, client_id):
@@ -119,12 +122,12 @@ class Playback:
             if lease and lease["client"] != client_id and lease["until"] > now:
                 return {
                     "owner": False,
-                    "item": next((i for i in self.items(channel) if i["status"] in PENDING), None),
+                    "item": next(iter(self.store.pending_playback(channel)), None),
                     "paused": config["paused"],
                     "server_time": now,
                 }
             if lease and lease["until"] <= now:
-                for item in self.items(channel):
+                for item in self.store.pending_playback(channel):
                     if item["status"] in {"playing", "ready"}:
                         self.store.patch(
                             "playback",
@@ -137,7 +140,7 @@ class Playback:
                     elif item["status"] == "countdown":
                         self.store.patch("playback", item["id"], status="queued", deadline=None)
             self.leases[channel] = {"client": client_id, "until": now + 8}
-            pending = [i for i in self.items(channel) if i["status"] in PENDING]
+            pending = self.store.pending_playback(channel)
             item = pending[0] if pending else None
             if item and not config["paused"]:
                 # Recheck filters if the policy changed while audio was waiting.

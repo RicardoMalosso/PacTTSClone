@@ -3,6 +3,7 @@ import copy
 import json
 import logging
 import shutil
+import sqlite3
 import tempfile
 import threading
 import time
@@ -55,6 +56,7 @@ class GenerationService:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._closed = False
+        self._dispatch_error = None
         self.gpu_warning = None
         self.setup_busy = False
         self.setup_ready = lambda: True
@@ -106,8 +108,7 @@ class GenerationService:
     def _audit(self, event, job):
         record = {k: v for k, v in job.items() if k not in {"workspace", "resources", "metrics"}}
         self.store.put("request", job["id"], record)
-        with (self.logs / "requests.jsonl").open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps({"event": event, **record}, ensure_ascii=False) + "\n")
+        self._append_diagnostic("requests.jsonl", {"event": event, **record})
 
     def reject_request(self, text, reason, *, channel, username, voice_id=None, identity=None):
         with self._lock:
@@ -160,6 +161,8 @@ class GenerationService:
         voice_titles=None,
     ):
         with self._lock:
+            if self._dispatch_error:
+                raise UserError(self._dispatch_error)
             if self.setup_busy:
                 raise BusyError("Dependency setup is running. Wait or cancel it first.")
             if not self.setup_ready():
@@ -330,8 +333,7 @@ class GenerationService:
                 "event": "low_vram" if warning else "vram_recovered",
                 **(warning or {}),
             }
-            with (self.logs / "gpu-status.jsonl").open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record) + "\n")
+            self._append_diagnostic("gpu-status.jsonl", record)
             if warning:
                 logger.warning("Low free VRAM: %s", warning)
         self.gpu_warning = warning
@@ -339,21 +341,60 @@ class GenerationService:
 
     def _dispatch(self):
         while not self._stop.is_set():
-            with self._lock:
-                waiting = [j for j in self.pending() if j["status"] == "queued"]
-                job = waiting[0] if waiting else None
-                if job:
-                    self.active_id = job["id"]
-                    self.active_start = time.monotonic()
-                    self.cancel_event = threading.Event()
-                    self.store.patch(
-                        "job", job["id"], status="running", stage="starting", started_at=time.time()
-                    )
-            if not job:
-                self._wake.wait(0.3)
-                self._wake.clear()
-                continue
+            try:
+                self._dispatch_next()
+            except sqlite3.Error:
+                with self._lock:
+                    self.active_id = None
+                    self.active_start = None
+                    self._dispatch_error = "Generation storage failed. Check the logs and restart."
+                logger.exception("Generation stopped because SQLite is unavailable")
+                return
+
+    def _dispatch_next(self):
+        with self._lock:
+            waiting = [j for j in self.pending() if j["status"] == "queued"]
+            job = waiting[0] if waiting else None
+            if job:
+                self.active_id = job["id"]
+                self.active_start = time.monotonic()
+                self.cancel_event = threading.Event()
+                self.store.patch(
+                    "job", job["id"], status="running", stage="starting", started_at=time.time()
+                )
+        if not job:
+            self._wake.wait(0.3)
+            self._wake.clear()
+            return
+        try:
             self._execute(job)
+        except sqlite3.Error:
+            raise
+        except Exception:
+            logger.exception("Could not complete generation job %s", job["id"])
+            with self._lock:
+                current = self.store.get("job", job["id"])
+                if current and current["status"] == "running":
+                    finished = self.store.patch(
+                        "job", job["id"], status="failed", stage="failed",
+                        error="Could not complete generation. See terminal.",
+                        finished_at=time.time(),
+                    )
+                    try:
+                        self.on_finished(finished)
+                    except Exception:
+                        logger.exception("Completion notification failed")
+        finally:
+            with self._lock:
+                self.active_id = None
+                self.active_start = None
+
+    def _append_diagnostic(self, filename, record):
+        try:
+            with (self.logs / filename).open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except OSError:
+            logger.exception("Could not write %s", filename)
 
     def log_generation_vram(self, job_id, event, sample, **extra):
         record = {
@@ -373,8 +414,7 @@ class GenerationService:
             "note": "GPU totals include games and other applications; allocator is worker-only.",
             **extra,
         }
-        with (self.logs / "generation-vram.jsonl").open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(record) + "\n")
+        self._append_diagnostic("generation-vram.jsonl", record)
 
     def _execute(self, job):
         job_id = job["id"]
@@ -440,7 +480,7 @@ class GenerationService:
             cancelled = isinstance(exc, Cancelled) or self.cancel_event.is_set()
             if not cancelled:
                 logger.exception("Generation failed: %s", job_id)
-            self.output_path(job_id).unlink(missing_ok=True)
+            self._remove_partial(self.output_path(job_id))
             outcome = dict(
                 status="cancelled" if cancelled else "failed",
                 stage="cancelled" if cancelled else "failed",
@@ -449,7 +489,7 @@ class GenerationService:
                 else "Unexpected generation error. See terminal.",
             )
         finally:
-            self.output_path(job_id).with_suffix(".partial.mp3").unlink(missing_ok=True)
+            self._remove_partial(self.output_path(job_id).with_suffix(".partial.mp3"))
             shutil.rmtree(job["workspace"], ignore_errors=True)
             metrics = result.get("metrics", {})
             if not metrics and last_progress:
@@ -504,11 +544,18 @@ class GenerationService:
             except Exception:
                 logger.exception("Completion notification failed")
 
+    @staticmethod
+    def _remove_partial(path):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not remove partial generation output")
+
     def _log(self, job):
         # One structured record per completed/failed/cancelled job, not raw chat console output.
         record = {k: v for k, v in job.items() if k not in {"workspace", "resources"}}
-        with self._lock, (self.logs / "generation.jsonl").open("a", encoding="utf-8") as log:
-            log.write(json.dumps(record, ensure_ascii=False) + "\n")
+        with self._lock:
+            self._append_diagnostic("generation.jsonl", record)
             self._audit("finished", job)
 
     def close(self):

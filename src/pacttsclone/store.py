@@ -64,6 +64,18 @@ class Store:
             ).fetchall()
         return [json.loads(row[0]) for row in rows]
 
+    def pending_playback(self, channel=None):
+        scope = "" if channel is None else "AND json_extract(data,'$.channel')=? "
+        params = () if channel is None else (channel,)
+        with self.lock:
+            rows = self.db.execute(
+                "SELECT data FROM records WHERE kind='playback' "
+                "AND json_extract(data,'$.status') IN ('queued','countdown','ready','playing') "
+                + scope + "ORDER BY json_extract(data,'$.created_at'), id",
+                params,
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
+
     def channel_records(self, kind, channel, limit=1000):
         with self.lock:
             rows = self.db.execute(
