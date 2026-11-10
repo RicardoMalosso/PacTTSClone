@@ -73,7 +73,7 @@ function renderSetup(data) {
   if (data.stage === 'models' && data.download?.total_bytes) {
     dashboard.modelDownloaded = Math.max(dashboard.modelDownloaded, data.download.completed_bytes || 0);
   }
-  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && !['setup', 'config', 'engines'].includes(node.dataset.tab); });
+  document.querySelectorAll('[data-tab]').forEach(node => { node.disabled = !data.ready && !['setup', 'config', 'engines', 'tournaments'].includes(node.dataset.tab); });
   $('generate').disabled = dashboard.busy || !data.ready;
   renderGlobalStatus();
   $('tunnel-card').hidden = !data.ready;

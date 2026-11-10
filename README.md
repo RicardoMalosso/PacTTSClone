@@ -501,3 +501,27 @@ reflect saved volume/duration. Inline insertion additionally requires a quiet ga
 at the timestamp boundary; otherwise phrases are generated separately to avoid
 cutting a syllable. Local OBS sources automatically refresh sessions after app
 restarts, and queued mirrors preserve the start of each clip.
+
+### Local audio tournaments
+
+Open **TTS Tourney** and pick an audio pool. **Bracket** is the local mode.
+**Community Voting (INDEV)** requires public voting and is disabled. **Today** starts at local midnight,
+**Last week** covers the past seven days, and **Date picker** includes both
+selected dates. **Previous Winners** takes the current top clip from each saved
+tournament with a recorded choice. **All** includes all eligible MP3s.
+Play Clip A and Clip B, then
+pick one or skip. Votes and the leaderboard survive app restarts.
+
+To let viewers weigh in, authorize **Tournament polls** for your broadcaster in
+**Twitch & OBS**, then select that channel in **TTS Tourney**. Click **Start Twitch
+poll** or enable **Start a Twitch poll for each matchup**. Play the clips on stream
+in A/B order so viewers can hear them. Polls run for 30 seconds and require a
+Twitch Affiliate or Partner channel. If a poll is already active, wait for it to
+end and start the current matchup's poll manually. The local pick controls the
+leaderboard.
+
+Open **Bracket** to see every clip and its recorded head-to-head matchups, or
+**Ranking** to play clips in leaderboard order. One local **Terrible horrible**
+report removes a clip from that tournament and tags it **shit from a butt** in
+the bracket roster. The original MP3 remains available. Public voting and
+Cloudflare links are INDEV.

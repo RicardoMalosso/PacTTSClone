@@ -13,6 +13,7 @@ import {initNavigation, tab} from './navigation.js';
 import {initSetup, renderSetup, runtimeStatus} from './setup.js';
 import {dashboard, subscribeState, updateState} from './state.js';
 import {autoqueueNote, initStudio, showSharedResult} from './studio.js';
+import {initTournaments} from './tournaments.js';
 import {initTwitch, loadTwitchAuth} from './twitch.js';
 import {initUpdates, refreshUpdates, renderUpdateStatus} from './updates.js';
 import {initVoices, renderVoices} from './voices.js';
@@ -54,6 +55,7 @@ async function init() {
       history.replaceState(null, '', location.pathname + location.search);
     }
     dashboard.session = await api('/api/session'); dashboard.config = await api('/api/config');
+    document.querySelector('[data-tab="tournaments"]').hidden = dashboard.session.remote_access;
     $('config-device').value = dashboard.config.device === 'cpu' ? 'cuda' : dashboard.config.device; $('config-threads').value = dashboard.config.cpu_threads; $('config-resident').checked = dashboard.config.keep_model_loaded;
     $('config-vram-warning').value = dashboard.config.vram_warning_mib ?? 512; $('config-hotkey').value = dashboard.config.hotkey; $('config-queue').value = dashboard.config.max_queue;
     await loadDiscord(true);
@@ -123,6 +125,7 @@ subscribeState(applyState);
 
 initApi();
 initNavigation();
+initTournaments();
 initGenerationSettings();
 initStudio();
 initMonitor();

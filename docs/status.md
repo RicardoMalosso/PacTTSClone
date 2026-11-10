@@ -985,3 +985,26 @@ Local checks: 367 backend tests passed. The Chromium suite passed 56 tests
 before the final create-readback assertion was added. The real process restart
 test kept the same player page open and recovered with the original saved
 audio. Windows OBS and real model/Whisper output still require verification.
+
+## Local audio tournaments (INDEV)
+
+The local dashboard snapshots unique, completed MP3s from Today, Last week,
+an inclusive date range, Previous Winners, or All. Saved Last month tournaments
+remain available. Matchups, choices, skips, and reports persist in SQLite.
+Rankings use regularized Bradley–Terry scores and have a dedicated view. The
+bracket visualizes recorded head-to-head comparisons and lists all enrolled
+clips. A single local report removes a clip and its results from ranking and
+tags the clip **shit from a butt** in the bracket roster.
+Public voting and the isolated Cloudflare voting site remain INDEV.
+
+Optional Twitch polls use broadcaster authorization and collect viewer feedback
+independently of the local vote. A matchup can start one poll per selected
+channel. The app checks for an active poll before requesting a new one.
+
+Validation for this change: 370 core tests passed and Ruff passed. Twitch polls
+were exercised with a mocked Helix endpoint. Browser validation was blocked by
+the missing Playwright Chromium build and sandbox restrictions on system Chromium.
+
+Audio pool follow-up: all six focused API and Chromium tests passed, including
+local date boundaries, the Previous Winners pool, and the date-picker controls.
+Ruff passed.

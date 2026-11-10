@@ -21,6 +21,7 @@ from .playback import GENERAL_PLAYER
 from .service import GenerationService
 from .setup_runtime import RuntimeSetup
 from .studio import Studio
+from .tournaments import tournament_routes
 from .tunnel import TUNNEL_HOST, Tunnel
 from .updater import Updater, attach_manager
 
@@ -155,6 +156,7 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     app.state.studio = studio
     app.state.tunnel = tunnel
     app.add_middleware(LocalBoundary, token=token, tunnel=tunnel)
+    app.include_router(tournament_routes(service, studio.accounts))
 
     @app.exception_handler(UserError)
     async def user_error(request, exc):

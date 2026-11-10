@@ -2,6 +2,7 @@
 import {fillChannel, renderChannelState, renderChannels} from './channels.js';
 import {$, el, error} from './dom.js';
 import {openBugVideo, stopBugVideo} from './help.js';
+import {loadTournaments} from './tournaments.js';
 import {dashboard} from './state.js';
 
 let localPlaybackHost;
@@ -12,11 +13,13 @@ let channelControlsHost;
 
 function tab(name) {
   if (name === 'general') name = 'studio';
-  if (!dashboard.runtimeSetup.ready && !['setup', 'config', 'engines'].includes(name)) name = 'setup';
+  if (!dashboard.runtimeSetup.ready && !['setup', 'config', 'engines', 'tournaments'].includes(name)) name = 'setup';
   if (name === 'bugs' && !dashboard.bugPlayerReady) { openBugVideo(); return; }
   window.Locale.apply();
   if (name !== 'bugs') stopBugVideo();
   if (name !== 'sfx') $('sfx-list').querySelectorAll('audio').forEach(audio => audio.pause());
+  if (name === 'tournaments') loadTournaments();
+  else $('pane-tournaments').querySelectorAll('audio').forEach(audio => audio.pause());
   const general = name === 'studio';
   if (general) dashboard.selectedChannel = 'playbackMain';
   else if (name === 'channels' && dashboard.selectedChannel === 'playbackMain') fillChannel('');
