@@ -39,18 +39,13 @@ its own list by published_at.
 
 ## App releases and installer releases
 
-A merged release PR labeled `publish-release` publishes the verified app wheel and
-checksums. The normal PR checks still apply. The publishing job runs lint and updater
-tests, builds the wheel, and verifies the uploaded asset sizes and SHA-256 digests.
-A stable app release can be GitHub Latest without carrying a setup executable.
+See the [default release procedure](release-procedure.md) for publishing app wheels
+and deciding when to rebuild the installer. A stable app release can be GitHub
+Latest without carrying a setup executable.
 
-Add `installer-acceptance` as well when the launcher, installer, bundled tools or
-required base runtime must change. That path builds the setup executable and runs
-full Windows acceptance. The first release of this change needs both labels to ship
-the updated setup executable. Thereafter, a fresh install from that executable
-uses the existing updater to stage a newer wheel before the first app launch.
-Offline installs and failed checks fall back to the bundled wheel. Previously
-published executables still check for updates once the app starts and activate them
+Fresh installs with the RC7 installer or newer stage the latest compatible app
+before first launch. Offline installs and failed checks fall back to the bundled
+wheel. Earlier installers check for updates once the app starts and activate them
 on the next launch.
 
 Controls and endpoints are local-only, including shared administrators; writes
