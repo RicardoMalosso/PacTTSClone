@@ -33,10 +33,25 @@ PACTTS_DISABLE_UPDATES=1 disables background checks for isolated acceptance test
 
 The 2.2.1 stable patch is discoverable by existing stable updaters. A one-time
 2.3.0-rc.2 wheel bridges existing 2.3.0-rc.1 numeric updaters. Releases bearing
-`<!-- pactts-update-bridge -->` are excluded from the new normal catalogue. The
-normal installer and GitHub Latest designation advance with each stable release. Older published assets
+`<!-- pactts-update-bridge -->` are excluded from the new normal catalogue. Older published assets
 are immutable. GitHub controls its native release-history ordering; the app sorts
-its own list by published_at and uses /releases/latest for the installer link.
+its own list by published_at.
+
+## App releases and installer releases
+
+A merged release PR labeled `publish-release` publishes the verified app wheel and
+checksums. The normal PR checks still apply. The publishing job runs lint and updater
+tests, builds the wheel, and verifies the uploaded asset sizes and SHA-256 digests.
+A stable app release can be GitHub Latest without carrying a setup executable.
+
+Add `installer-acceptance` as well when the launcher, installer, bundled tools or
+required base runtime must change. That path builds the setup executable and runs
+full Windows acceptance. The first release of this change needs both labels to ship
+the updated setup executable. Thereafter, a fresh install from that executable
+uses the existing updater to stage a newer wheel before the first app launch.
+Offline installs and failed checks fall back to the bundled wheel. Previously
+published executables still check for updates once the app starts and activate them
+on the next launch.
 
 Controls and endpoints are local-only, including shared administrators; writes
 require the existing same-origin CSRF token. The updater does not run inference,

@@ -69,6 +69,14 @@ try {
     Invoke-Checked $uv @('pip','install','--python',$python,'--index-url','https://pypi.org/simple',$wheel[0].FullName)
     Write-Host '[5/6] Checking web runtime and audio tools'
     Invoke-Checked $python @((Join-Path $PayloadDir 'verify-runtime.py'), '--device', 'web')
+    if (!(Test-Path -LiteralPath $activePath) -and $env:PACTTS_DISABLE_UPDATES -ne '1') {
+        Write-Host 'Checking for the latest application release'
+        $env:PACTTS_APP_ROOT = $AppRoot
+        & $python -c 'from pacttsclone.updater import update_fresh_install; update_fresh_install()'
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host 'The application update check could not run. Starting with the installed application.'
+        }
+    }
     Write-Host '[6/6] Activating installation; open Initial Setup in the browser to install inference and models'
     $settings = @{python=$python; data_dir=$DataRoot; ffmpeg_bin=$ffBin; device=$Device; version=$version; uv=$uv}
     $temporaryConfig = Join-Path $AppRoot 'active.json.new'

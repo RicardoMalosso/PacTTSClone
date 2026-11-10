@@ -1008,3 +1008,12 @@ the missing Playwright Chromium build and sandbox restrictions on system Chromiu
 Audio pool follow-up: all six focused API and Chromium tests passed, including
 local date boundaries, the Previous Winners pool, and the date-picker controls.
 Ruff passed.
+
+## Separate application and installer releases — 2026-11-10
+
+Routine releases publish a verified wheel and checksums. Native setup publication
+uses the installer-acceptance label for launcher, bundled tool or base runtime
+changes. Fresh setup stages an app update before launch, keeping the bundled wheel
+if the release check fails. The next installer release must include this bootstrap
+change. Local updater tests, Ruff, workflow YAML parsing and wheel build passed.
+Native Windows setup and GitHub release publication require Actions validation.
