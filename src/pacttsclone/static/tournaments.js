@@ -53,8 +53,43 @@ function showView(view) {
   }
 }
 
+function clipIdentity(clip, label) {
+  const identity = document.createElement('div');
+  identity.className = 'tournament-clip-identity';
+  if (clip.thumbnail_url) {
+    const picture = document.createElement('img');
+    picture.src = clip.thumbnail_url;
+    picture.alt = '';
+    picture.loading = 'lazy';
+    identity.append(picture);
+  }
+  const details = document.createElement('div');
+  details.append(label);
+  const {wins, losses, gold, silver, bronze} = clip.record;
+  const stats = document.createElement('div');
+  stats.className = 'muted';
+  stats.textContent = wins + ' W / ' + losses + ' L';
+  stats.title = 'Host picks across tournaments.';
+  if (wins) {
+    for (const [count, icon, medal] of [
+      [gold, '🥇', 'gold'], [silver, '🥈', 'silver'], [bronze, '🥉', 'bronze'],
+    ]) {
+      if (!count) continue;
+      const award = document.createElement('span');
+      award.textContent = ' ' + icon + ' ' + count;
+      award.title = count + ' ' + medal + ' medals';
+      award.setAttribute('aria-label', award.title);
+      stats.append(award);
+    }
+  }
+  details.append(stats);
+  identity.append(details);
+  return identity;
+}
+
 function renderResults(rows, bracket) {
   const labels = new Map(bracket.clips.map(({id}, index) => [id, 'Clip ' + (index + 1)]));
+  const clips = new Map(bracket.clips.map(clip => [clip.id, clip]));
   const ranking = $('tournament-ranking');
   ranking.replaceChildren();
   for (const row of rows) {
@@ -63,7 +98,7 @@ function renderResults(rows, bracket) {
     item.title = row.provisional
       ? 'Provisional until this clip has five counted comparisons.'
       : 'Placement is based on counted head-to-head choices.';
-    item.append(label + ' · ' + row.comparisons + ' comparisons',
+    item.append(clipIdentity(clips.get(row.clip), label), row.comparisons + ' comparisons',
       row.provisional ? ' · Provisional' : '', audio(row.clip, label));
     ranking.append(item);
   }
@@ -74,7 +109,7 @@ function renderResults(rows, bracket) {
   for (const clip of bracket.clips) {
     const item = document.createElement('li');
     const label = labels.get(clip.id);
-    item.append(label);
+    item.append(clipIdentity(clip, label));
     if (clip.tag) {
       item.title = 'Reported locally and removed from this tournament.';
       item.append(' · ' + clip.tag);
@@ -100,8 +135,14 @@ function renderResults(rows, bracket) {
         const card = document.createElement('div');
         card.className = 'tournament-match';
         const contestants = document.createElement('div');
-        contestants.textContent = [slot.a, slot.b].map(clip =>
-          labels.get(clip) || (slot.resolved ? 'Empty slot' : 'Awaiting entrant')).join(' vs ');
+        contestants.className = 'tournament-contenders';
+        for (const id of [slot.a, slot.b]) {
+          const side = document.createElement('div');
+          if (clips.has(id)) side.append(clipIdentity(clips.get(id), labels.get(id)));
+          else side.textContent = slot.resolved ? 'Empty slot' : 'Awaiting entrant';
+          contestants.append(side);
+        }
+        card.classList.add('tournament-elimination-match');
         const outcome = document.createElement('div');
         outcome.textContent = slot.winner
           ? labels.get(slot.winner) + (slot.played ? ' won' : ' advances by walkover')
@@ -121,7 +162,7 @@ function renderResults(rows, bracket) {
     for (const side of ['a', 'b']) {
       const slot = document.createElement('div');
       slot.className = 'tournament-slot';
-      slot.textContent = labels.get(match[side]);
+      slot.append(clipIdentity(clips.get(match[side]), labels.get(match[side])));
       sides.append(slot);
     }
     const result = document.createElement('div');
@@ -164,12 +205,16 @@ async function refreshMatch() {
     await api(endpoint + '/vote', {method: 'POST', body: {match_id: match.id, result}});
     await refreshMatch();
   };
+  const contenders = document.createElement('div');
+  contenders.className = 'tournament-contenders';
+  panel.append(contenders);
   for (const side of ['a', 'b']) {
     const clip = match[side];
     const label = side.toUpperCase();
     const group = document.createElement('div');
     group.append(
-      label + ' · ' + labels.get(clip),
+      clipIdentity(bracket.clips.find(entry => entry.id === clip),
+        label + ' · ' + labels.get(clip)),
       audio(clip, 'Clip ' + label),
       button('Pick ' + label, 'Count a local win for Clip ' + label + '.', () => vote(side)),
       button('Terrible horrible (' + label + ')',
@@ -179,7 +224,7 @@ async function refreshMatch() {
         $('tournament-status').textContent = 'Clip removed · ' + report.tag;
       }),
     );
-    panel.append(group);
+    contenders.append(group);
   }
   if (!bracket.slots) {
     panel.append(button('Skip', 'Move to the next matchup without awarding a win.', () => vote('skip')));
@@ -196,7 +241,7 @@ async function refreshMatch() {
 async function load(selected = $('tournament-select').value) {
   const select = $('tournament-select');
   const periods = {today: 'Today', week: 'Last week', range: 'Date range',
-    winners: 'Previous Winners', all: 'All', month: 'Last month', short: 'Random 16'};
+    winners: 'Previous Winners', all: 'All', month: 'Last month', short: 'Random draft'};
   const [tournaments, channels] = await Promise.all([api(base), api('/api/channels')]);
   const pollChannel = $('tournament-poll-channel');
   const previous = pollChannel.value;
@@ -221,10 +266,12 @@ export function initTournaments() {
   }
   $('tournament-period').onchange = () => {
     $('tournament-date-range').hidden = $('tournament-period').value !== 'range';
+    $('tournament-draft-options').hidden = $('tournament-period').value !== 'short';
   };
   $('tournament-select').onchange = () => run(refreshMatch);
   $('tournament-create').onclick = () => run(async () => {
     const body = {period: $('tournament-period').value, mode: $('tournament-mode').value};
+    if (body.period === 'short') body.draft_size = Number($('tournament-draft-size').value);
     if (body.period === 'range') {
       body.start_date = $('tournament-start').value || null;
       body.end_date = $('tournament-end').value || null;

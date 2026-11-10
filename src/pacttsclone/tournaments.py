@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS tournament_reports (
 class CreateTournament(BaseModel):
     mode: Literal["elimination"] = "elimination"
     period: Period
+    draft_size: Literal[4, 8, 16, 32, 64] = 16
     start_date: date | None = None
     end_date: date | None = None
 
@@ -134,14 +135,12 @@ class TournamentStore:
         with self.store.lock, self.db:
             jobs = self._candidate_clips(selection, now)
             if period == "short":
-                used = {
-                    clip for (clip,) in self.db.execute(
-                        "SELECT e.clip FROM tournament_entries e JOIN tournaments t "
-                        "ON t.id=e.tournament WHERE t.period='short'"
-                    )
-                }
-                jobs = [clip for clip in jobs if clip not in used]
+                appearances = dict(self.db.execute(
+                    "SELECT e.clip,COUNT(*) FROM tournament_entries e JOIN tournaments t "
+                    "ON t.id=e.tournament WHERE t.period='short' GROUP BY e.clip"
+                ))
                 random.shuffle(jobs)
+                jobs.sort(key=lambda clip: appearances.get(clip, 0))
         entries = {}
         for clip in jobs:
             path = self.service.output_path(clip)
@@ -152,11 +151,11 @@ class TournamentStore:
                     entries.setdefault(hashlib.file_digest(audio, "sha256").digest(), clip)
             except OSError:
                 continue
-            if period == "short" and len(entries) == 16:
+            if period == "short" and len(entries) == selection.draft_size:
                 break
         if len(entries) < 2:
             if period == "short":
-                raise HTTPException(422, "Random 16 needs at least two unused generated MP3s.")
+                raise HTTPException(422, "Random draft needs at least two distinct generated MP3s.")
             if period == "winners":
                 raise HTTPException(422, "At least two distinct previous winners are needed.")
             raise HTTPException(422, "This selection needs at least two distinct generated MP3s.")
@@ -385,12 +384,64 @@ class TournamentStore:
                 self._finish_if_complete(tournament, voter, active)
         return {"removed": True, "tag": REMOVED_TAG}
 
+    def _clip_records(self, tournament):
+        records = {
+            clip: {"wins": 0, "losses": 0, "gold": 0, "silver": 0, "bronze": 0}
+            for (clip,) in self.db.execute(
+                "SELECT clip FROM tournament_entries WHERE tournament=?", (tournament,)
+            )
+        }
+        for a, b, result in self.db.execute(
+            """SELECT m.a,m.b,m.result FROM tournament_matches m
+               JOIN tournament_entries a ON a.tournament=m.tournament AND a.clip=m.a
+               JOIN tournament_entries b ON b.tournament=m.tournament AND b.clip=m.b
+               WHERE m.voter=? AND m.result IN ('a','b') AND a.removed=0 AND b.removed=0
+               AND EXISTS (SELECT 1 FROM tournament_entries e WHERE e.tournament=?
+                           AND e.clip IN (m.a,m.b))""",
+            (LOCAL_OWNER, tournament),
+        ):
+            winner, loser = (a, b) if result == "a" else (b, a)
+            if winner in records:
+                records[winner]["wins"] += 1
+            if loser in records:
+                records[loser]["losses"] += 1
+
+        for slot, loser, champion in self.db.execute(
+            """SELECT s.slot,e.clip,c.champion FROM elimination_slots s
+               JOIN tournament_completions c ON c.tournament=s.tournament
+               LEFT JOIN tournament_matches m ON m.id=s.match_id
+               LEFT JOIN tournament_entries e ON e.tournament=s.tournament AND e.removed=0
+                   AND e.clip=CASE m.result WHEN 'a' THEN m.b WHEN 'b' THEN m.a END
+               WHERE s.slot BETWEEN 1 AND 3 AND c.champion IS NOT NULL
+               AND EXISTS (SELECT 1 FROM tournament_entries e WHERE e.tournament=?
+                           AND e.clip IN (s.a,s.b,c.champion))""",
+            (tournament,),
+        ):
+            if slot == 1 and champion in records:
+                records[champion]["gold"] += 1
+            if loser in records:
+                records[loser]["silver" if slot == 1 else "bronze"] += 1
+        return records
+
+    def _thumbnail(self, clip):
+        job = self.store.get("job", clip) or {}
+        voice_ids = job.get("voice_ids") or [job.get("voice_id")]
+        for voice_id in voice_ids:
+            if voice_id:
+                voice = self.store.get("voice", voice_id) or {}
+                if voice.get("thumbnail_url"):
+                    return voice["thumbnail_url"]
+        return None
+
     def bracket(self, tournament, voter):
         with self.store.lock:
             active = self._active(tournament)
+            records = self._clip_records(tournament)
             clips = [
                 {
                     "id": clip,
+                    "thumbnail_url": self._thumbnail(clip),
+                    "record": records[clip],
                     "tag": REMOVED_TAG if removed else None,
                     "playable": clip in active
                     or bool(removed and self.service.output_path(clip).is_file()),

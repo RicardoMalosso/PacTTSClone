@@ -515,9 +515,10 @@ bye. The final winner becomes champion. **Local comparisons (INDEV)** and
 
 **Today** starts at local midnight, **Last week** covers the past seven days,
 and **Date picker** includes both dates. **Previous Winners** uses champions from
-completed tournaments. **All** includes all eligible MP3s. **Random 16** draws up to 16
-random clips, excluding entries from earlier Random 16 tournaments. Clips remain
-available in the other pools. Random 16 needs at least two unused eligible MP3s.
+completed tournaments. **All** includes all eligible MP3s. **Random draft** draws
+up to 4, 8, 16, 32, or 64 clips. It prioritizes clips with fewer past draft
+appearances and randomizes ties. Repeat entries fill the remaining slots when
+needed. Drafts count appearances across sizes and require two distinct MP3s.
 
 Play Clip A and Clip B, then pick the winner. The bracket and votes survive
 app restarts.
@@ -531,7 +532,11 @@ end and start the current matchup's poll manually. The local pick controls the
 leaderboard.
 
 Open **Bracket** to see the rounds and enrolled clips, or **Ranking** to play
-clips in leaderboard order. Older pairwise tournaments retain **Match history**. One local **Terrible horrible**
+clips in leaderboard order. Clip cards use available voice pictures and show
+career wins and losses from host picks. Completed elimination brackets award gold
+to the champion, silver to the final loser and bronze to both semifinal losers
+when those matches were played. Medal icons appear only for clips with a win.
+Older pairwise tournaments retain **Match history**. One local **Terrible horrible**
 report removes a clip from that tournament and tags it **shit from a butt** in
 the tournament roster. The original MP3 remains available. Public voting and
 Cloudflare links are INDEV.

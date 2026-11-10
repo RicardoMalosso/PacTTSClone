@@ -29,9 +29,13 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     )
     pool = page.get_by_label("Audio pool")
     expect(pool.locator("option")).to_have_text(
-        ["Today", "Last week", "Date picker", "Previous Winners", "All", "Random 16"]
+        ["Today", "Last week", "Date picker", "Previous Winners", "All", "Random draft"]
     )
     expect(page.get_by_label("Beginning")).to_be_hidden()
+    pool.select_option("short")
+    expect(page.get_by_label("Draft size").locator("option")).to_have_text(
+        ["4", "8", "16", "32", "64"]
+    )
     pool.select_option("range")
     today = date.today().isoformat()
     page.get_by_label("Beginning").fill(today)
@@ -39,6 +43,10 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     page.get_by_role("button", name="Create tournament").click()
     pair = page.locator("#tournament-pair")
     expect(pair.locator("audio")).to_have_count(2)
+    left, right = [pair.locator("audio").nth(i).bounding_box() for i in range(2)]
+    assert left["x"] < right["x"]
+    expect(pair).to_contain_text("0 W / 0 L")
+    expect(pair.get_by_label("1 gold medals")).to_have_count(0)
     expect(page.get_by_role("button", name="Pick A", exact=True)).to_have_attribute(
         "title", "Count a local win for Clip A."
     )

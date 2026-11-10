@@ -40,7 +40,12 @@
 <option value="comparison" disabled title="Pairwise ranking is in development.">Local comparisons (INDEV)</option>
 <option value="community" disabled title="Requires public voting.">Community Voting (INDEV)</option>
 </select>
-<label>Audio pool<select id="tournament-period" title="Choose which generated clips enter this tournament."><option value="today" title="Use clips completed since local midnight.">Today</option><option value="week" selected title="Use clips completed in the past seven days.">Last week</option><option value="range" title="Use clips completed between the beginning and end dates, inclusive.">Date picker</option><option value="winners" title="Use champions from completed tournaments.">Previous Winners</option><option value="all" title="Use all eligible generated MP3s.">All</option><option value="short" title="Draw up to 16 random clips unused in previous Random 16 tournaments.">Random 16</option></select></label>
+<label>Audio pool<select id="tournament-period" title="Choose which generated clips enter this tournament."><option value="today" title="Use clips completed since local midnight.">Today</option><option value="week" selected title="Use clips completed in the past seven days.">Last week</option><option value="range" title="Use clips completed between the beginning and end dates, inclusive.">Date picker</option><option value="winners" title="Use champions from completed tournaments.">Previous Winners</option><option value="all" title="Use all eligible generated MP3s.">All</option><option value="short" title="Draw random clips, favoring clips used least often.">Random draft</option></select></label>
+<div id="tournament-draft-options" hidden>
+<label>Draft size<select id="tournament-draft-size" title="Maximum number of clips to draw.">
+<option>4</option><option>8</option><option selected>16</option><option>32</option><option>64</option>
+</select></label>
+</div>
 <div id="tournament-date-range" hidden>
 <label>Beginning<input id="tournament-start" title="Include clips starting on this local calendar date." type="date"></label>
 <label>End<input id="tournament-end" title="Include clips through the end of this local calendar date." type="date"></label>

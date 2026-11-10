@@ -87,7 +87,11 @@ def test_one_local_report_tags_clip_and_voids_comparisons(tmp_path, engine):
         assert client.post(report).json() == removed
         assert store.pair(tournament, "second") is None
         assert client.post(endpoint + "/pair").json() is None
-        assert client.get(endpoint + "/bracket").json() == {
+        board = client.get(endpoint + "/bracket").json()
+        for clip in board["clips"]:
+            assert clip.pop("thumbnail_url") is None
+            assert clip.pop("record")["wins"] == 0
+        assert board == {
             "clips": [
                 {"id": "a", "tag": "shit from a butt", "playable": True},
                 {"id": "b", "tag": None, "playable": True},
@@ -242,9 +246,15 @@ def test_elimination_advances_winners_through_byes(tmp_path, engine):
         board = client.get(endpoint + "/bracket").json()
         assert board["champion"] == match["a"]
         assert len(eliminated) == 4
+        records = {clip["id"]: clip["record"] for clip in board["clips"]}
+        assert records[match["a"]]["gold"] == 1
+        assert records[match["b"]]["silver"] == 1
+        assert sum(record["bronze"] for record in records.values()) == 2
+        assert sum(record["wins"] for record in records.values()) == 4
+        assert sum(record["losses"] for record in records.values()) == 4
 
 
-def test_short_draws_consume_only_short_eligibility(tmp_path, engine):
+def test_draft_prioritizes_fewer_previous_appearances(tmp_path, engine):
     app = create_app(Settings(data_dir=tmp_path), engine)
     with TestClient(app, base_url="http://127.0.0.1") as client:
         client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
@@ -252,15 +262,19 @@ def test_short_draws_consume_only_short_eligibility(tmp_path, engine):
         for i in range(19):
             seed_clip(app.state.service, str(i), str(i).encode())
 
-        def draw(period):
-            tournament = client.post(base, json={"period": period}).json()["id"]
+        def draw(period, size=16):
+            tournament = client.post(base, json={"period": period, "draft_size": size}).json()["id"]
             board = client.get(f"{base}/{tournament}/bracket").json()
             return {clip["id"] for clip in board["clips"]}
 
-        first, second = draw("short"), draw("short")
-        assert len(first) == 16
-        assert len(second) == 3
+        first, second = draw("short", 4), draw("short", 8)
+        assert len(first) == 4
+        assert len(second) == 8
         assert first.isdisjoint(second)
-        assert client.post(base, json={"period": "short"}).status_code == 422
-        assert draw("all") == first | second
+        all_clips = {str(i) for i in range(19)}
+        third = draw("short")
+        assert len(third) == 16
+        assert all_clips - first - second <= third
+        assert draw("short", 4).isdisjoint((first | second) & third)
+        assert draw("all") == all_clips
         assert client.post(base, json={"period": "all", "mode": "community"}).status_code == 422
