@@ -13,3 +13,5 @@ inference service, chat posting or telemetry.
 Run `pytest` and `ruff check .`. Browser tests: `pytest tests/browser --browser chromium`.
 Real model smoke: see docs/testing.md. No model weights, recordings, outputs or
 machine-specific paths belong in git. Never silently substitute synthetic audio.
+
+For release preparation and publishing, follow [the default release procedure](docs/release-procedure.md).
