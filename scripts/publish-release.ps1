@@ -38,9 +38,14 @@ gh release create $tag --draft "--prerelease=$($identity.prerelease)" --target $
 if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
 
 if ($env:PACTTS_PUBLISH -ne 'true') { return }
-$releases = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json
-if ($LASTEXITCODE -ne 0) { throw 'Could not verify draft release.' }
-$matches = @($releases | Where-Object tag_name -eq $tag)
+# A new draft may take a few seconds to appear in the releases list.
+for ($attempt = 0; $attempt -lt 12; $attempt++) {
+    $releases = gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=100" | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0) { throw 'Could not verify draft release.' }
+    $matches = @($releases | Where-Object tag_name -eq $tag)
+    if ($matches.Count -gt 0) { break }
+    Start-Sleep -Seconds 5
+}
 if ($matches.Count -ne 1) { throw 'Expected exactly one draft release.' }
 $release = $matches[0]
 if (!$release.draft -or $release.prerelease -ne [bool]::Parse($identity.prerelease) -or
