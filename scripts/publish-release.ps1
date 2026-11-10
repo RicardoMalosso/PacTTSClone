@@ -2,7 +2,14 @@ param([switch]$AppOnly)
 $ErrorActionPreference = 'Stop'
 
 $identity = @{}
-$lines = python scripts/release-identity.py
+# The Actions runner sets GITHUB_OUTPUT on every step. This script needs stdout.
+$outputFile = $env:GITHUB_OUTPUT
+try {
+    Remove-Item Env:GITHUB_OUTPUT -ErrorAction SilentlyContinue
+    $lines = python scripts/release-identity.py
+} finally {
+    $env:GITHUB_OUTPUT = $outputFile
+}
 if ($LASTEXITCODE -ne 0) { throw 'Could not derive release identity.' }
 foreach ($line in $lines) {
     $key, $value = $line -split '=', 2
