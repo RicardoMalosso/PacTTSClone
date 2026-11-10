@@ -28,6 +28,8 @@ def test_local_tournament_and_persisted_votes(tmp_path, engine):
     settings = Settings(data_dir=tmp_path)
     app = create_app(settings, engine)
     base = "/api/tournaments"
+    # Existing installations probe the candidate app before activating an update.
+    assert any(route.path == "/api/updates/manager" for route in app.routes)
     with TestClient(app, base_url="http://127.0.0.1") as client:
         service = app.state.service
         seed_clip(service, "a", b"audio a")
