@@ -86,6 +86,33 @@ function renderResults(rows, bracket) {
 
   const graphic = $('tournament-bracket');
   graphic.replaceChildren();
+  $('tournament-show-bracket').textContent = bracket.slots ? 'Bracket' : 'Match history';
+  $('tournament-bracket-heading').textContent = bracket.slots
+    ? 'Elimination bracket' : 'Head-to-head match history';
+  if (bracket.slots) {
+    const depth = Math.max(...bracket.slots.map(slot => slot.round));
+    for (let level = depth; level >= 1; level--) {
+      const column = document.createElement('section');
+      const heading = document.createElement('h3');
+      heading.textContent = level === 1 ? 'Final' : 'Round ' + (depth - level + 1);
+      column.append(heading);
+      for (const slot of bracket.slots.filter(match => match.round === level)) {
+        const card = document.createElement('div');
+        card.className = 'tournament-match';
+        const contestants = document.createElement('div');
+        contestants.textContent = [slot.a, slot.b].map(clip =>
+          labels.get(clip) || (slot.resolved ? 'Empty slot' : 'Awaiting entrant')).join(' vs ');
+        const outcome = document.createElement('div');
+        outcome.textContent = slot.winner
+          ? labels.get(slot.winner) + (slot.played ? ' won' : ' advances by walkover')
+          : slot.resolved ? 'No entrant advances' : 'Pending';
+        card.append(contestants, outcome);
+        column.append(card);
+      }
+      graphic.append(column);
+    }
+    return labels;
+  }
   if (!bracket.matches.length) graphic.textContent = 'No matchups yet.';
   for (const match of bracket.matches) {
     const card = document.createElement('div');
@@ -128,7 +155,8 @@ async function refreshMatch() {
     api(endpoint + '/bracket')]);
   const labels = renderResults(rows, bracket);
   if (!match) {
-    panel.textContent = 'No more matchups available.';
+    panel.textContent = bracket.champion
+      ? 'Champion: ' + labels.get(bracket.champion) : 'No more matchups available.';
     return;
   }
 
@@ -153,8 +181,10 @@ async function refreshMatch() {
     );
     panel.append(group);
   }
+  if (!bracket.slots) {
+    panel.append(button('Skip', 'Move to the next matchup without awarding a win.', () => vote('skip')));
+  }
   panel.append(
-    button('Skip', 'Move to the next matchup without awarding a win.', () => vote('skip')),
     button('Start Twitch poll', 'Ask viewers to pick A or B. The result is advisory.',
       () => startPoll(endpoint, match)),
   );
@@ -166,7 +196,7 @@ async function refreshMatch() {
 async function load(selected = $('tournament-select').value) {
   const select = $('tournament-select');
   const periods = {today: 'Today', week: 'Last week', range: 'Date range',
-    winners: 'Previous Winners', all: 'All', month: 'Last month'};
+    winners: 'Previous Winners', all: 'All', month: 'Last month', short: 'Random 16'};
   const [tournaments, channels] = await Promise.all([api(base), api('/api/channels')]);
   const pollChannel = $('tournament-poll-channel');
   const previous = pollChannel.value;
@@ -194,7 +224,7 @@ export function initTournaments() {
   };
   $('tournament-select').onchange = () => run(refreshMatch);
   $('tournament-create').onclick = () => run(async () => {
-    const body = {period: $('tournament-period').value};
+    const body = {period: $('tournament-period').value, mode: $('tournament-mode').value};
     if (body.period === 'range') {
       body.start_date = $('tournament-start').value || null;
       body.end_date = $('tournament-end').value || null;

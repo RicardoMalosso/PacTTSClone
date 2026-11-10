@@ -68,6 +68,10 @@ def test_one_local_report_tags_clip_and_voids_comparisons(tmp_path, engine):
         seed_clip(service, "b", b"audio b")
         client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
         tournament = client.post("/api/tournaments", json={"period": "all"}).json()["id"]
+        # Simulate an existing pairwise tournament from before elimination was added.
+        with service.store.lock, service.store.db:
+            for table in ("elimination_slots", "tournament_matches"):
+                service.store.db.execute(f"DELETE FROM {table} WHERE tournament=?", (tournament,))
         endpoint = f"/api/tournaments/{tournament}"
         match = client.post(endpoint + "/pair").json()
         vote = {"match_id": match["id"], "result": "a"}
@@ -214,3 +218,49 @@ def test_unfinished_tournament_does_not_supply_previous_winner(tmp_path, engine)
             vote = {"match_id": match["id"], "result": "a" if match["a"] == winner else "b"}
             assert client.post(endpoint + "/vote", json=vote).status_code == 200
         assert client.post(base, json={"period": "winners"}).status_code == 422
+
+
+def test_elimination_advances_winners_through_byes(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
+        for clip in "abcde":
+            seed_clip(app.state.service, clip, clip.encode())
+        tournament = client.post("/api/tournaments", json={"period": "all"}).json()["id"]
+        endpoint = f"/api/tournaments/{tournament}"
+        board = client.get(endpoint + "/bracket").json()
+        assert sum(slot["resolved"] for slot in board["slots"]) == 3
+        eliminated = set()
+        for _ in range(4):
+            match = client.post(endpoint + "/pair").json()
+            assert client.post(endpoint + "/pair").json() == match
+            assert not eliminated.intersection({match["a"], match["b"]})
+            eliminated.add(match["b"])
+            vote = {"match_id": match["id"], "result": "a"}
+            assert client.post(endpoint + "/vote", json=vote).status_code == 200
+        assert client.post(endpoint + "/pair").json() is None
+        board = client.get(endpoint + "/bracket").json()
+        assert board["champion"] == match["a"]
+        assert len(eliminated) == 4
+
+
+def test_short_draws_consume_only_short_eligibility(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
+        base = "/api/tournaments"
+        for i in range(19):
+            seed_clip(app.state.service, str(i), str(i).encode())
+
+        def draw(period):
+            tournament = client.post(base, json={"period": period}).json()["id"]
+            board = client.get(f"{base}/{tournament}/bracket").json()
+            return {clip["id"] for clip in board["clips"]}
+
+        first, second = draw("short"), draw("short")
+        assert len(first) == 16
+        assert len(second) == 3
+        assert first.isdisjoint(second)
+        assert client.post(base, json={"period": "short"}).status_code == 422
+        assert draw("all") == first | second
+        assert client.post(base, json={"period": "all", "mode": "community"}).status_code == 422

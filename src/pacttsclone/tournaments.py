@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from .twitch_oauth import FEATURE_SCOPES
 
-Period = Literal["today", "week", "range", "winners", "all", "month"]
+Period = Literal["today", "week", "range", "winners", "all", "month", "short"]
 REMOVED_TAG = "shit from a butt"
 DAYS = {"week": 7, "month": 30}
 LOCAL_OWNER = "local-owner"
@@ -34,6 +34,11 @@ CREATE TABLE IF NOT EXISTS tournament_matches (
 );
 CREATE INDEX IF NOT EXISTS tournament_matches_by_voter
     ON tournament_matches (tournament, voter);
+CREATE TABLE IF NOT EXISTS elimination_slots (
+    tournament TEXT NOT NULL, slot INTEGER NOT NULL,
+    a TEXT, b TEXT, match_id TEXT, winner TEXT, resolved INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (tournament, slot)
+);
 CREATE TABLE IF NOT EXISTS tournament_completions (
     tournament TEXT PRIMARY KEY, champion TEXT
 );
@@ -45,6 +50,7 @@ CREATE TABLE IF NOT EXISTS tournament_reports (
 
 
 class CreateTournament(BaseModel):
+    mode: Literal["elimination"] = "elimination"
     period: Period
     start_date: date | None = None
     end_date: date | None = None
@@ -65,6 +71,7 @@ class TournamentStore:
         self.service = service
         self.store = service.store
         self.db = self.store.db
+        self.create_lock = Lock()
         with self.store.lock:
             self.db.executescript(SCHEMA)
 
@@ -76,7 +83,8 @@ class TournamentStore:
                 "SELECT id FROM tournaments WHERE id NOT IN "
                 "(SELECT tournament FROM tournament_completions)"
             ).fetchall():
-                self._finish_if_complete(tournament, LOCAL_OWNER, self._active(tournament))
+                if not self._elimination(tournament):
+                    self._finish_if_complete(tournament, LOCAL_OWNER, self._active(tournament))
             return [
                 clip for (clip,) in self.db.execute(
                     "SELECT DISTINCT champion FROM tournament_completions "
@@ -117,10 +125,23 @@ class TournamentStore:
         ]
 
     def create(self, selection: CreateTournament):
+        with self.create_lock:
+            return self._create(selection)
+
+    def _create(self, selection: CreateTournament):
         now = time.time()
         period = selection.period
         with self.store.lock, self.db:
             jobs = self._candidate_clips(selection, now)
+            if period == "short":
+                used = {
+                    clip for (clip,) in self.db.execute(
+                        "SELECT e.clip FROM tournament_entries e JOIN tournaments t "
+                        "ON t.id=e.tournament WHERE t.period='short'"
+                    )
+                }
+                jobs = [clip for clip in jobs if clip not in used]
+                random.shuffle(jobs)
         entries = {}
         for clip in jobs:
             path = self.service.output_path(clip)
@@ -131,7 +152,11 @@ class TournamentStore:
                     entries.setdefault(hashlib.file_digest(audio, "sha256").digest(), clip)
             except OSError:
                 continue
+            if period == "short" and len(entries) == 16:
+                break
         if len(entries) < 2:
+            if period == "short":
+                raise HTTPException(422, "Random 16 needs at least two unused generated MP3s.")
             if period == "winners":
                 raise HTTPException(422, "At least two distinct previous winners are needed.")
             raise HTTPException(422, "This selection needs at least two distinct generated MP3s.")
@@ -142,6 +167,16 @@ class TournamentStore:
                 "INSERT INTO tournament_entries (tournament,clip) VALUES (?,?)",
                 [(tournament, clip) for clip in entries.values()],
             )
+            seeds = list(entries.values())
+            random.shuffle(seeds)
+            half = 1 << ((len(seeds) - 1).bit_length() - 1)
+            seeds.extend([None] * (2 * half - len(seeds)))
+            self.db.executemany(
+                "INSERT INTO elimination_slots (tournament,slot,a,b) VALUES (?,?,?,?)",
+                [(tournament, slot, None, None) for slot in range(1, half)]
+                + [(tournament, half + i, seeds[i], seeds[half + i]) for i in range(half)],
+            )
+            self._advance_elimination(tournament, LOCAL_OWNER, set(entries.values()))
         return {"id": tournament, "period": period, "created_at": now}
 
     def list(self):
@@ -198,9 +233,67 @@ class TournamentStore:
             (tournament, champion),
         )
 
+    def _elimination(self, tournament):
+        return self.db.execute(
+            "SELECT 1 FROM elimination_slots WHERE tournament=? AND slot=1", (tournament,)
+        ).fetchone() is not None
+
+    def _advance_elimination(self, tournament, voter, active):
+        slots = self.db.execute(
+            """SELECT s.slot,s.a,s.b,s.match_id,s.winner,s.resolved,m.result
+               FROM elimination_slots s LEFT JOIN tournament_matches m ON m.id=s.match_id
+               WHERE s.tournament=? ORDER BY s.slot DESC""",
+            (tournament,),
+        ).fetchall()
+        winners = {}
+        pending = None
+        for slot, a, b, match_id, winner, resolved, result in slots:
+            if resolved:
+                winners[slot] = winner
+                continue
+            if 2 * slot <= len(slots):
+                if 2 * slot not in winners or 2 * slot + 1 not in winners:
+                    continue
+                a, b = winners[2 * slot], winners[2 * slot + 1]
+            contenders = [clip for clip in (a, b) if clip in active]
+            if result in {"a", "b"}:
+                winner = a if result == "a" else b
+            elif len(contenders) < 2:
+                winner = next(iter(contenders), None)
+            else:
+                if not match_id:
+                    match_id = uuid4().hex
+                    self.db.execute(
+                        "INSERT INTO tournament_matches VALUES (?,?,?,?,?,NULL)",
+                        (match_id, tournament, voter, a, b),
+                    )
+                    self.db.execute(
+                        "UPDATE elimination_slots SET a=?,b=?,match_id=? "
+                        "WHERE tournament=? AND slot=?",
+                        (a, b, match_id, tournament, slot),
+                    )
+                if pending is None:
+                    pending = {"id": match_id, "a": a, "b": b}
+                continue
+            winners[slot] = winner
+            self.db.execute(
+                "UPDATE elimination_slots SET a=?,b=?,winner=?,resolved=1 "
+                "WHERE tournament=? AND slot=?",
+                (a, b, winner, tournament, slot),
+            )
+        if 1 in winners:
+            champion = winners[1] if winners[1] in active else None
+            self.db.execute(
+                "INSERT OR REPLACE INTO tournament_completions VALUES (?,?)",
+                (tournament, champion),
+            )
+        return pending
+
     def pair(self, tournament, voter):
         with self.store.lock, self.db:
             active = self._active(tournament)
+            if self._elimination(tournament):
+                return self._advance_elimination(tournament, voter, active)
             seen = set()
             for match, a, b, result in self.db.execute(
                 "SELECT id,a,b,result FROM tournament_matches WHERE tournament=? AND voter=?",
@@ -234,7 +327,9 @@ class TournamentStore:
             active = self._active(tournament)
             row = self.db.execute(
                 "SELECT a,b FROM tournament_matches "
-                "WHERE id=? AND tournament=? AND voter=? AND result IS NULL",
+                "WHERE id=? AND tournament=? AND voter=? AND result IS NULL "
+                "AND NOT EXISTS (SELECT 1 FROM elimination_slots "
+                "WHERE match_id=tournament_matches.id AND resolved=1)",
                 (match_id, tournament, voter),
             ).fetchone()
             if row is None or any(clip not in active for clip in row):
@@ -252,12 +347,21 @@ class TournamentStore:
             a, b, result = row
             if result == value.result:
                 return
-            if result is not None or a not in active or b not in active:
+            elimination = self._elimination(tournament)
+            if elimination and value.result == "skip":
+                raise HTTPException(422, "Choose a winner to advance the bracket.")
+            resolved = elimination and self.db.execute(
+                "SELECT resolved FROM elimination_slots WHERE match_id=?", (value.match_id,)
+            ).fetchone()[0]
+            if resolved or result is not None or a not in active or b not in active:
                 raise HTTPException(409, "This matchup is no longer open.")
             self.db.execute(
                 "UPDATE tournament_matches SET result=? WHERE id=?", (value.result, value.match_id)
             )
-            self._finish_if_complete(tournament, voter, active)
+            if elimination:
+                self._advance_elimination(tournament, voter, active)
+            else:
+                self._finish_if_complete(tournament, voter, active)
 
     def report_local(self, tournament, voter, clip):
         with self.store.lock, self.db:
@@ -274,7 +378,11 @@ class TournamentStore:
             self.db.execute(
                 "DELETE FROM tournament_completions WHERE tournament=?", (tournament,)
             )
-            self._finish_if_complete(tournament, voter, self._active(tournament))
+            active = self._active(tournament)
+            if self._elimination(tournament):
+                self._advance_elimination(tournament, voter, active)
+            else:
+                self._finish_if_complete(tournament, voter, active)
         return {"removed": True, "tag": REMOVED_TAG}
 
     def bracket(self, tournament, voter):
@@ -300,6 +408,23 @@ class TournamentStore:
                     (tournament, voter),
                 )
             ]
+            if self._elimination(tournament):
+                slots = [
+                    {"round": slot.bit_length(), "a": a, "b": b, "winner": winner,
+                     "resolved": bool(resolved), "played": result in {"a", "b"}}
+                    for slot, a, b, winner, resolved, result in self.db.execute(
+                        """SELECT s.slot,s.a,s.b,s.winner,s.resolved,m.result
+                           FROM elimination_slots s
+                           LEFT JOIN tournament_matches m ON m.id=s.match_id
+                           WHERE s.tournament=? ORDER BY s.slot""", (tournament,),
+                    )
+                ]
+                champion = self.db.execute(
+                    "SELECT champion FROM tournament_completions WHERE tournament=?",
+                    (tournament,),
+                ).fetchone()
+                return {"clips": clips, "matches": matches, "slots": slots,
+                        "champion": champion[0] if champion else None}
         return {"clips": clips, "matches": matches}
 
     def leaderboard(self, tournament):

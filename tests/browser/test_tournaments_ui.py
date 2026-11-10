@@ -1,3 +1,4 @@
+import re
 from datetime import date
 
 from playwright.sync_api import expect
@@ -20,12 +21,15 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     )
     tab.click()
     mode = page.get_by_label("Mode", exact=True)
-    expect(mode).to_have_value("bracket")
+    expect(mode).to_have_value("elimination")
     expect(mode.locator('option[value="community"]')).to_be_disabled()
-    expect(mode.locator("option")).to_have_text(["Local comparisons", "Community Voting (INDEV)"])
+    expect(mode.locator('option[value="comparison"]')).to_be_disabled()
+    expect(mode.locator("option")).to_have_text(
+        ["Single elimination", "Local comparisons (INDEV)", "Community Voting (INDEV)"]
+    )
     pool = page.get_by_label("Audio pool")
     expect(pool.locator("option")).to_have_text(
-        ["Today", "Last week", "Date picker", "Previous Winners", "All"]
+        ["Today", "Last week", "Date picker", "Previous Winners", "All", "Random 16"]
     )
     expect(page.get_by_label("Beginning")).to_be_hidden()
     pool.select_option("range")
@@ -43,13 +47,13 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     page.wait_for_function("document.querySelector('#tournament-pair audio').duration > 0")
     page.get_by_role("button", name="Terrible horrible (A)", exact=True).click()
     expect(page.locator("#tournament-status")).to_have_text("Clip removed · shit from a butt")
-    expect(pair).to_have_text("No more matchups available.")
+    expect(pair).to_have_text(re.compile(r"^Champion: Clip [12]$"))
 
     page.reload()
     page.locator('[data-tab="tournaments"]').click()
-    expect(pair).to_have_text("No more matchups available.")
-    page.get_by_role("button", name="Match history", exact=True).click()
-    expect(page.locator("#tournament-bracket")).to_contain_text("Out of ranking")
+    expect(pair).to_have_text(re.compile(r"^Champion: Clip [12]$"))
+    page.get_by_role("button", name="Bracket", exact=True).click()
+    expect(page.locator("#tournament-bracket")).to_contain_text("advances by walkover")
     expect(page.locator("#tournament-clips li")).to_have_count(2)
     expect(page.locator("#tournament-clips")).to_contain_text("shit from a butt")
     page.get_by_role("button", name="Ranking", exact=True).click()
