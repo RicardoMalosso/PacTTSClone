@@ -94,3 +94,17 @@ def test_rejects_submission_after_shutdown(tmp_path, engine):
     service.close()
     with pytest.raises(UserError, match="encerrando"):
         service.submit(io.BytesIO(b"x"), GenerationRequest(text="Olá"))
+
+
+def test_diagnostic_write_failure_preserves_generation_and_queue(mp3, tmp_path, engine):
+    service = GenerationService(Settings(data_dir=tmp_path), engine)
+    try:
+        for name in ("requests.jsonl", "generation.jsonl", "generation-vram.jsonl"):
+            (service.logs / name).mkdir()
+        for text in ("First.", "Second."):
+            with mp3.open("rb") as source:
+                job = service.submit(source, GenerationRequest(text=text), allow_queue=True)
+            assert wait_job(service, job["id"])["status"] == "succeeded"
+        assert service.thread.is_alive()
+    finally:
+        service.close()

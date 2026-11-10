@@ -508,11 +508,13 @@ restarts, and queued mirrors preserve the start of each clip.
 
 ### Local audio tournaments
 
-Open **TTS Tourney** and pick an audio pool. **Bracket** is the local mode.
+Open **TTS Tourney** and pick an audio pool. **Local comparisons** is the host mode.
 **Community Voting (INDEV)** requires public voting and is disabled. **Today** starts at local midnight,
 **Last week** covers the past seven days, and **Date picker** includes both
-selected dates. **Previous Winners** takes the current top clip from each saved
-tournament with a recorded choice. **All** includes all eligible MP3s.
+selected dates. **Previous Winners** uses champions from completed tournaments.
+A tournament finishes after every remaining pair is voted on or skipped. A tied
+leaderboard or an all-skipped tournament has no champion. **All** includes all
+eligible MP3s.
 Play Clip A and Clip B, then
 pick one or skip. Votes and the leaderboard survive app restarts.
 
@@ -524,8 +526,8 @@ Twitch Affiliate or Partner channel. If a poll is already active, wait for it to
 end and start the current matchup's poll manually. The local pick controls the
 leaderboard.
 
-Open **Bracket** to see every clip and its recorded head-to-head matchups, or
+Open **Match history** to see every clip and its recorded head-to-head matchups, or
 **Ranking** to play clips in leaderboard order. One local **Terrible horrible**
 report removes a clip from that tournament and tags it **shit from a butt** in
-the bracket roster. The original MP3 remains available. Public voting and
+the match history roster. The original MP3 remains available. Public voting and
 Cloudflare links are INDEV.

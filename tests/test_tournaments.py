@@ -185,3 +185,32 @@ def test_previous_winners_requires_distinct_clips_with_votes(tmp_path, engine):
         tournament = client.post(base, json=selection).json()["id"]
         bracket = client.get(f"{base}/{tournament}/bracket").json()
         assert {clip["id"] for clip in bracket["clips"]} == {"a", "b"}
+
+
+def test_provisional_status_does_not_rank_five_losses_first():
+    from pacttsclone.tournaments import rank_clips
+
+    opponents = list("bcdef")
+    rows = rank_clips(["a", *opponents], [("a", clip, "b") for clip in opponents])
+    assert rows[-1]["clip"] == "a"
+    assert rows[-1]["comparisons"] == 5
+    assert all(row["provisional"] for row in rows[:-1])
+
+
+def test_unfinished_tournament_does_not_supply_previous_winner(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
+        base = "/api/tournaments"
+        for clip in ("a", "b"):
+            seed_clip(app.state.service, clip, clip.encode())
+        for size in (2, 3):
+            if size == 3:
+                seed_clip(app.state.service, "c", b"c")
+            tournament = client.post(base, json={"period": "all"}).json()["id"]
+            endpoint = f"{base}/{tournament}"
+            match = client.post(endpoint + "/pair").json()
+            winner = min(match["a"], match["b"]) if size == 2 else max(match["a"], match["b"])
+            vote = {"match_id": match["id"], "result": "a" if match["a"] == winner else "b"}
+            assert client.post(endpoint + "/vote", json=vote).status_code == 200
+        assert client.post(base, json={"period": "winners"}).status_code == 422

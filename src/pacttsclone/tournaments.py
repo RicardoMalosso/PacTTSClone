@@ -19,6 +19,7 @@ from .twitch_oauth import FEATURE_SCOPES
 Period = Literal["today", "week", "range", "winners", "all", "month"]
 REMOVED_TAG = "shit from a butt"
 DAYS = {"week": 7, "month": 30}
+LOCAL_OWNER = "local-owner"
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tournaments (
     id TEXT PRIMARY KEY, period TEXT NOT NULL, created_at REAL NOT NULL
@@ -33,6 +34,9 @@ CREATE TABLE IF NOT EXISTS tournament_matches (
 );
 CREATE INDEX IF NOT EXISTS tournament_matches_by_voter
     ON tournament_matches (tournament, voter);
+CREATE TABLE IF NOT EXISTS tournament_completions (
+    tournament TEXT PRIMARY KEY, champion TEXT
+);
 CREATE TABLE IF NOT EXISTS tournament_reports (
     tournament TEXT NOT NULL, clip TEXT NOT NULL, voter TEXT NOT NULL,
     PRIMARY KEY (tournament, clip, voter)
@@ -67,12 +71,18 @@ class TournamentStore:
     def _candidate_clips(self, selection, now):
         period = selection.period
         if period == "winners":
-            winners = []
-            for tournament in self.list():
-                ranked = self.leaderboard(tournament["id"])
-                if ranked and ranked[0]["comparisons"]:
-                    winners.append(ranked[0]["clip"])
-            return list(dict.fromkeys(winners))
+            # Existing installations have match records but no completion records.
+            for (tournament,) in self.db.execute(
+                "SELECT id FROM tournaments WHERE id NOT IN "
+                "(SELECT tournament FROM tournament_completions)"
+            ).fetchall():
+                self._finish_if_complete(tournament, LOCAL_OWNER, self._active(tournament))
+            return [
+                clip for (clip,) in self.db.execute(
+                    "SELECT DISTINCT champion FROM tournament_completions "
+                    "WHERE champion IS NOT NULL ORDER BY champion"
+                )
+            ]
 
         cutoff = 0
         end = now
@@ -109,7 +119,7 @@ class TournamentStore:
     def create(self, selection: CreateTournament):
         now = time.time()
         period = selection.period
-        with self.store.lock:
+        with self.store.lock, self.db:
             jobs = self._candidate_clips(selection, now)
         entries = {}
         for clip in jobs:
@@ -166,6 +176,28 @@ class TournamentStore:
             if a in active and b in active
         ]
 
+    def _finish_if_complete(self, tournament, voter, active):
+        resolved = {
+            tuple(sorted((a, b)))
+            for a, b in self.db.execute(
+                "SELECT a,b FROM tournament_matches WHERE tournament=? AND voter=? "
+                "AND result IS NOT NULL",
+                (tournament, voter),
+            )
+            if a in active and b in active
+        }
+        if len(resolved) != len(active) * (len(active) - 1) // 2:
+            return
+        results = self._results(tournament, active)
+        ranked = rank_clips(active, results)
+        champion = None
+        if results and len(ranked) >= 2 and ranked[0]["score"] - ranked[1]["score"] > 1e-6:
+            champion = ranked[0]["clip"]
+        self.db.execute(
+            "INSERT OR IGNORE INTO tournament_completions VALUES (?,?)",
+            (tournament, champion),
+        )
+
     def pair(self, tournament, voter):
         with self.store.lock, self.db:
             active = self._active(tournament)
@@ -194,6 +226,7 @@ class TournamentStore:
                         (match, tournament, voter, a, b),
                     )
                     return {"id": match, "a": a, "b": b}
+            self._finish_if_complete(tournament, voter, active)
             return None
 
     def require_open_match(self, tournament, voter, match_id):
@@ -224,6 +257,7 @@ class TournamentStore:
             self.db.execute(
                 "UPDATE tournament_matches SET result=? WHERE id=?", (value.result, value.match_id)
             )
+            self._finish_if_complete(tournament, voter, active)
 
     def report_local(self, tournament, voter, clip):
         with self.store.lock, self.db:
@@ -237,6 +271,10 @@ class TournamentStore:
                 "INSERT OR IGNORE INTO tournament_reports VALUES (?,?,?)",
                 (tournament, clip, voter),
             )
+            self.db.execute(
+                "DELETE FROM tournament_completions WHERE tournament=?", (tournament,)
+            )
+            self._finish_if_complete(tournament, voter, self._active(tournament))
         return {"removed": True, "tag": REMOVED_TAG}
 
     def bracket(self, tournament, voter):
@@ -307,7 +345,7 @@ def rank_clips(clips, results):
                 "provisional": comparisons < 5,
             }
         )
-    return sorted(rows, key=lambda row: (row["provisional"], -row["score"], row["clip"]))
+    return sorted(rows, key=lambda row: (-row["score"], row["clip"]))
 
 
 def register_tournament_routes(app, service, accounts):
@@ -319,7 +357,7 @@ def register_tournament_routes(app, service, accounts):
             raise HTTPException(403, "Tournament controls require local access.")
 
     # The local dashboard represents one owner. Public identities will be verified separately.
-    owner = "local-owner"
+    owner = LOCAL_OWNER
 
     @app.get("/api/tournaments")
     def list_tournaments(request: Request):

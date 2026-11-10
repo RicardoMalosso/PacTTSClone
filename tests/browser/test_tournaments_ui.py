@@ -22,7 +22,7 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     mode = page.get_by_label("Mode", exact=True)
     expect(mode).to_have_value("bracket")
     expect(mode.locator('option[value="community"]')).to_be_disabled()
-    expect(mode.locator("option")).to_have_text(["Bracket", "Community Voting (INDEV)"])
+    expect(mode.locator("option")).to_have_text(["Local comparisons", "Community Voting (INDEV)"])
     pool = page.get_by_label("Audio pool")
     expect(pool.locator("option")).to_have_text(
         ["Today", "Last week", "Date picker", "Previous Winners", "All"]
@@ -48,7 +48,7 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     page.reload()
     page.locator('[data-tab="tournaments"]').click()
     expect(pair).to_have_text("No more matchups available.")
-    page.get_by_role("button", name="Bracket", exact=True).click()
+    page.get_by_role("button", name="Match history", exact=True).click()
     expect(page.locator("#tournament-bracket")).to_contain_text("Out of ranking")
     expect(page.locator("#tournament-clips li")).to_have_count(2)
     expect(page.locator("#tournament-clips")).to_contain_text("shit from a butt")

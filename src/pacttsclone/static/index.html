@@ -35,11 +35,11 @@
 <section id="pane-tournaments" class="pane" hidden>
 <div class="intro"><h1>TTS Tourney</h1><p>Compare two generated clips and pick the better one. Public voting is INDEV.</p></div>
 <fieldset id="tournament-controls" class="card">
-<label for="tournament-mode">Mode</label><select id="tournament-mode" title="Bracket uses local choices. Community Voting requires public voting and is in development.">
-<option value="bracket" title="Compare clips locally and track head-to-head results.">Bracket</option>
+<label for="tournament-mode">Mode</label><select id="tournament-mode" title="Local comparisons use host choices. Community Voting requires public voting and is in development.">
+<option value="bracket" title="Compare clips locally and track head-to-head results.">Local comparisons</option>
 <option value="community" disabled title="Requires public voting.">Community Voting (INDEV)</option>
 </select>
-<label>Audio pool<select id="tournament-period" title="Choose which generated clips enter this tournament."><option value="today" title="Use clips completed since local midnight.">Today</option><option value="week" selected title="Use clips completed in the past seven days.">Last week</option><option value="range" title="Use clips completed between the beginning and end dates, inclusive.">Date picker</option><option value="winners" title="Use the current top clip from each saved tournament with a recorded choice.">Previous Winners</option><option value="all" title="Use all eligible generated MP3s.">All</option></select></label>
+<label>Audio pool<select id="tournament-period" title="Choose which generated clips enter this tournament."><option value="today" title="Use clips completed since local midnight.">Today</option><option value="week" selected title="Use clips completed in the past seven days.">Last week</option><option value="range" title="Use clips completed between the beginning and end dates, inclusive.">Date picker</option><option value="winners" title="Use champions from completed tournaments.">Previous Winners</option><option value="all" title="Use all eligible generated MP3s.">All</option></select></label>
 <div id="tournament-date-range" hidden>
 <label>Beginning<input id="tournament-start" title="Include clips starting on this local calendar date." type="date"></label>
 <label>End<input id="tournament-end" title="Include clips through the end of this local calendar date." type="date"></label>
@@ -52,12 +52,12 @@
 <p id="tournament-status" role="status"></p>
 <div id="tournament-views" class="row-actions" hidden>
 <button id="tournament-show-compare" title="Listen to the current pair and choose a clip." type="button" aria-pressed="true">Compare</button>
-<button id="tournament-show-bracket" title="See recorded head-to-head matchups and all enrolled clips." type="button" aria-pressed="false">Bracket</button>
+<button id="tournament-show-bracket" title="See recorded head-to-head matchups and all enrolled clips." type="button" aria-pressed="false">Match history</button>
 <button id="tournament-show-ranking" title="See active clips ranked by their local matchup results." type="button" aria-pressed="false">Ranking</button>
 </div>
 <div id="tournament-pair"></div>
 <section id="tournament-bracket-view" hidden>
-<h2>Head-to-head bracket</h2>
+<h2>Head-to-head match history</h2>
 <p class="muted">Each card shows one matchup. Clips can appear in multiple matchups.</p>
 <div id="tournament-bracket"></div>
 <h3>All clips</h3><ul id="tournament-clips"></ul>
