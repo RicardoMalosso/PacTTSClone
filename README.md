@@ -518,7 +518,8 @@ and **Date picker** includes both dates. **Previous Winners** uses champions fro
 completed tournaments. **All** includes all eligible MP3s. **Random draft** draws
 up to 4, 8, 16, 32, or 64 clips. It prioritizes clips with fewer past draft
 appearances and randomizes ties. Repeat entries fill the remaining slots when
-needed. Drafts count appearances across sizes and require two distinct MP3s.
+needed. Drafts count appearances across sizes and require two distinct MP3s. Clips
+tagged **Terrible horrible** are excluded from future drafts.
 
 Play Clip A and Clip B, then pick the winner. The bracket and votes survive
 app restarts.

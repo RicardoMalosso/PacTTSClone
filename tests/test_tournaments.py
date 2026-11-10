@@ -81,6 +81,12 @@ def test_both_clips_can_be_tagged_without_changing_the_winner(tmp_path, engine):
         assert board["champion"] == match["a"]
         assert board["matches"][0]["counts"]
         assert all(clip["tag"] == "shit from a butt" for clip in board["clips"])
+        for clip in ("c", "d"):
+            seed_clip(app.state.service, clip, clip.encode())
+        draft = client.post("/api/tournaments", json={"period": "short", "draft_size": 4})
+        assert draft.status_code == 200
+        drafted = client.get(f"/api/tournaments/{draft.json()['id']}/bracket").json()
+        assert {clip["id"] for clip in drafted["clips"]} == {"c", "d"}
 
 
 def test_twitch_poll_is_advisory_and_posted_once_per_match(tmp_path, engine, monkeypatch):

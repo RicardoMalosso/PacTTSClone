@@ -139,6 +139,12 @@ class TournamentStore:
                     "SELECT e.clip,COUNT(*) FROM tournament_entries e JOIN tournaments t "
                     "ON t.id=e.tournament WHERE t.period='short' GROUP BY e.clip"
                 ))
+                tagged = {
+                    clip for (clip,) in self.db.execute(
+                        "SELECT DISTINCT clip FROM tournament_reports"
+                    )
+                }
+                jobs = [clip for clip in jobs if clip not in tagged]
                 random.shuffle(jobs)
                 jobs.sort(key=lambda clip: appearances.get(clip, 0))
         entries = {}
@@ -155,7 +161,7 @@ class TournamentStore:
                 break
         if len(entries) < 2:
             if period == "short":
-                raise HTTPException(422, "Random draft needs at least two distinct generated MP3s.")
+                raise HTTPException(422, "Random draft needs at least two distinct untagged MP3s.")
             if period == "winners":
                 raise HTTPException(422, "At least two distinct previous winners are needed.")
             raise HTTPException(422, "This selection needs at least two distinct generated MP3s.")
