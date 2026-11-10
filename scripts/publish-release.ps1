@@ -34,7 +34,7 @@ $noteArgs = @('--generate-notes')
 $notes = "docs/release-$($identity.installer_version).md"
 if (Test-Path $notes) { $noteArgs = @('--notes-file', $notes) }
 $assets = @($files.FullName)
-gh release create $tag --draft "--prerelease=$($identity.prerelease)" --target $target --title "PacTTSClone $($identity.version)" @noteArgs @assets
+gh release create $tag --draft "--prerelease=$($identity.prerelease)" --target $target --title "PacTTSClone $($identity.installer_version)" @noteArgs @assets
 if ($LASTEXITCODE -ne 0) { throw 'Could not create draft release.' }
 
 if ($env:PACTTS_PUBLISH -ne 'true') { return }
