@@ -152,7 +152,8 @@ async function refreshMatch() {
 
 async function load(selected = $('tournament-select').value) {
   const select = $('tournament-select');
-  const periods = {week: 'Last week', month: 'Last month', all: 'All time'};
+  const periods = {today: 'Today', week: 'Last week', range: 'Date range',
+    winners: 'Previous Winners', all: 'All', month: 'Last month'};
   const [tournaments, channels] = await Promise.all([api(base), api('/api/channels')]);
   const pollChannel = $('tournament-poll-channel');
   const previous = pollChannel.value;
@@ -175,11 +176,17 @@ export function initTournaments() {
   for (const view of ['compare', 'bracket', 'ranking']) {
     $('tournament-show-' + view).onclick = () => showView(view);
   }
+  $('tournament-period').onchange = () => {
+    $('tournament-date-range').hidden = $('tournament-period').value !== 'range';
+  };
   $('tournament-select').onchange = () => run(refreshMatch);
   $('tournament-create').onclick = () => run(async () => {
-    const tournament = await api(base, {
-      method: 'POST', body: {period: $('tournament-period').value},
-    });
+    const body = {period: $('tournament-period').value};
+    if (body.period === 'range') {
+      body.start_date = $('tournament-start').value || null;
+      body.end_date = $('tournament-end').value || null;
+    }
+    const tournament = await api(base, {method: 'POST', body});
     await load(tournament.id);
   });
 }

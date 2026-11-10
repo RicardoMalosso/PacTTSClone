@@ -1,3 +1,5 @@
+from datetime import date
+
 from playwright.sync_api import expect
 
 from tests.test_tournaments import seed_clip
@@ -13,6 +15,15 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
 
     page.goto(url)
     page.locator('[data-tab="tournaments"]').click()
+    pool = page.get_by_label("Audio pool")
+    expect(pool.locator("option")).to_have_text(
+        ["Today", "Last week", "Date picker", "Previous Winners", "All"]
+    )
+    expect(page.get_by_label("Beginning")).to_be_hidden()
+    pool.select_option("range")
+    today = date.today().isoformat()
+    page.get_by_label("Beginning").fill(today)
+    page.get_by_label("End", exact=True).fill(today)
     page.get_by_role("button", name="Create tournament").click()
     pair = page.locator("#tournament-pair")
     expect(pair.locator("audio")).to_have_count(2)

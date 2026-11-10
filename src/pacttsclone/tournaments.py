@@ -4,6 +4,8 @@ import hashlib
 import random
 import time
 from collections import Counter
+from datetime import date, datetime, timedelta
+from datetime import time as clock
 from itertools import combinations
 from threading import Lock
 from typing import Literal
@@ -14,9 +16,9 @@ from pydantic import BaseModel
 
 from .twitch_oauth import FEATURE_SCOPES
 
-Period = Literal["week", "month", "all"]
+Period = Literal["today", "week", "range", "winners", "all", "month"]
 REMOVED_TAG = "shit from a butt"
-DAYS = {"week": 7, "month": 30, "all": None}
+DAYS = {"week": 7, "month": 30}
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS tournaments (
     id TEXT PRIMARY KEY, period TEXT NOT NULL, created_at REAL NOT NULL
@@ -40,6 +42,8 @@ CREATE TABLE IF NOT EXISTS tournament_reports (
 
 class CreateTournament(BaseModel):
     period: Period
+    start_date: date | None = None
+    end_date: date | None = None
 
 
 class Poll(BaseModel):
@@ -60,21 +64,55 @@ class TournamentStore:
         with self.store.lock:
             self.db.executescript(SCHEMA)
 
-    def create(self, period: Period):
-        now = time.time()
-        days = DAYS[period]
-        cutoff = now - days * 86400 if days else 0
-        with self.store.lock:
-            jobs = self.db.execute(
+    def _candidate_clips(self, selection, now):
+        period = selection.period
+        if period == "winners":
+            winners = []
+            for tournament in self.list():
+                ranked = self.leaderboard(tournament["id"])
+                if ranked and ranked[0]["comparisons"]:
+                    winners.append(ranked[0]["clip"])
+            return list(dict.fromkeys(winners))
+
+        cutoff = 0
+        end = now
+        if period in DAYS:
+            cutoff = now - DAYS[period] * 86400
+        elif period == "today":
+            cutoff = datetime.combine(date.fromtimestamp(now), clock.min).timestamp()
+        elif period == "range":
+            start_date, end_date = selection.start_date, selection.end_date
+            if not start_date or not end_date or start_date > end_date:
+                raise HTTPException(422, "Choose a beginning and end date in order.")
+            try:
+                cutoff = datetime.combine(start_date, clock.min).timestamp()
+                end = min(
+                    now, datetime.combine(end_date + timedelta(days=1), clock.min).timestamp()
+                )
+            except (OverflowError, OSError, ValueError) as exc:
+                raise HTTPException(422, "Choose dates supported by this computer.") from exc
+
+        return [
+            clip
+            for (clip,) in self.db.execute(
                 """SELECT id FROM records WHERE kind='job'
                 AND json_extract(data,'$.status')='succeeded'
                 AND COALESCE(json_extract(data,'$.finished_at'),
-                             json_extract(data,'$.created_at')) BETWEEN ? AND ?
+                             json_extract(data,'$.created_at')) >= ?
+                AND COALESCE(json_extract(data,'$.finished_at'),
+                             json_extract(data,'$.created_at')) < ?
                 ORDER BY id""",
-                (cutoff, now),
-            ).fetchall()
+                (cutoff, end),
+            )
+        ]
+
+    def create(self, selection: CreateTournament):
+        now = time.time()
+        period = selection.period
+        with self.store.lock:
+            jobs = self._candidate_clips(selection, now)
         entries = {}
-        for (clip,) in jobs:
+        for clip in jobs:
             path = self.service.output_path(clip)
             try:
                 if not path.is_file() or not path.stat().st_size:
@@ -84,7 +122,9 @@ class TournamentStore:
             except OSError:
                 continue
         if len(entries) < 2:
-            raise HTTPException(422, "This period needs at least two distinct generated MP3s.")
+            if period == "winners":
+                raise HTTPException(422, "At least two distinct previous winners are needed.")
+            raise HTTPException(422, "This selection needs at least two distinct generated MP3s.")
         tournament = uuid4().hex
         with self.store.lock, self.db:
             self.db.execute("INSERT INTO tournaments VALUES (?,?,?)", (tournament, period, now))
@@ -290,7 +330,7 @@ def tournament_routes(service, accounts):
     @router.post("")
     def create_tournament(request: Request, value: CreateTournament):
         local_owner(request)
-        return store.create(value.period)
+        return store.create(value)
 
     @router.post("/{tournament}/pair")
     def pair(request: Request, tournament: str):

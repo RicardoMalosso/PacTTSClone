@@ -1,4 +1,6 @@
 import time
+from datetime import date, datetime, timedelta
+from datetime import time as clock
 
 from fastapi.testclient import TestClient
 
@@ -128,3 +130,56 @@ def test_twitch_poll_is_advisory_and_posted_once_per_match(tmp_path, engine, mon
         vote = {"match_id": match["id"], "result": "b"}
         assert client.post(endpoint + "/vote", json=vote).status_code == 200
         assert client.get(endpoint + "/leaderboard").json()[0]["clip"] == match["b"]
+
+
+def test_date_pools_use_local_calendar_boundaries(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        service = app.state.service
+        midnight = datetime.combine(date.today(), clock.min)
+        for clip, completed in (
+            ("today-a", midnight),
+            ("today-b", midnight),
+            ("yesterday-a", midnight - timedelta(seconds=1)),
+            ("yesterday-b", midnight - timedelta(hours=12)),
+        ):
+            seed_clip(service, clip, clip.encode())
+            service.store.patch("job", clip, finished_at=completed.timestamp())
+        client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
+        base = "/api/tournaments"
+
+        def clips_for(selection):
+            created = client.post(base, json=selection)
+            assert created.status_code == 200
+            bracket = client.get(f"{base}/{created.json()['id']}/bracket").json()
+            return {clip["id"] for clip in bracket["clips"]}
+
+        assert clips_for({"period": "today"}) == {"today-a", "today-b"}
+        yesterday = (midnight.date() - timedelta(days=1)).isoformat()
+        selection = {"period": "range", "start_date": yesterday, "end_date": yesterday}
+        assert clips_for(selection) == {"yesterday-a", "yesterday-b"}
+        assert client.post(base, json={"period": "range"}).status_code == 422
+        assert client.post(base, json={**selection, "start_date": "9999-12-31"}).status_code == 422
+
+
+def test_previous_winners_requires_distinct_clips_with_votes(tmp_path, engine):
+    app = create_app(Settings(data_dir=tmp_path), engine)
+    with TestClient(app, base_url="http://127.0.0.1") as client:
+        service = app.state.service
+        seed_clip(service, "a", b"audio a")
+        seed_clip(service, "b", b"audio b")
+        client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
+        base = "/api/tournaments"
+        selection = {"period": "winners"}
+        assert client.post(base, json=selection).status_code == 422
+        for winner in ("a", "b"):
+            tournament = client.post(base, json={"period": "all"}).json()["id"]
+            endpoint = f"{base}/{tournament}"
+            match = client.post(endpoint + "/pair").json()
+            result = "a" if match["a"] == winner else "b"
+            vote = {"match_id": match["id"], "result": result}
+            assert client.post(endpoint + "/vote", json=vote).status_code == 200
+        seed_clip(service, "c", b"audio c")
+        tournament = client.post(base, json=selection).json()["id"]
+        bracket = client.get(f"{base}/{tournament}/bracket").json()
+        assert {clip["id"] for clip in bracket["clips"]} == {"a", "b"}

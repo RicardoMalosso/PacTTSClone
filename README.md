@@ -504,8 +504,11 @@ restarts, and queued mirrors preserve the start of each clip.
 
 ### Local audio tournaments
 
-Open **TTS Tourney**, select **Last week**, **Last month**, or **All time**, and
-create a tournament from existing generated MP3s. Play Clip A and Clip B, then
+Open **TTS Tourney** and pick an audio pool. **Today** starts at local midnight,
+**Last week** covers the past seven days, and **Date picker** includes both
+selected dates. **Previous Winners** takes the current top clip from each saved
+tournament with a recorded choice. **All** includes all eligible MP3s.
+Play Clip A and Clip B, then
 pick one or skip. Votes and the leaderboard survive app restarts.
 
 To let viewers weigh in, authorize **Tournament polls** for your broadcaster in

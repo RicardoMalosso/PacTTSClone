@@ -35,7 +35,11 @@
 <section id="pane-tournaments" class="pane" hidden>
 <div class="intro"><h1>TTS Tourney</h1><p>Compare two generated clips and pick the better one. Public voting is INDEV.</p></div>
 <fieldset id="tournament-controls" class="card">
-<label>Period<select id="tournament-period"><option value="week">Last week</option><option value="month">Last month</option><option value="all">All time</option></select></label>
+<label>Audio pool<select id="tournament-period"><option value="today">Today</option><option value="week" selected>Last week</option><option value="range">Date picker</option><option value="winners">Previous Winners</option><option value="all">All</option></select></label>
+<div id="tournament-date-range" hidden>
+<label>Beginning<input id="tournament-start" type="date"></label>
+<label>End<input id="tournament-end" type="date"></label>
+</div>
 <button id="tournament-create" type="button">Create tournament</button>
 <label>Saved tournaments<select id="tournament-select"></select></label>
 <label>Twitch poll channel<select id="tournament-poll-channel"><option value="">No Twitch polls</option></select></label>
