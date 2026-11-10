@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from pacttsclone.app import create_app
 from pacttsclone.config import Settings
-from pacttsclone.tournaments import TournamentStore
 
 
 def seed_clip(service, clip, content, *, age=0, status="succeeded"):
@@ -60,48 +59,28 @@ def test_local_tournament_and_persisted_votes(tmp_path, engine):
         assert winner["score"] > loser["score"]
 
 
-def test_one_local_report_tags_clip_and_voids_comparisons(tmp_path, engine):
+def test_both_clips_can_be_tagged_without_changing_the_winner(tmp_path, engine):
     app = create_app(Settings(data_dir=tmp_path), engine)
     with TestClient(app, base_url="http://127.0.0.1") as client:
-        service = app.state.service
-        seed_clip(service, "a", b"audio a")
-        seed_clip(service, "b", b"audio b")
+        seed_clip(app.state.service, "a", b"audio a")
+        seed_clip(app.state.service, "b", b"audio b")
         client.headers["X-PacTTS-Token"] = client.get("/api/session").json()["token"]
         tournament = client.post("/api/tournaments", json={"period": "all"}).json()["id"]
-        # Simulate an existing pairwise tournament from before elimination was added.
-        with service.store.lock, service.store.db:
-            for table in ("elimination_slots", "tournament_matches"):
-                service.store.db.execute(f"DELETE FROM {table} WHERE tournament=?", (tournament,))
         endpoint = f"/api/tournaments/{tournament}"
         match = client.post(endpoint + "/pair").json()
-        vote = {"match_id": match["id"], "result": "a"}
-        assert client.post(endpoint + "/vote", json=vote).status_code == 200
-
-        store = TournamentStore(service)
-        pending = store.pair(tournament, "second")
-        assert "a" in (pending["a"], pending["b"])
-
-        report = endpoint + "/report/a"
-        removed = {"removed": True, "tag": "shit from a butt"}
-        assert client.post(report).json() == removed
-        assert client.post(report).json() == removed
-        assert store.pair(tournament, "second") is None
-        assert client.post(endpoint + "/pair").json() is None
+        for clip in ("a", "b", "a"):
+            assert client.post(f"{endpoint}/report/{clip}").json() == {
+                "tag": "shit from a butt",
+            }
+        assert client.post(endpoint + "/pair").json() == match
+        assert client.get(endpoint + "/bracket").json()["champion"] is None
+        assert client.post(endpoint + "/vote", json={
+            "match_id": match["id"], "result": "a",
+        }).status_code == 200
         board = client.get(endpoint + "/bracket").json()
-        for clip in board["clips"]:
-            assert clip.pop("thumbnail_url") is None
-            assert clip.pop("record")["wins"] == 0
-        assert board == {
-            "clips": [
-                {"id": "a", "tag": "shit from a butt", "playable": True},
-                {"id": "b", "tag": None, "playable": True},
-            ],
-            "matches": [{"a": match["a"], "b": match["b"], "result": "a", "counts": False}],
-        }
-        assert client.get(endpoint + "/leaderboard").json() == [
-            {"clip": "b", "score": 1.0, "comparisons": 0, "provisional": True},
-        ]
-        assert service.output_path("a").is_file()
+        assert board["champion"] == match["a"]
+        assert board["matches"][0]["counts"]
+        assert all(clip["tag"] == "shit from a butt" for clip in board["clips"])
 
 
 def test_twitch_poll_is_advisory_and_posted_once_per_match(tmp_path, engine, monkeypatch):

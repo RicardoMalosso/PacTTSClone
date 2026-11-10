@@ -536,7 +536,7 @@ clips in leaderboard order. Clip cards use available voice pictures and show
 career wins and losses from host picks. Completed elimination brackets award gold
 to the champion, silver to the final loser and bronze to both semifinal losers
 when those matches were played. Medal icons appear only for clips with a win.
-Older pairwise tournaments retain **Match history**. One local **Terrible horrible**
-report removes a clip from that tournament and tags it **shit from a butt** in
-the tournament roster. The original MP3 remains available. Public voting and
+Older pairwise tournaments retain **Match history**. **Terrible horrible** tags a clip
+as **shit from a butt** in the tournament roster. You can tag both clips and
+then pick the winner separately. Public voting and
 Cloudflare links are INDEV.

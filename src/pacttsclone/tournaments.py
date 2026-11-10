@@ -364,25 +364,16 @@ class TournamentStore:
 
     def report_local(self, tournament, voter, clip):
         with self.store.lock, self.db:
-            updated = self.db.execute(
-                "UPDATE tournament_entries SET removed=1 WHERE tournament=? AND clip=?",
+            if not self.db.execute(
+                "SELECT 1 FROM tournament_entries WHERE tournament=? AND clip=?",
                 (tournament, clip),
-            )
-            if not updated.rowcount:
+            ).fetchone():
                 raise HTTPException(404, "Tournament clip not found.")
             self.db.execute(
                 "INSERT OR IGNORE INTO tournament_reports VALUES (?,?,?)",
                 (tournament, clip, voter),
             )
-            self.db.execute(
-                "DELETE FROM tournament_completions WHERE tournament=?", (tournament,)
-            )
-            active = self._active(tournament)
-            if self._elimination(tournament):
-                self._advance_elimination(tournament, voter, active)
-            else:
-                self._finish_if_complete(tournament, voter, active)
-        return {"removed": True, "tag": REMOVED_TAG}
+        return {"tag": REMOVED_TAG}
 
     def _clip_records(self, tournament):
         records = {
@@ -442,12 +433,14 @@ class TournamentStore:
                     "id": clip,
                     "thumbnail_url": self._thumbnail(clip),
                     "record": records[clip],
-                    "tag": REMOVED_TAG if removed else None,
+                    "tag": REMOVED_TAG if tagged or removed else None,
                     "playable": clip in active
                     or bool(removed and self.service.output_path(clip).is_file()),
                 }
-                for clip, removed in self.db.execute(
-                    "SELECT clip,removed FROM tournament_entries WHERE tournament=? ORDER BY clip",
+                for clip, removed, tagged in self.db.execute(
+                    "SELECT e.clip,e.removed,EXISTS (SELECT 1 FROM tournament_reports r "
+                    "WHERE r.tournament=e.tournament AND r.clip=e.clip) "
+                    "FROM tournament_entries e WHERE e.tournament=? ORDER BY e.clip",
                     (tournament,),
                 )
             ]

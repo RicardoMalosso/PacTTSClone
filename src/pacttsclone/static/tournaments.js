@@ -111,7 +111,7 @@ function renderResults(rows, bracket) {
     const label = labels.get(clip.id);
     item.append(clipIdentity(clip, label));
     if (clip.tag) {
-      item.title = 'Reported locally and removed from this tournament.';
+      item.title = 'Tagged locally by the host.';
       item.append(' · ' + clip.tag);
     }
     if (clip.playable) item.append(audio(clip.id, label));
@@ -212,17 +212,23 @@ async function refreshMatch() {
     const clip = match[side];
     const label = side.toUpperCase();
     const group = document.createElement('div');
+    const entry = bracket.clips.find(item => item.id === clip);
+    const tagButton = button('Terrible horrible (' + label + ')',
+      'Tag this clip without changing the result or advancing the bracket.', async () => {
+        const report = await api(endpoint + '/report/' + encodeURIComponent(clip), {method: 'POST'});
+        entry.tag = report.tag;
+        tagButton.setAttribute('aria-pressed', 'true');
+        tagButton.disabled = true;
+        renderResults(rows, bracket);
+        $('tournament-status').textContent = 'Clip tagged · ' + report.tag;
+      });
+    tagButton.disabled = Boolean(entry.tag);
+    tagButton.setAttribute('aria-pressed', String(Boolean(entry.tag)));
     group.append(
-      clipIdentity(bracket.clips.find(entry => entry.id === clip),
-        label + ' · ' + labels.get(clip)),
+      clipIdentity(entry, label + ' · ' + labels.get(clip)),
       audio(clip, 'Clip ' + label),
       button('Pick ' + label, 'Count a local win for Clip ' + label + '.', () => vote(side)),
-      button('Terrible horrible (' + label + ')',
-        'Remove this clip from the tournament and tag it “shit from a butt.”', async () => {
-        const report = await api(endpoint + '/report/' + encodeURIComponent(clip), {method: 'POST'});
-        await refreshMatch();
-        $('tournament-status').textContent = 'Clip removed · ' + report.tag;
-      }),
+      tagButton,
     );
     contenders.append(group);
   }
