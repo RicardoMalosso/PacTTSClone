@@ -11,7 +11,7 @@ from threading import Lock
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import HTTPException, Request
 from pydantic import BaseModel
 
 from .twitch_oauth import FEATURE_SCOPES
@@ -310,10 +310,9 @@ def rank_clips(clips, results):
     return sorted(rows, key=lambda row: (row["provisional"], -row["score"], row["clip"]))
 
 
-def tournament_routes(service, accounts):
+def register_tournament_routes(app, service, accounts):
     store = TournamentStore(service)
     poll_lock = Lock()
-    router = APIRouter(prefix="/api/tournaments")
 
     def local_owner(request: Request):
         if request.state.remote_access:
@@ -322,33 +321,33 @@ def tournament_routes(service, accounts):
     # The local dashboard represents one owner. Public identities will be verified separately.
     owner = "local-owner"
 
-    @router.get("")
+    @app.get("/api/tournaments")
     def list_tournaments(request: Request):
         local_owner(request)
         return store.list()
 
-    @router.post("")
+    @app.post("/api/tournaments")
     def create_tournament(request: Request, value: CreateTournament):
         local_owner(request)
         return store.create(value)
 
-    @router.post("/{tournament}/pair")
+    @app.post("/api/tournaments/{tournament}/pair")
     def pair(request: Request, tournament: str):
         local_owner(request)
         return store.pair(tournament, owner)
 
-    @router.post("/{tournament}/vote")
+    @app.post("/api/tournaments/{tournament}/vote")
     def vote(request: Request, tournament: str, value: Compare):
         local_owner(request)
         store.vote(tournament, owner, value)
         return {"ok": True}
 
-    @router.post("/{tournament}/report/{clip}")
+    @app.post("/api/tournaments/{tournament}/report/{clip}")
     def report(request: Request, tournament: str, clip: str):
         local_owner(request)
         return store.report_local(tournament, owner, clip)
 
-    @router.post("/{tournament}/poll")
+    @app.post("/api/tournaments/{tournament}/poll")
     def poll(request: Request, tournament: str, value: Poll):
         local_owner(request)
         channel = service.store.get("channel", value.channel)
@@ -384,14 +383,12 @@ def tournament_routes(service, accounts):
             )
             return service.store.put("tournament_poll", key, {"id": response["data"][0]["id"]})
 
-    @router.get("/{tournament}/bracket")
+    @app.get("/api/tournaments/{tournament}/bracket")
     def bracket(request: Request, tournament: str):
         local_owner(request)
         return store.bracket(tournament, owner)
 
-    @router.get("/{tournament}/leaderboard")
+    @app.get("/api/tournaments/{tournament}/leaderboard")
     def leaderboard(request: Request, tournament: str):
         local_owner(request)
         return store.leaderboard(tournament)
-
-    return router
