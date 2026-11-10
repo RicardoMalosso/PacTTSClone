@@ -9,13 +9,15 @@ function audio(clip, label) {
   player.preload = 'none';
   player.src = '/api/jobs/' + encodeURIComponent(clip) + '/audio';
   player.setAttribute('aria-label', label);
+  player.title = 'Preview ' + label + ' in this browser.';
   return player;
 }
 
-function button(label, action) {
+function button(label, hint, action) {
   const node = document.createElement('button');
   node.type = 'button';
   node.textContent = label;
+  node.title = hint;
   node.onclick = () => run(action);
   return node;
 }
@@ -58,6 +60,9 @@ function renderResults(rows, bracket) {
   for (const row of rows) {
     const item = document.createElement('li');
     const label = labels.get(row.clip);
+    item.title = row.provisional
+      ? 'Provisional until this clip has five counted comparisons.'
+      : 'Placement is based on counted head-to-head choices.';
     item.append(label + ' · ' + row.comparisons + ' comparisons',
       row.provisional ? ' · Provisional' : '', audio(row.clip, label));
     ranking.append(item);
@@ -70,7 +75,10 @@ function renderResults(rows, bracket) {
     const item = document.createElement('li');
     const label = labels.get(clip.id);
     item.append(label);
-    if (clip.tag) item.append(' · ' + clip.tag);
+    if (clip.tag) {
+      item.title = 'Reported locally and removed from this tournament.';
+      item.append(' · ' + clip.tag);
+    }
     if (clip.playable) item.append(audio(clip.id, label));
     else item.append(' · MP3 unavailable');
     roster.append(item);
@@ -95,6 +103,9 @@ function renderResults(rows, bracket) {
     else if (!match.result) result.textContent = 'Pending';
     else if (match.result === 'skip') result.textContent = 'Skipped';
     else result.textContent = labels.get(match[match.result]) + ' won';
+    result.title = match.counts
+      ? 'Recorded outcome of this matchup.'
+      : 'This matchup is excluded because a clip was removed or is unavailable.';
     card.append(sides, result);
     graphic.append(card);
   }
@@ -132,8 +143,9 @@ async function refreshMatch() {
     group.append(
       label + ' · ' + labels.get(clip),
       audio(clip, 'Clip ' + label),
-      button('Pick ' + label, () => vote(side)),
-      button('Terrible horrible (' + label + ')', async () => {
+      button('Pick ' + label, 'Count a local win for Clip ' + label + '.', () => vote(side)),
+      button('Terrible horrible (' + label + ')',
+        'Remove this clip from the tournament and tag it “shit from a butt.”', async () => {
         const report = await api(endpoint + '/report/' + encodeURIComponent(clip), {method: 'POST'});
         await refreshMatch();
         $('tournament-status').textContent = 'Clip removed · ' + report.tag;
@@ -142,8 +154,9 @@ async function refreshMatch() {
     panel.append(group);
   }
   panel.append(
-    button('Skip', () => vote('skip')),
-    button('Start Twitch poll', () => startPoll(endpoint, match)),
+    button('Skip', 'Move to the next matchup without awarding a win.', () => vote('skip')),
+    button('Start Twitch poll', 'Ask viewers to pick A or B. The result is advisory.',
+      () => startPoll(endpoint, match)),
   );
   if ($('tournament-auto-poll').checked && $('tournament-poll-channel').value) {
     await startPoll(endpoint, match);

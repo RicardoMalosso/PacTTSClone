@@ -3,7 +3,7 @@
 <title>PacTTSClone · Local voice studio</title><link rel="stylesheet" href="/static/style.css"><script src="/static/i18n.js" defer></script><script src="/static/events.js" defer></script><script type="module" src="/static/app.js"></script></head>
 <body><section id="live-generation" class="card live-generation" aria-label="Current generation"><strong id="live-generation-source"></strong><span id="live-generation-status"></span><span id="live-generation-timer">00:00.0</span><progress id="live-generation-progress" max="1" value="0" aria-label="Current operation progress"></progress><button id="view-monitor" type="button" class="secondary small-button">View generation monitor</button><button id="restart-cuda" type="button" class="danger small-button" title="Restart the inference worker and reinitialize CUDA on the next generation">SOMETHING IS A FUCK — RESTART CUDA</button><button id="live-generation-cancel" type="button" class="danger small-button" hidden>Cancel active generation</button></section><main><p id="cuda-status" role="status">CUDA: not checked yet</p><p id="gpu-pressure-warning" class="notice" role="status" hidden></p><header><div><strong class="brand">PAC<span>TTS</span>CLONE</strong><div class="studio-title"><small>LOCAL VOICE STUDIO · v2</small><div class="locale-switch" aria-label="Language"><button data-locale="en" aria-label="English (Canada)"><svg viewBox="0 0 60 40" aria-hidden="true"><path fill="#fff" d="M0 0h60v40H0z"/><path fill="#d6242a" d="M0 0h15v40H0zm45 0h15v40H45zM30 7l3 7 4-2-1 7 6-1-4 6 2 2-9 2v6h-2v-6l-9-2 2-2-4-6 6 1-1-7 4 2z"/></svg> English</button><button data-locale="pt" aria-label="Português (Brasil)"><svg viewBox="0 0 60 40" aria-hidden="true"><path fill="#009b3a" d="M0 0h60v40H0z"/><path fill="#ffdf00" d="M30 4L55 20 30 36 5 20z"/><circle cx="30" cy="20" r="10" fill="#002776"/><path fill="none" stroke="#fff" stroke-width="2" d="M21 16q11-1 18 8"/></svg> Português</button></div></div></div>
 <div class="header-actions"><button id="panic" class="danger">Stop playback / panic</button><button id="cancel-all" class="secondary">Cancel all work</button></div></header>
-<nav aria-label="Studio sections"><button data-tab="setup" class="active">Initial Setup</button><button data-tab="engines">Engines</button><button disabled data-tab="voices">Voices</button><button disabled data-tab="sfx">SFX</button><button disabled data-tab="channels">Twitch & OBS</button><button disabled data-tab="history">History</button><button data-tab="tournaments" hidden>TTS Tourney</button><button disabled data-tab="config">Configuration</button><button disabled data-tab="bugs">Report a bug</button><button disabled data-tab="studio">Local</button></nav>
+<nav aria-label="Studio sections"><button data-tab="setup" class="active">Initial Setup</button><button data-tab="engines">Engines</button><button disabled data-tab="voices">Voices</button><button disabled data-tab="sfx">SFX</button><button disabled data-tab="channels">Twitch & OBS</button><button disabled data-tab="history">History</button><button data-tab="tournaments" hidden title="Compare generated MP3s, review head-to-head matchups, and see the rankings.">TTS Tourney</button><button disabled data-tab="config">Configuration</button><button disabled data-tab="bugs">Report a bug</button><button disabled data-tab="studio">Local</button></nav>
 <p id="health" class="notice" role="status">Checking local environment…</p><p id="error" class="error" role="alert" hidden></p>
 
 <section class="resources" aria-label="Live resource usage"><div><small>System CPU</small><strong id="cpu">N/A</strong></div><div><small>Worker RAM</small><strong id="ram">N/A</strong></div><div><small>System RAM</small><strong id="system-ram">N/A</strong></div><div><small>Device-wide VRAM</small><strong id="vram">N/A</strong></div><div><small>GPU utilization (device)</small><strong id="gpu">N/A</strong></div></section>
@@ -35,21 +35,25 @@
 <section id="pane-tournaments" class="pane" hidden>
 <div class="intro"><h1>TTS Tourney</h1><p>Compare two generated clips and pick the better one. Public voting is INDEV.</p></div>
 <fieldset id="tournament-controls" class="card">
-<label>Audio pool<select id="tournament-period"><option value="today">Today</option><option value="week" selected>Last week</option><option value="range">Date picker</option><option value="winners">Previous Winners</option><option value="all">All</option></select></label>
+<label for="tournament-mode">Mode</label><select id="tournament-mode" title="Bracket uses local choices. Community Voting requires public voting and is in development.">
+<option value="bracket" title="Compare clips locally and track head-to-head results.">Bracket</option>
+<option value="community" disabled title="Requires public voting.">Community Voting (INDEV)</option>
+</select>
+<label>Audio pool<select id="tournament-period" title="Choose which generated clips enter this tournament."><option value="today" title="Use clips completed since local midnight.">Today</option><option value="week" selected title="Use clips completed in the past seven days.">Last week</option><option value="range" title="Use clips completed between the beginning and end dates, inclusive.">Date picker</option><option value="winners" title="Use the current top clip from each saved tournament with a recorded choice.">Previous Winners</option><option value="all" title="Use all eligible generated MP3s.">All</option></select></label>
 <div id="tournament-date-range" hidden>
-<label>Beginning<input id="tournament-start" type="date"></label>
-<label>End<input id="tournament-end" type="date"></label>
+<label>Beginning<input id="tournament-start" title="Include clips starting on this local calendar date." type="date"></label>
+<label>End<input id="tournament-end" title="Include clips through the end of this local calendar date." type="date"></label>
 </div>
-<button id="tournament-create" type="button">Create tournament</button>
-<label>Saved tournaments<select id="tournament-select"></select></label>
-<label>Twitch poll channel<select id="tournament-poll-channel"><option value="">No Twitch polls</option></select></label>
-<label class="check"><input type="checkbox" id="tournament-auto-poll"> Start a Twitch poll for each matchup</label>
+<button id="tournament-create" title="Create a tournament using the selected mode and audio pool." type="button">Create tournament</button>
+<label>Saved tournaments<select id="tournament-select" title="Reopen a saved tournament with its matchups and votes."></select></label>
+<label>Twitch poll channel<select id="tournament-poll-channel" title="Choose where optional Twitch polls appear. Poll votes are advisory."><option value="">No Twitch polls</option></select></label>
+<label class="check"><input type="checkbox" id="tournament-auto-poll" title="Start a Twitch poll when a matchup opens and the channel has no active poll."> Start a Twitch poll for each matchup</label>
 <p class="muted">Authorize Tournament polls in Twitch &amp; OBS first. Play the clips on your stream for viewers. Only your local pick counts toward the leaderboard.</p>
 <p id="tournament-status" role="status"></p>
 <div id="tournament-views" class="row-actions" hidden>
-<button id="tournament-show-compare" type="button" aria-pressed="true">Compare</button>
-<button id="tournament-show-bracket" type="button" aria-pressed="false">Bracket</button>
-<button id="tournament-show-ranking" type="button" aria-pressed="false">Ranking</button>
+<button id="tournament-show-compare" title="Listen to the current pair and choose a clip." type="button" aria-pressed="true">Compare</button>
+<button id="tournament-show-bracket" title="See recorded head-to-head matchups and all enrolled clips." type="button" aria-pressed="false">Bracket</button>
+<button id="tournament-show-ranking" title="See active clips ranked by their local matchup results." type="button" aria-pressed="false">Ranking</button>
 </div>
 <div id="tournament-pair"></div>
 <section id="tournament-bracket-view" hidden>

@@ -504,7 +504,8 @@ restarts, and queued mirrors preserve the start of each clip.
 
 ### Local audio tournaments
 
-Open **TTS Tourney** and pick an audio pool. **Today** starts at local midnight,
+Open **TTS Tourney** and pick an audio pool. **Bracket** is the local mode.
+**Community Voting (INDEV)** requires public voting and is disabled. **Today** starts at local midnight,
 **Last week** covers the past seven days, and **Date picker** includes both
 selected dates. **Previous Winners** takes the current top clip from each saved
 tournament with a recorded choice. **All** includes all eligible MP3s.

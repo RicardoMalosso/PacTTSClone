@@ -14,7 +14,15 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     seed_clip(app.state.service, "clip-b", content + b"\0")
 
     page.goto(url)
-    page.locator('[data-tab="tournaments"]').click()
+    tab = page.get_by_role("button", name="TTS Tourney", exact=True)
+    expect(tab).to_have_attribute(
+        "title", "Compare generated MP3s, review head-to-head matchups, and see the rankings."
+    )
+    tab.click()
+    mode = page.get_by_label("Mode", exact=True)
+    expect(mode).to_have_value("bracket")
+    expect(mode.locator('option[value="community"]')).to_be_disabled()
+    expect(mode.locator("option")).to_have_text(["Bracket", "Community Voting (INDEV)"])
     pool = page.get_by_label("Audio pool")
     expect(pool.locator("option")).to_have_text(
         ["Today", "Last week", "Date picker", "Previous Winners", "All"]
@@ -27,6 +35,9 @@ def test_create_tournament_play_report_and_reload(page, live_server, mp3):
     page.get_by_role("button", name="Create tournament").click()
     pair = page.locator("#tournament-pair")
     expect(pair.locator("audio")).to_have_count(2)
+    expect(page.get_by_role("button", name="Pick A", exact=True)).to_have_attribute(
+        "title", "Count a local win for Clip A."
+    )
     clip = pair.locator("audio").first
     clip.evaluate("audio => audio.load()")
     page.wait_for_function("document.querySelector('#tournament-pair audio').duration > 0")
