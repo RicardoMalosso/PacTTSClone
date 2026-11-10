@@ -22,6 +22,7 @@ FEATURE_SCOPES = {
     "rewards": "channel:manage:redemptions",
     "bits": "bits:read",
     "subscriptions": "channel:read:subscriptions",
+    "polls": "channel:manage:polls",
     "follows": "moderator:read:followers",
 }
 
