@@ -1,0 +1,30 @@
+name: Publish verified 2.3.0 application draft
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/publish-verified-230.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify uploaded assets and publish draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release="repos/$GITHUB_REPOSITORY/releases/440913792"
+          gh api "$release" > release.json
+          jq -e '
+            .tag_name == "v2.3.0" and .name == "PacTTSClone 2.3.0" and
+            .draft and (.prerelease | not) and
+            .target_commitish == "1448cbdfd10b82c066de722515b9e45bcd9252f1" and
+            (.assets | length == 2) and
+            any(.assets[]; .name == "pacttsclone-2.3.0-py3-none-any.whl" and
+              .size == 1837259 and
+              .digest == "sha256:631b31456ff655aba8cc17949ca3a292d59a792164a648affa3eb71c24993a62") and
+            any(.assets[]; .name == "SHA256SUMS.txt" and
+              .digest == "sha256:f5f64a9dd7cdde524642d94f5e7a789d081fe412bdbbfba9c94393e2e5ba4543")
+          ' release.json
+          gh api --method PATCH "$release" -F draft=false -f make_latest=true
