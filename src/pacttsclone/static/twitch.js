@@ -62,6 +62,9 @@ async function loadTwitchAuth() {
     if (channel !== dashboard.selectedChannel) return;
     twitchAuthChannel = channel; dashboard.twitchAuthPending = info.pending;
     $('twitch-auth-status').textContent = info.error || (info.pending ? t('Waiting for Twitch authorization…') : info.authorized ? t('Authorized broadcaster') + ': ' + info.login + ' · ' + info.scopes.join(', ') : t('Not authorized'));
+    if (info.authorized && !info.pending && !info.scopes.includes('user:write:chat')) {
+      $('twitch-auth-status').textContent += ' · ' + t('To enable !pactts, select its permission and reconnect.');
+    }
     $('twitch-device').hidden = !info.pending; $('twitch-user-code').textContent = info.user_code || '';
     $('twitch-activate').href = info.verification_uri || 'https://www.twitch.tv/activate';
     $('twitch-authorize').disabled = Boolean(info.pending);

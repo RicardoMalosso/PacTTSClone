@@ -23,6 +23,7 @@ def test_twitch_modes_authorization_and_rule_persistence(page, live_server, mp3,
     page.locator("#enable-twitch-events").click()
     expect(page.locator("#twitch-oauth-panel")).to_be_visible()
     expect(page.locator("#twitch-client-id")).to_have_count(0)
+    expect(page.get_by_label("Reply to !pactts with available voices and SFX")).to_be_checked()
     page.locator("#twitch-authorize").click()
     expect(page.locator("#twitch-user-code")).to_have_text("ABCD")
     expect(page.locator("#twitch-auth-status")).to_contain_text(

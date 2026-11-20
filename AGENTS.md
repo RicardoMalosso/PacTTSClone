@@ -9,7 +9,7 @@ Read docs/v2-design.md for the current scope: local TTS, saved voices, hardware
 settings, cancellable process worker, read-only Twitch IRC and OBS playback.
 Keep inference isolated. Public access is only through the explicitly requested
 opt-in authenticated tunnel with separate admin/player capabilities. No remote
-inference service, chat posting or telemetry.
+inference service or telemetry. Limit chat posting to authorized !pactts replies.
 Run `pytest` and `ruff check .`. Browser tests: `pytest tests/browser --browser chromium`.
 Real model smoke: see docs/testing.md. No model weights, recordings, outputs or
 machine-specific paths belong in git. Never silently substitute synthetic audio.
