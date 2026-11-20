@@ -464,6 +464,10 @@ or Portuguese. **Output volume (%)** adjusts new MP3s: 100 keeps the level,
 50 halves signal amplitude, 200 doubles it, and 0 mutes (range 0–300).
 Boosting too much can distort loud peaks. Local generation can override saved
 settings for one request; existing recordings keep their original volume.
+Use **Configuration → Test Volume** to produce a local calibration report for the
+selected saved voice. It measures the saved gain through the MP3 encoder without
+running TTS. The synthetic tone isolates the app's output path; it cannot measure
+OBS mixer settings or your audio device.
 
 ## Ming 3.0 dense engine (preview)
 

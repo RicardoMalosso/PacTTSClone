@@ -362,3 +362,13 @@ late joins. CSRF rotation on app restart is recoverable through `/api/session` a
 does not itself prove a shared link was revoked. A fresh invalid capability still
 stops retries. Visible save feedback and configured previews distinguish failed
 validation, hidden catalogue entries and unchanged original-audio previews.
+
+## Local volume diagnostic — 2026-11-20
+
+Configuration's Test Volume uses a short synthetic sine tone, explicitly labeled
+as a calibration signal, to isolate saved per-voice gain from model loudness and
+reference conditioning. Encode through the production MP3 path at baseline and
+configured gain, decode locally, and compare RMS. Keep files temporary and report
+OBS mixer/filter/device output as outside the diagnostic's scope. This makes the
+setting and encoder measurable on the host while avoiding model inference or
+network dependencies.

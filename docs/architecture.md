@@ -417,3 +417,14 @@ reconciles saved cards by ID/content to preserve unrelated edits and reads back
 saves from the server. OBS token rotation and startup network failure refresh/retry
 authorization; genuine invalid capabilities stop. Countdown preloading and
 queue-observing mirrors preserve clip onsets; late joins keep timestamp seeking.
+
+## Local volume diagnostic
+
+The host-only `/api/volume-test` resolves the active engine's saved voice volume,
+creates a short synthetic calibration signal in memory, and runs it twice through
+the same `AudioPipeline.encode` MP3 encoder used for generated output. It decodes
+the temporary files locally and reports signal RMS, peak, size, duration and
+expected/measured gain. No engine, reference recording or network is involved;
+temporary MP3/WAV files are deleted when the request ends. This verifies the saved
+setting-to-encoder path, but cannot observe OBS mixer/filter configuration or
+speaker/device output.

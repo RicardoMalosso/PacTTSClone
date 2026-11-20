@@ -19,6 +19,7 @@ Current scope supersedes v1 exclusions. Detailed rationale: v2-design.md.
 | R13 | Browser/system language detection, English and Brazilian Portuguese, persisted override with Canadian/Brazilian flag buttons at bottom. Preserve user content verbatim. |
 | R15 | Always-available /playbackMain OBS player and /playbackMain/control dashboard; explicitly queue completed Generate/History audio from any origin without changing its channel metadata. Independent delay/filter/pause policy, cancellation, panic, replay and scoped tunnel link. No Twitch connection required. |
 | R14 | Deterministic unit/API/process/browser tests and Linux/Windows CI. Real model, real external network and real GPU/physical hotkey validation reported separately. |
+| R21 | Host Configuration offers Test Volume for a saved voice. Locally encode a short, explicitly synthetic calibration tone at 100% and the saved per-voice gain, decode both MP3s, and report measured RMS/peak/duration/size, expected versus measured gain, checks and result. No TTS inference, reference audio, network request or persistent sample file. Clearly state that this cannot measure OBS mixers/filters or physical output. |
 
 Bind the server to 127.0.0.1. Public requests must enter through the opt-in tunnel
 with a forced non-loopback origin Host, active capability cookie and CSRF boundary.

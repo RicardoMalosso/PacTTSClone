@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from pacttsclone.app import create_app
 from pacttsclone.config import MAX_BODY_BYTES, Settings
+from pacttsclone.domain import GenerationSettings
 
 from .conftest import wait_job
 
@@ -58,6 +59,36 @@ def test_static_and_health_do_not_load_engine(client, engine):
     assert health["ffmpeg_available"]
     assert engine.calls == []
     assert client.get("/api/session").headers["cache-control"] == "no-store"
+
+
+def test_local_volume_diagnostic_measures_saved_gain_without_inference(client, app, mp3):
+    with mp3.open("rb") as reference:
+        voice = app.state.studio.voices.create(
+            reference, "Volume diagnostic", "reference.mp3", "Known transcript."
+        )
+    app.state.studio.voices.set_generation_settings(
+        voice["id"], GenerationSettings(volume=50)
+    )
+    temporary_before = set(app.state.service.temporary.iterdir())
+    token = client.get("/api/session").json()["token"]
+
+    response = client.post(
+        "/api/volume-test",
+        json={"voice_id": voice["id"]},
+        headers={"X-PacTTS-Token": token},
+    )
+
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["saved_volume_percent"] == 50
+    assert report["signal"]["type"] == "synthetic_sine_tone"
+    assert report["expected_gain_ratio"] == 0.5
+    assert report["measured_gain_ratio"] == pytest.approx(0.5, abs=0.03)
+    assert report["checks"]["gain_matches_saved_setting"] is True
+    assert report["result"] == "pass"
+    assert report["engine"] == app.state.service.settings.engine_id
+    assert set(app.state.service.temporary.iterdir()) == temporary_before
+    assert app.state.service.engine.calls == []
 
 
 @pytest.mark.parametrize(

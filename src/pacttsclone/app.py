@@ -24,6 +24,7 @@ from .studio import Studio
 from .tournaments import register_tournament_routes
 from .tunnel import TUNNEL_HOST, Tunnel
 from .updater import Updater, attach_manager
+from .volume_diagnostic import run_volume_diagnostic
 
 STATIC = Path(__file__).parent / "static"
 
@@ -708,6 +709,15 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
     @app.put("/api/voices/{voice_id}/generation-settings")
     def save_voice_generation_settings(voice_id: str, value: GenerationSettings):
         return studio.voices.set_generation_settings(voice_id, value)
+
+    @app.post("/api/volume-test")
+    def test_volume(value: dict, request: Request):
+        if request.state.remote_access:
+            raise HTTPException(403, "The volume diagnostic is available on the host only.")
+        voice_id = value.get("voice_id")
+        if not isinstance(voice_id, str) or not voice_id:
+            raise HTTPException(422, "Choose a saved voice to test.")
+        return run_volume_diagnostic(service, studio, voice_id)
 
     @app.delete("/api/voices/{voice_id}")
     def delete_voice(voice_id: str):

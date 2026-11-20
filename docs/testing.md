@@ -540,3 +540,12 @@ preview gain/duration, quiet-gap rejection and decoded MP3 onset preservation fo
 multiple voices/effects. Browser tests exercise stale CSRF recovery, server-offline
 startup retries and queued-versus-late mirror offsets. These controlled fixtures
 do not reproduce the owner's real TTS output or establish ASR boundary accuracy.
+
+## Local volume diagnostic
+
+The API regression sets a saved volume to 50%, exercises both real FFmpeg MP3
+encodes/decodes, checks measured RMS gain and confirms no model inference or
+persistent temporary files. The Chromium regression opens Configuration, runs the
+button, reads the local report and confirms JSON download availability. The
+calibration signal is intentionally synthetic and labeled as such; these tests do
+not inspect a live OBS mixer, audio device or physical speaker output.

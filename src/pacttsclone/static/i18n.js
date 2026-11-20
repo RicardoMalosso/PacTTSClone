@@ -1,6 +1,14 @@
 'use strict';
 (() => {
   const pt = {
+    "Test Volume": "Testar volume",
+    "Saved voice": "Voz salva",
+    "Download JSON report": "Baixar relatório JSON",
+    "Creates a short synthetic calibration tone, encodes it at the selected voice’s saved volume, and compares the measured MP3 level with a 100% baseline. It runs locally without TTS inference or network requests. It cannot inspect OBS mixer levels, filters, or speaker output.": "Cria um tom sintético curto, codifica-o com o volume salvo da voz selecionada e compara o nível medido do MP3 com uma referência de 100%. O teste roda localmente, sem inferência TTS ou solicitações de rede. Ele não consegue inspecionar níveis, filtros ou saída de áudio do OBS.",
+    "Running local volume test…": "Executando teste local de volume…",
+    "Volume test passed.": "O teste de volume passou.",
+    "Volume test failed.": "O teste de volume falhou.",
+    "Volume test failed: {message}": "O teste de volume falhou: {message}",
     "Saved sound effects": "Efeitos sonoros salvos",
     "Search sound effects": "Buscar efeitos sonoros",
     "Name or trigger": "Nome ou gatilho",
