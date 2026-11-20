@@ -190,8 +190,8 @@ existing polling and lease system. LAN hosting is planned separately. See
    faster but continues occupying RAM/VRAM between messages.
 4. In **Twitch & OBS**, save a channel login (without URL), map commands like
    `!lula` / `!dilma` to ready voices, choose filters/delay and enable connection.
-   `viewer: !lula oi bom dia` queues local generation. This is read-only IRC; it
-   does not post chat. Choose OAuth mode for authorized Twitch events; see below.
+   `viewer: !lula oi bom dia` queues local generation. IRC reads incoming commands. Enable broadcaster OAuth for the optional `!pactts` voice
+   and SFX directory reply. See [Twitch setup](docs/twitch-eventsub.md#viewer-command-directory).
 5. Add **http://127.0.0.1:7860/channelname** as an OBS Browser Source. The separate
    control page is **http://127.0.0.1:7860/channelname/control**. Only the OBS page
    automatically plays channel audio. Route its audio through OBS as desired.

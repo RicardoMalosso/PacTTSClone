@@ -135,3 +135,13 @@ Official references reviewed 2026-10-25:
 - <https://dev.twitch.tv/docs/eventsub/handling-websocket-events/>
 - <https://dev.twitch.tv/docs/eventsub/eventsub-subscription-types/>
 - <https://dev.twitch.tv/docs/api/reference/#update-redemption-status>
+
+## Viewer command directory
+
+In **Twitch & OBS**, edit the channel, enable Twitch events and save. Select
+**Reply to !pactts with available voices and SFX**, then **Connect Twitch account**.
+Existing installations need to authorize again to grant `user:write:chat`.
+Anyone can type `!pactts` alone in that channel. The broadcaster account replies
+with the channel's voice commands, enabled custom sound triggers and active
+engine's vocal tags. Long lists arrive in order with at least two seconds between
+messages. Requests received during a reply share the same list.

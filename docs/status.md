@@ -1035,3 +1035,9 @@ not installed here; the system Chromium also cannot start under this container's
 socket restrictions. The focused API regression passed, including measured 50%
 gain, no inference, and temporary-file cleanup. Real OBS playback and hardware
 output remain unverified.
+
+## Twitch voice and SFX directory
+
+Implemented the optional broadcaster-authorized `!pactts` reply. Three directory
+tests pass with simulated Twitch delivery, including pagination, retry timing,
+channel isolation and duplicate requests. Live broadcaster delivery requires consent.

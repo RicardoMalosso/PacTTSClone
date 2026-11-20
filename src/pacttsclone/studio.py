@@ -12,6 +12,7 @@ from .playback import GENERAL_PLAYER, Playback
 from .sfx import SoundEffects
 from .twitch import TwitchClient
 from .twitch_actions import TwitchActions
+from .twitch_directory import TwitchDirectory
 from .twitch_events import EventSubClient
 from .twitch_oauth import TwitchAccounts
 from .voices import Voices
@@ -39,6 +40,7 @@ class Studio:
         self.started = False
         self.client_modes = {}
         self.accounts = TwitchAccounts(service.settings.data_dir, self.authorization_changed)
+        self.directory = TwitchDirectory(self)
         self.events = TwitchActions(self)
         self.discord = DiscordIntegration(service, self.voices)
 
@@ -197,6 +199,10 @@ class Studio:
         with self.chat_lock:
             config = self.store.get("channel", channel)
             if not config or not config["enabled"]:
+                return None
+            if message.strip().casefold() == "!pactts":
+                if config.get("transport") == "oauth":
+                    self.directory.request(channel)
                 return None
             parts = message.strip().split(maxsplit=1)
             if not parts or parts[0].casefold() not in config["commands"]:
@@ -381,6 +387,7 @@ class Studio:
     def close(self):
         self.started = False
         self.discord.stop()
+        self.directory.close()
         self.accounts.close()
         for client in [*self.clients.values(), *self.event_clients.values()]:
             client.close()

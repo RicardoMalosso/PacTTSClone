@@ -18,6 +18,7 @@ from .domain import UserError
 PUBLIC_CLIENT_ID = "93mkh0su05k4ouzlkdk9jtu55f9ak2"
 
 FEATURE_SCOPES = {
+    "directory": "user:write:chat",
     "chat": "user:read:chat",
     "rewards": "channel:manage:redemptions",
     "bits": "bits:read",
@@ -28,7 +29,8 @@ FEATURE_SCOPES = {
 
 
 class TwitchAPIError(UserError):
-    def __init__(self, status, code=""):
+    def __init__(self, status, code="", retry_after=30):
+        self.retry_after = retry_after
         self.status, self.code = status, code
         super().__init__(f"Twitch request failed ({status}). Reconnect or check permissions.")
 
@@ -48,6 +50,12 @@ def http_json(method, url, *, headers=None, form=None, body=None):
             return json.loads(response.read(2 * 1024 * 1024)) if response.status != 204 else {}
     except urllib.error.HTTPError as exc:
         # Never propagate URLs, request headers, tokens or arbitrary remote text.
+        if exc.code == 429:
+            delay = 30
+            with contextlib.suppress(ValueError, OverflowError):
+                delay = max(0, int(exc.headers.get("Retry-After", 0)),
+                            int(exc.headers.get("Ratelimit-Reset", 0)) - int(time.time()) + 1)
+            raise TwitchAPIError(429, retry_after=max(2, delay or 30)) from None
         with contextlib.suppress(ValueError, OSError):
             payload = json.loads(exc.read(4096))
             code = payload.get("error", "") or payload.get("message", "")
