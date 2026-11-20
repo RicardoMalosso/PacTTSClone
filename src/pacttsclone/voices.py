@@ -209,15 +209,7 @@ class Voices:
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
         # Twitch callers pass text alone; only explicitly supplied fields override
         # the voice's stored generation defaults. Snapshot before queueing.
-        engine_id = self.service.settings.engine_id
-        saved = (
-            (voice.get("generation_settings") or {})
-            if engine_id == "omnivoice"
-            else (
-                (voice.get("engine_generation_settings") or {}).get(engine_id)
-                or {"language": "en" if engine_id == "ming-3" else "auto"}
-            )
-        )
+        saved = self._saved_generation_settings(voice)
         explicit = {
             key: getattr(request, key)
             for key in GenerationSettings.model_fields
@@ -227,10 +219,27 @@ class Voices:
         request = GenerationRequest.model_validate(
             {**request.model_dump(), "ref_text": voice["transcript"], **effective}
         )
-        preset = engine_id == "kittentts2" and request.kitten.mode == "preset"
+        preset = self.service.settings.engine_id == "kittentts2" and request.kitten.mode == "preset"
         if voice["status"] != "ready" and not preset:
             raise UserError("This voice is not ready. Finish or retry its transcription first.")
         return voice, request
+
+    def _saved_generation_settings(self, voice):
+        engine_id = self.service.settings.engine_id
+        if engine_id == "omnivoice":
+            return voice.get("generation_settings") or {}
+        return (
+            (voice.get("engine_generation_settings") or {}).get(engine_id)
+            or {"language": "en" if engine_id == "ming-3" else "auto"}
+        )
+
+    def volume_setting(self, voice_id):
+        """Read the saved output gain for the active engine without preparing the voice."""
+        voice = self.store.get("voice", voice_id)
+        if not voice:
+            raise UserError("Voice not found.")
+        settings = GenerationSettings.model_validate(self._saved_generation_settings(voice))
+        return voice, settings.volume
 
     def generate(self, voice_id, request, channel=None, username=None, identity=None):
         voice, request = self.resolve_request(voice_id, request)

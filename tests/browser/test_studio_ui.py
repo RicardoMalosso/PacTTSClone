@@ -56,6 +56,29 @@ def test_voice_screen_transcription_edit_config_persistence(page, live_server, m
     expect(page.locator("#config-hotkey")).to_have_value("Ctrl+Alt+F8")
 
 
+def test_config_volume_button_shows_local_measurement_report(page, live_server, mp3):
+    url, app = live_server
+    page.goto(url)
+    add_ready_voice(page, mp3, title="Diagnostic voice")
+    voice = app.state.service.store.all("voice")[0]
+    from pacttsclone.domain import GenerationSettings
+
+    app.state.studio.voices.set_generation_settings(
+        voice["id"], GenerationSettings(volume=50)
+    )
+
+    open_tab(page, "Configuration")
+    expect(page.locator("#volume-test-voice")).to_have_value(voice["id"])
+    page.get_by_role("button", name="Test Volume", exact=True).click()
+
+    expect(page.locator("#volume-test-status")).to_have_text("Volume test passed.")
+    report = page.locator("#volume-test-report").inner_text()
+    assert '"saved_volume_percent": 50' in report
+    assert '"measured_gain_ratio": 0.5' in report
+    assert page.get_by_role("button", name="Download JSON report").is_visible()
+    assert app.state.service.engine.calls == []
+
+
 def test_progress_timer_and_cancel_interface(page, live_server, mp3):
     url, app = live_server
     engine = app.state.service.engine

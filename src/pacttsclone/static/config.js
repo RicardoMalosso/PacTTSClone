@@ -2,7 +2,21 @@
 import {api, refresh} from './api.js';
 import {$, action, button, el, t} from './dom.js';
 import {renderSetup} from './setup.js';
-import {dashboard} from './state.js';
+import {dashboard, subscribeState} from './state.js';
+
+function renderVolumeTestVoices() {
+  const select = $('volume-test-voice');
+  const card = $('volume-test-card');
+  if (!select || !card) return;
+  const previous = select.value;
+  select.replaceChildren();
+  for (const voice of dashboard.state.voices || []) {
+    select.append(el('option', {value: voice.id}, voice.title));
+  }
+  if ([...select.options].some(option => option.value === previous)) select.value = previous;
+  card.hidden = Boolean(dashboard.session?.remote_access);
+  $('volume-test-run').disabled = !select.options.length;
+}
 
 async function tunnelStatus(data = null) {
   if (dashboard.session?.remote_access || !dashboard.runtimeSetup.ready) { $('tunnel-card').hidden = true; return; }
@@ -25,6 +39,43 @@ async function tunnelStatus(data = null) {
 }
 
 export function initConfig() {
+  subscribeState(renderVolumeTestVoices);
+  renderVolumeTestVoices();
+  let latestVolumeReport = null;
+  $('volume-test-run').addEventListener('click', action(async () => {
+    const run = $('volume-test-run');
+    const status = $('volume-test-status');
+    const report = $('volume-test-report');
+    const download = $('volume-test-download');
+    run.disabled = true;
+    status.textContent = t('Running local volume test…');
+    report.hidden = true;
+    download.hidden = true;
+    try {
+      latestVolumeReport = await api('/api/volume-test', {
+        method: 'POST', body: {voice_id: $('volume-test-voice').value},
+      });
+      report.textContent = JSON.stringify(latestVolumeReport, null, 2);
+      report.hidden = false;
+      download.hidden = false;
+      status.textContent = t(
+        latestVolumeReport.result === 'pass' ? 'Volume test passed.' : 'Volume test failed.',
+      );
+    } catch (error) {
+      status.textContent = t('Volume test failed: {message}', {message: error.message});
+    } finally {
+      renderVolumeTestVoices();
+    }
+  }));
+  $('volume-test-download').addEventListener('click', () => {
+    if (!latestVolumeReport) return;
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(latestVolumeReport, null, 2)], {type: 'application/json'}),
+    );
+    const anchor = el('a', {href: url, download: 'pactts-volume-test.json'});
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   $('restart-cuda').addEventListener('click', action(async () => {
     if (!confirm('Restart the GPU inference worker? This unloads the model; the next generation will reload CUDA. Active work must finish or be cancelled first.')) return;
     const control = $('restart-cuda');

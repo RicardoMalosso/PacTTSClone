@@ -1017,3 +1017,21 @@ changes. Fresh setup stages an app update before launch, keeping the bundled whe
 if the release check fails. The next installer release must include this bootstrap
 change. Local updater tests, Ruff, workflow YAML parsing and wheel build passed.
 Native Windows setup and GitHub release publication require Actions validation.
+
+## Configuration Test Volume — 2026-11-20
+
+Added a host-only Configuration diagnostic for the selected voice's active-engine
+saved volume. It creates a clearly labeled 0.5-second synthetic sine calibration
+tone locally, encodes it at 100% and the selected saved gain using the production
+MP3 encoder, decodes and measures both files, and reports RMS/peak/duration/size,
+expected and measured gain, clipping and result. The JSON report is visible and
+exportable. No speech model, reference recording, network request or persistent
+sample file is used. This verifies the application gain-to-MP3 path; it cannot
+measure OBS mixer/filter settings or physical output.
+
+Validation: 380 backend tests passed; Ruff passed. The full Chromium suite and the
+focused new UI regression could not start because the Playwright Chromium binary is
+not installed here; the system Chromium also cannot start under this container's
+socket restrictions. The focused API regression passed, including measured 50%
+gain, no inference, and temporary-file cleanup. Real OBS playback and hardware
+output remain unverified.
